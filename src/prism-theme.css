@@ -1,0 +1,142 @@
+/* PrismJS Nord Theme - Adapted for Milkdown */
+
+/* Code Block Container */
+.prose pre {
+    padding: 1rem !important;
+    border-radius: 0.5rem !important;
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace !important;
+    font-size: 0.9em !important;
+    line-height: 1.5 !important;
+    tab-size: 4 !important;
+    hyphens: none !important;
+    white-space: pre !important;
+    word-spacing: normal !important;
+    word-break: normal !important;
+    word-wrap: normal !important;
+    direction: ltr !important;
+    text-align: left !important;
+    margin: 1em 0 !important;
+    overflow: auto !important;
+    background: #f8f9fa !important;
+    /* Light mode bg */
+    color: #3b4252 !important;
+    /* Light mode text */
+    border: 1px solid #e5e7eb !important;
+}
+
+.dark .prose pre {
+    background: #2e3440 !important;
+    /* Nord Dark bg */
+    color: #eceff4 !important;
+    /* Nord Dark text */
+    border: 1px solid #434c5e !important;
+}
+
+/* Inline Code */
+.prose :not(pre)>code[class*="language-"],
+.prose pre[class*="language-"] {
+    background: transparent !important;
+}
+
+/* Tokens */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+    color: #6c7a96 !important;
+    /* Nord Comment */
+    font-style: italic !important;
+}
+
+.token.punctuation {
+    color: #81a1c1 !important;
+    /* Nord Punctuation */
+}
+
+.dark .token.punctuation {
+    color: #eceff4 !important;
+}
+
+.token.namespace {
+    opacity: .7 !important;
+}
+
+.token.property,
+.token.tag,
+.token.constant,
+.token.symbol,
+.token.deleted {
+    color: #bf616a !important;
+    /* Nord Red */
+}
+
+.token.number {
+    color: #b48ead !important;
+    /* Nord Purple */
+}
+
+.token.boolean {
+    color: #81a1c1 !important;
+    /* Nord Blue */
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+    color: #a3be8c !important;
+    /* Nord Green */
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string,
+.token.variable {
+    color: #81a1c1 !important;
+    /* Nord Blue */
+}
+
+.token.atrule,
+.token.attr-value,
+.token.function,
+.token.class-name {
+    color: #88c0d0 !important;
+    /* Nord Cyan */
+}
+
+.token.keyword {
+    color: #81a1c1 !important;
+    /* Nord Blue */
+}
+
+.token.regex,
+.token.important {
+    color: #ebcb8b !important;
+    /* Nord Yellow */
+}
+
+.token.important,
+.token.bold {
+    font-weight: bold !important;
+}
+
+.token.italic {
+    font-style: italic !important;
+}
+
+.token.entity {
+    cursor: help !important;
+}
+
+/* Line Numbers (if enabled later) */
+.line-numbers .line-numbers-rows {
+    border-right-color: #434c5e !important;
+}
+
+.line-numbers-rows>span:before {
+    color: #4c566a !important;
+}

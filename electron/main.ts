@@ -1,15 +1,10 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
-import path from 'path';
-import fs from 'fs-extra';
-import { watch, FSWatcher } from 'chokidar';
+import * as path from 'path';
+import * as fs from 'fs-extra';
+import { watch } from 'chokidar';
 
 let mainWindow: BrowserWindow | null = null;
-let watcher: FSWatcher | null = null;
-
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
-  app.quit();
-}
+let watcher: any = null;
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
@@ -29,7 +24,7 @@ const createWindow = () => {
   }
 };
 
-app.on('ready', createWindow);
+app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -43,121 +38,221 @@ app.on('activate', () => {
   }
 });
 
-// --- IPC Handlers for File System ---
+// Helper for recursive file listing
+async function getFilesRecursively(dir: string): Promise<string[]> {
+  const dirents = await fs.readdir(dir, { withFileTypes: true });
+  const files = await Promise.all(
+    dirents.map((dirent) => {
+      const res = path.resolve(dir, dirent.name);
+      return dirent.isDirectory() ? getFilesRecursively(res) : Promise.resolve([res]);
+    })
+  );
+  return Array.prototype.concat(...files);
+}
 
+// Helper for recursive directory listing
+async function getDirectoriesRecursively(dir: string, baseDir: string): Promise<string[]> {
+  const dirents = await fs.readdir(dir, { withFileTypes: true });
+  const dirs = await Promise.all(
+    dirents.map(async (dirent) => {
+      if (dirent.isDirectory() && !dirent.name.startsWith('.')) {
+        const fullPath = path.resolve(dir, dirent.name);
+        const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+        const subDirs = await getDirectoriesRecursively(fullPath, baseDir);
+        return [relativePath, ...subDirs];
+      }
+      return [];
+    })
+  );
+  return Array.prototype.concat(...dirs);
+}
+
+// IPC Handlers
 ipcMain.handle('select-folder', async () => {
-  console.log('IPC: select-folder called');
-  try {
-    const result = await dialog.showOpenDialog(mainWindow!, {
-      properties: ['openDirectory'],
-    });
-    console.log('Dialog result:', result);
-    if (result.canceled) return null;
-    return result.filePaths[0];
-  } catch (err) {
-    console.error('Dialog error:', err);
-    throw err;
-  }
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openDirectory'],
+  });
+  return result.canceled ? null : result.filePaths[0];
 });
 
-ipcMain.handle('list-notes', async (_, folderPath: string) => {
+ipcMain.handle('list-notes', async (_event, folderPath: string) => {
   try {
-    const files = await fs.readdir(folderPath);
-    const notes = await Promise.all(
+    const files = await getFilesRecursively(folderPath);
+    return Promise.all(
       files
-        .filter((file: string) => file.endsWith('.md'))
-        .map(async (file: string) => {
-          const content = await fs.readFile(path.join(folderPath, file), 'utf-8');
-          const stats = await fs.stat(path.join(folderPath, file));
+        .filter((file) => file.endsWith('.md'))
+        .map(async (file) => {
+          const content = await fs.readFile(file, 'utf-8');
+          const stats = await fs.stat(file);
+          const relativePath = path.relative(folderPath, file);
+          const dirname = path.dirname(relativePath).replace(/\\/g, '/');
           return {
-            filename: file,
+            filename: path.basename(file),
+            folder: dirname === '.' ? '' : dirname,
             content,
             updatedAt: stats.mtime.toISOString(),
           };
         })
     );
-    return notes;
   } catch (error) {
     console.error('Error listing notes:', error);
     return [];
   }
 });
 
-ipcMain.handle('save-note', async (_, { folderPath, filename, content }) => {
+ipcMain.handle('list-folders', async (_event, folderPath: string) => {
   try {
-    await fs.writeFile(path.join(folderPath, filename), content, 'utf-8');
-    return true;
+    const files = await fs.readdir(folderPath, { withFileTypes: true });
+    return files
+      .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+      .map((d) => d.name);
   } catch (error) {
-    console.error('Error saving note:', error);
-    return false;
+    console.error('Error listing folders:', error);
+    return [];
   }
 });
 
-ipcMain.handle('delete-note', async (_, { folderPath, filename }) => {
-  try {
-    await fs.remove(path.join(folderPath, filename));
-    return true;
-  } catch (error) {
-    console.error('Error deleting note:', error);
-    return false;
-  }
+ipcMain.handle('save-note', async (_event, { folderPath, filename, content }) => {
+  // folderPath here might be the absolute path to the folder, or root + relative
+  // Let's assume the caller provides the full absolute path to the directory where the file lives
+  await fs.ensureDir(folderPath);
+  await fs.writeFile(path.join(folderPath, filename), content, 'utf-8');
+  return true;
 });
 
-ipcMain.handle('create-folder', async (_, folderPath: string) => {
-  try {
-    await fs.ensureDir(folderPath);
-    return true;
-  } catch (error) {
-    console.error('Error creating folder:', error);
-    return false;
-  }
+ipcMain.handle('delete-note', async (_event, { folderPath, filename }) => {
+  await fs.remove(path.join(folderPath, filename));
+  return true;
 });
 
-ipcMain.handle('export-pdf', async (_, html: string) => {
-  const pdfWindow = new BrowserWindow({ show: false });
+ipcMain.handle('rename-note', async (_event, { folderPath, oldFilename, newFilename }) => {
   try {
-    await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-    const pdfData = await pdfWindow.webContents.printToPDF({});
+    const oldPath = path.join(folderPath, oldFilename);
+    const newPath = path.join(folderPath, newFilename);
 
-    const { filePath } = await dialog.showSaveDialog(mainWindow!, {
-      filters: [{ name: 'PDF', extensions: ['pdf'] }]
-    });
-
-    if (filePath) {
-      await fs.writeFile(filePath, pdfData);
-      return true;
+    // Special handling for case-only changes on Windows
+    if (oldPath.toLowerCase() === newPath.toLowerCase() && oldPath !== newPath) {
+      const tempPath = `${oldPath}.tmp`;
+      await fs.rename(oldPath, tempPath);
+      await fs.rename(tempPath, newPath);
+    } else {
+      await fs.rename(oldPath, newPath);
     }
-    return false;
-  } catch (error) {
-    console.error('Error exporting PDF:', error);
-    return false;
-  } finally {
-    pdfWindow.close();
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error renaming note:', error);
+    return { success: false, error: error.message };
   }
 });
 
+ipcMain.handle('rename-folder', async (_event, { rootPath, oldName, newName }) => {
+  try {
+    const oldPath = path.join(rootPath, oldName);
+    const newPath = path.join(rootPath, newName);
 
-// Watcher Logic
-ipcMain.on('start-watch', (_, folderPath: string) => {
-  if (watcher) {
-    watcher.close();
+    if (oldPath.toLowerCase() === newPath.toLowerCase() && oldPath !== newPath) {
+      const tempPath = `${oldPath}.tmp_dir`;
+      await fs.rename(oldPath, tempPath);
+      await fs.rename(tempPath, newPath);
+    } else {
+      await fs.rename(oldPath, newPath);
+    }
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error renaming folder:', error);
+    return { success: false, error: error.message };
   }
+});
 
-  watcher = watch(folderPath, {
-    ignored: /(^|[\/\\])\../, // ignore dotfiles
-    persistent: true,
-    ignoreInitial: true,
-    depth: 0 // simple for now, maybe increase if subfolders needed
+ipcMain.handle('read-metadata', async (_event, rootPath: string) => {
+  const metaPath = path.join(rootPath, '.notizapp-metadata.json');
+  try {
+    if (await fs.pathExists(metaPath)) {
+      const content = await fs.readJson(metaPath);
+      return content;
+    }
+  } catch (error) {
+    console.error('Error reading metadata:', error);
+  }
+  return { folders: {} };
+});
+
+ipcMain.handle('save-metadata', async (_event, { rootPath, metadata }) => {
+  const metaPath = path.join(rootPath, '.notizapp-metadata.json');
+  try {
+    await fs.writeJson(metaPath, metadata, { spaces: 2 });
+    return true;
+  } catch (error) {
+    console.error('Error saving metadata:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('create-folder', async (_event, folderPath: string) => {
+  await fs.ensureDir(folderPath);
+  return true;
+});
+
+ipcMain.handle('export-pdf', async (_event, html: string) => {
+  const pdfWindow = new BrowserWindow({ show: false });
+  await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+  const pdfData = await pdfWindow.webContents.printToPDF({});
+  const { filePath } = await dialog.showSaveDialog(mainWindow!, {
+    filters: [{ name: 'PDF', extensions: ['pdf'] }],
   });
+  if (filePath) {
+    await fs.writeFile(filePath, pdfData);
+    pdfWindow.close();
+    return true;
+  }
+  pdfWindow.close();
+  return false;
+});
 
-  watcher
-    .on('add', (path: string) => {
-      mainWindow?.webContents.send('file-changed', { type: 'add', path });
-    })
-    .on('change', (path: string) => {
-      mainWindow?.webContents.send('file-changed', { type: 'change', path });
-    })
-    .on('unlink', (path: string) => {
-      mainWindow?.webContents.send('file-changed', { type: 'unlink', path });
-    });
+ipcMain.handle('delete-folder-recursive', async (_event, folderPath: string) => {
+  try {
+    await fs.remove(folderPath);
+    return true;
+  } catch (error) {
+    console.error('Error deleting folder recursively:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('delete-folder-move-contents', async (_event, { folderPath, rootPath }) => {
+  try {
+    const files = await getFilesRecursively(folderPath);
+    for (const file of files) {
+      if (file.endsWith('.md')) {
+        const basename = path.basename(file);
+        let targetPath = path.join(rootPath, basename);
+
+        // Handle collisions in root
+        let counter = 1;
+        while (await fs.pathExists(targetPath)) {
+          const ext = path.extname(basename);
+          const name = path.basename(basename, ext);
+          targetPath = path.join(rootPath, `${name}_${counter}${ext}`);
+          counter++;
+        }
+
+        await fs.move(file, targetPath);
+      }
+    }
+    // After moving files, delete the empty folder tree
+    await fs.remove(folderPath);
+    return true;
+  } catch (error) {
+    console.error('Error moving contents and deleting folder:', error);
+    return false;
+  }
+});
+
+ipcMain.on('start-watch', (_event, folderPath: string) => {
+  if (watcher) watcher.close();
+  // Recursive watch is default for chokidar
+  watcher = watch(folderPath, { ignored: /(^|[\/\\])\../, persistent: true, ignoreInitial: true });
+  watcher.on('all', (event: string, filePath: string) => {
+    mainWindow?.webContents.send('file-changed', { type: event, path: filePath });
+  });
 });

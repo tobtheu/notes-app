@@ -1,70 +1,181 @@
+import { useState, useEffect } from 'react';
 import { useNotes } from './hooks/useNotes';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
+import { SettingsModal } from './components/SettingsModal';
+import { DeleteFolderModal } from './components/DeleteFolderModal';
+import { useTheme } from './hooks/useTheme';
+import { useSettings } from './hooks/useSettings';
+import { FolderEditModal } from './components/FolderEditModal';
+import type { FolderMetadata } from './types';
+import { Folder } from 'lucide-react';
 
 function App() {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [categoryToEdit, setCategoryToEdit] = useState<string | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string>(Date.now().toString());
+  const { theme, setTheme } = useTheme();
+  const { markdownEnabled, setMarkdownEnabled, accentColor, setAccentColor } = useSettings();
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-accent', accentColor);
+  }, [accentColor]);
+
   const {
     currentFolder,
     notes,
+    folders,
+    metadata,
     selectedNote,
     setSelectedNote,
+    selectedCategory,
+    setSelectedCategory,
     searchTerm,
     setSearchTerm,
     selectFolder,
     saveNote,
+    updateNoteLocally,
     createNote,
-    deleteNote
+    deleteNote,
+    createFolder,
+    renameFolder,
+    updateFolderMetadata,
+    deleteFolder,
+    togglePinNote,
+    isNotePinned,
+    getNoteId,
   } = useNotes();
+
+
 
   if (!currentFolder) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100">
-        <h1 className="text-3xl font-bold mb-4">Welcome to NotizApp</h1>
-        <p className="mb-8 text-gray-500">Please select a folder to store your notes.</p>
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 p-6 text-center">
+        <div className="w-20 h-20 bg-primary-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-primary-500/20">
+          <span className="text-4xl text-white">📝</span>
+        </div>
+        <h1 className="text-3xl font-bold mb-2">Welcome to NotizApp</h1>
+        <p className="mb-8 text-gray-500 dark:text-gray-400 max-w-sm">
+          Manage your thoughts in markdown. Select a folder to get started.
+        </p>
         <button
           onClick={selectFolder}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          className="px-8 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-all font-semibold shadow-md active:scale-95"
         >
-          Select Folder
+          Select Workspace Folder
         </button>
       </div>
     );
   }
 
+  const handleDeleteCategory = (mode: 'recursive' | 'move') => {
+    if (categoryToDelete) {
+      deleteFolder(categoryToDelete, mode);
+      setCategoryToDelete(null);
+    }
+  };
+
+  const handleEditCategory = async (newName: string, meta: FolderMetadata) => {
+    if (!categoryToEdit) return;
+
+    // Rename if name changed
+    if (newName !== categoryToEdit) {
+      const result = await renameFolder(categoryToEdit, newName);
+      if (!result?.success) return; // Error handled in renameFolder
+    }
+
+    // Update metadata (icon/color)
+    await updateFolderMetadata(newName, meta);
+    setCategoryToEdit(null);
+  };
+
+
+
   return (
-    <div className="flex h-screen w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden">
-      {/* Sidebar (Folders/Tags) - Placeholder for now, simplistic view */}
+    <div
+      className="flex h-screen w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden font-sans"
+    >
       <Sidebar
-        className="w-16 md:w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-800"
+        folders={folders}
+        metadata={metadata}
+        selectedCategory={selectedCategory}
+        isCollapsed={isSidebarCollapsed}
         onCreateNote={createNote}
+        onCreateFolder={createFolder}
+        onDeleteCategory={setCategoryToDelete}
+        onEditCategory={setCategoryToEdit}
+        onSelectCategory={setSelectedCategory}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
-      {/* Note List */}
       <NoteList
-        className="w-64 md:w-80 flex-shrink-0 border-r border-gray-200 dark:border-gray-800"
+        className="w-80 flex-shrink-0 border-r border-gray-100 dark:border-gray-800"
         notes={notes}
         selectedNote={selectedNote}
-        onSelectNote={(note) => setSelectedNote(note.filename)}
+        onSelectNote={(note) => {
+          setSelectedNote(getNoteId(note));
+          setEditingSessionId(Date.now().toString());
+        }}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         onDeleteNote={deleteNote}
+        onTogglePin={togglePinNote}
+        isNotePinned={isNotePinned}
+        getNoteId={getNoteId}
       />
 
-      {/* Editor */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {selectedNote ? (
           <Editor
-            key={selectedNote.filename} // Remount on switch to avoid stale state if needed, or handle in useEffect
+            key={editingSessionId}
             note={selectedNote}
             onSave={saveNote}
+            onUpdateLocally={updateNoteLocally}
+            markdownEnabled={markdownEnabled}
           />
         ) : (
-          <div className="flex items-center justify-center h-full text-gray-400">
-            Select a note to view or edit
+          <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-400 p-8 text-center animate-in fade-in duration-500">
+            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+              <Folder size={32} />
+            </div>
+            <h2 className="text-xl font-medium text-gray-600 dark:text-gray-300 mb-1">No Note Selected</h2>
+            <p className="text-sm">Select a note from the list or create a new one to start writing.</p>
           </div>
         )}
       </div>
+
+      <FolderEditModal
+        isOpen={!!categoryToEdit}
+        onClose={() => setCategoryToEdit(null)}
+        folderName={categoryToEdit || ""}
+        metadata={categoryToEdit ? (metadata.folders[categoryToEdit] || {}) : {}}
+        onSave={handleEditCategory}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        currentPath={currentFolder}
+        onChangePath={selectFolder}
+        theme={theme}
+        setTheme={setTheme}
+        markdownEnabled={markdownEnabled}
+        onToggleMarkdown={setMarkdownEnabled}
+        accentColor={accentColor}
+        setAccentColor={setAccentColor}
+      />
+
+      {categoryToDelete && (
+        <DeleteFolderModal
+          folderName={categoryToDelete}
+          onClose={() => setCategoryToDelete(null)}
+          onConfirm={handleDeleteCategory}
+        />
+      )}
     </div>
   );
 }

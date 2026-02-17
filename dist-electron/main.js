@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -8,26 +41,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
-const path_1 = __importDefault(require("path"));
-const fs_extra_1 = __importDefault(require("fs-extra"));
+const path = __importStar(require("path"));
+const fs = __importStar(require("fs-extra"));
 const chokidar_1 = require("chokidar");
 let mainWindow = null;
 let watcher = null;
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
-    electron_1.app.quit();
-}
 const createWindow = () => {
     mainWindow = new electron_1.BrowserWindow({
         width: 1200,
         height: 800,
         webPreferences: {
-            preload: path_1.default.join(__dirname, 'preload.js'),
+            preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
         },
@@ -36,10 +62,10 @@ const createWindow = () => {
         mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     }
     else {
-        mainWindow.loadFile(path_1.default.join(__dirname, '../dist/index.html'));
+        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
 };
-electron_1.app.on('ready', createWindow);
+electron_1.app.whenReady().then(createWindow);
 electron_1.app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         electron_1.app.quit();
@@ -50,115 +76,211 @@ electron_1.app.on('activate', () => {
         createWindow();
     }
 });
-// --- IPC Handlers for File System ---
+// Helper for recursive file listing
+function getFilesRecursively(dir) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const dirents = yield fs.readdir(dir, { withFileTypes: true });
+        const files = yield Promise.all(dirents.map((dirent) => {
+            const res = path.resolve(dir, dirent.name);
+            return dirent.isDirectory() ? getFilesRecursively(res) : Promise.resolve([res]);
+        }));
+        return Array.prototype.concat(...files);
+    });
+}
+// Helper for recursive directory listing
+function getDirectoriesRecursively(dir, baseDir) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const dirents = yield fs.readdir(dir, { withFileTypes: true });
+        const dirs = yield Promise.all(dirents.map((dirent) => __awaiter(this, void 0, void 0, function* () {
+            if (dirent.isDirectory() && !dirent.name.startsWith('.')) {
+                const fullPath = path.resolve(dir, dirent.name);
+                const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+                const subDirs = yield getDirectoriesRecursively(fullPath, baseDir);
+                return [relativePath, ...subDirs];
+            }
+            return [];
+        })));
+        return Array.prototype.concat(...dirs);
+    });
+}
+// IPC Handlers
 electron_1.ipcMain.handle('select-folder', () => __awaiter(void 0, void 0, void 0, function* () {
-    console.log('IPC: select-folder called');
-    try {
-        const result = yield electron_1.dialog.showOpenDialog(mainWindow, {
-            properties: ['openDirectory'],
-        });
-        console.log('Dialog result:', result);
-        if (result.canceled)
-            return null;
-        return result.filePaths[0];
-    }
-    catch (err) {
-        console.error('Dialog error:', err);
-        throw err;
-    }
+    const result = yield electron_1.dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory'],
+    });
+    return result.canceled ? null : result.filePaths[0];
 }));
-electron_1.ipcMain.handle('list-notes', (_, folderPath) => __awaiter(void 0, void 0, void 0, function* () {
+electron_1.ipcMain.handle('list-notes', (_event, folderPath) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const files = yield fs_extra_1.default.readdir(folderPath);
-        const notes = yield Promise.all(files
+        const files = yield getFilesRecursively(folderPath);
+        return Promise.all(files
             .filter((file) => file.endsWith('.md'))
             .map((file) => __awaiter(void 0, void 0, void 0, function* () {
-            const content = yield fs_extra_1.default.readFile(path_1.default.join(folderPath, file), 'utf-8');
-            const stats = yield fs_extra_1.default.stat(path_1.default.join(folderPath, file));
+            const content = yield fs.readFile(file, 'utf-8');
+            const stats = yield fs.stat(file);
+            const relativePath = path.relative(folderPath, file);
+            const dirname = path.dirname(relativePath).replace(/\\/g, '/');
             return {
-                filename: file,
+                filename: path.basename(file),
+                folder: dirname === '.' ? '' : dirname,
                 content,
                 updatedAt: stats.mtime.toISOString(),
             };
         })));
-        return notes;
     }
     catch (error) {
         console.error('Error listing notes:', error);
         return [];
     }
 }));
-electron_1.ipcMain.handle('save-note', (_1, _a) => __awaiter(void 0, [_1, _a], void 0, function* (_, { folderPath, filename, content }) {
+electron_1.ipcMain.handle('list-folders', (_event, folderPath) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        yield fs_extra_1.default.writeFile(path_1.default.join(folderPath, filename), content, 'utf-8');
-        return true;
+        const files = yield fs.readdir(folderPath, { withFileTypes: true });
+        return files
+            .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+            .map((d) => d.name);
     }
     catch (error) {
-        console.error('Error saving note:', error);
-        return false;
+        console.error('Error listing folders:', error);
+        return [];
     }
 }));
-electron_1.ipcMain.handle('delete-note', (_1, _a) => __awaiter(void 0, [_1, _a], void 0, function* (_, { folderPath, filename }) {
-    try {
-        yield fs_extra_1.default.remove(path_1.default.join(folderPath, filename));
-        return true;
-    }
-    catch (error) {
-        console.error('Error deleting note:', error);
-        return false;
-    }
+electron_1.ipcMain.handle('save-note', (_event_1, _a) => __awaiter(void 0, [_event_1, _a], void 0, function* (_event, { folderPath, filename, content }) {
+    // folderPath here might be the absolute path to the folder, or root + relative
+    // Let's assume the caller provides the full absolute path to the directory where the file lives
+    yield fs.ensureDir(folderPath);
+    yield fs.writeFile(path.join(folderPath, filename), content, 'utf-8');
+    return true;
 }));
-electron_1.ipcMain.handle('create-folder', (_, folderPath) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        yield fs_extra_1.default.ensureDir(folderPath);
-        return true;
-    }
-    catch (error) {
-        console.error('Error creating folder:', error);
-        return false;
-    }
+electron_1.ipcMain.handle('delete-note', (_event_1, _a) => __awaiter(void 0, [_event_1, _a], void 0, function* (_event, { folderPath, filename }) {
+    yield fs.remove(path.join(folderPath, filename));
+    return true;
 }));
-electron_1.ipcMain.handle('export-pdf', (_, html) => __awaiter(void 0, void 0, void 0, function* () {
-    const pdfWindow = new electron_1.BrowserWindow({ show: false });
+electron_1.ipcMain.handle('rename-note', (_event_1, _a) => __awaiter(void 0, [_event_1, _a], void 0, function* (_event, { folderPath, oldFilename, newFilename }) {
     try {
-        yield pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-        const pdfData = yield pdfWindow.webContents.printToPDF({});
-        const { filePath } = yield electron_1.dialog.showSaveDialog(mainWindow, {
-            filters: [{ name: 'PDF', extensions: ['pdf'] }]
-        });
-        if (filePath) {
-            yield fs_extra_1.default.writeFile(filePath, pdfData);
-            return true;
+        const oldPath = path.join(folderPath, oldFilename);
+        const newPath = path.join(folderPath, newFilename);
+        // Special handling for case-only changes on Windows
+        if (oldPath.toLowerCase() === newPath.toLowerCase() && oldPath !== newPath) {
+            const tempPath = `${oldPath}.tmp`;
+            yield fs.rename(oldPath, tempPath);
+            yield fs.rename(tempPath, newPath);
         }
-        return false;
+        else {
+            yield fs.rename(oldPath, newPath);
+        }
+        return { success: true };
     }
     catch (error) {
-        console.error('Error exporting PDF:', error);
-        return false;
-    }
-    finally {
-        pdfWindow.close();
+        console.error('Error renaming note:', error);
+        return { success: false, error: error.message };
     }
 }));
-// Watcher Logic
-electron_1.ipcMain.on('start-watch', (_, folderPath) => {
-    if (watcher) {
-        watcher.close();
+electron_1.ipcMain.handle('rename-folder', (_event_1, _a) => __awaiter(void 0, [_event_1, _a], void 0, function* (_event, { rootPath, oldName, newName }) {
+    try {
+        const oldPath = path.join(rootPath, oldName);
+        const newPath = path.join(rootPath, newName);
+        if (oldPath.toLowerCase() === newPath.toLowerCase() && oldPath !== newPath) {
+            const tempPath = `${oldPath}.tmp_dir`;
+            yield fs.rename(oldPath, tempPath);
+            yield fs.rename(tempPath, newPath);
+        }
+        else {
+            yield fs.rename(oldPath, newPath);
+        }
+        return { success: true };
     }
-    watcher = (0, chokidar_1.watch)(folderPath, {
-        ignored: /(^|[\/\\])\../, // ignore dotfiles
-        persistent: true,
-        ignoreInitial: true,
-        depth: 0 // simple for now, maybe increase if subfolders needed
+    catch (error) {
+        console.error('Error renaming folder:', error);
+        return { success: false, error: error.message };
+    }
+}));
+electron_1.ipcMain.handle('read-metadata', (_event, rootPath) => __awaiter(void 0, void 0, void 0, function* () {
+    const metaPath = path.join(rootPath, '.notizapp-metadata.json');
+    try {
+        if (yield fs.pathExists(metaPath)) {
+            const content = yield fs.readJson(metaPath);
+            return content;
+        }
+    }
+    catch (error) {
+        console.error('Error reading metadata:', error);
+    }
+    return { folders: {} };
+}));
+electron_1.ipcMain.handle('save-metadata', (_event_1, _a) => __awaiter(void 0, [_event_1, _a], void 0, function* (_event, { rootPath, metadata }) {
+    const metaPath = path.join(rootPath, '.notizapp-metadata.json');
+    try {
+        yield fs.writeJson(metaPath, metadata, { spaces: 2 });
+        return true;
+    }
+    catch (error) {
+        console.error('Error saving metadata:', error);
+        return false;
+    }
+}));
+electron_1.ipcMain.handle('create-folder', (_event, folderPath) => __awaiter(void 0, void 0, void 0, function* () {
+    yield fs.ensureDir(folderPath);
+    return true;
+}));
+electron_1.ipcMain.handle('export-pdf', (_event, html) => __awaiter(void 0, void 0, void 0, function* () {
+    const pdfWindow = new electron_1.BrowserWindow({ show: false });
+    yield pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    const pdfData = yield pdfWindow.webContents.printToPDF({});
+    const { filePath } = yield electron_1.dialog.showSaveDialog(mainWindow, {
+        filters: [{ name: 'PDF', extensions: ['pdf'] }],
     });
-    watcher
-        .on('add', (path) => {
-        mainWindow === null || mainWindow === void 0 ? void 0 : mainWindow.webContents.send('file-changed', { type: 'add', path });
-    })
-        .on('change', (path) => {
-        mainWindow === null || mainWindow === void 0 ? void 0 : mainWindow.webContents.send('file-changed', { type: 'change', path });
-    })
-        .on('unlink', (path) => {
-        mainWindow === null || mainWindow === void 0 ? void 0 : mainWindow.webContents.send('file-changed', { type: 'unlink', path });
+    if (filePath) {
+        yield fs.writeFile(filePath, pdfData);
+        pdfWindow.close();
+        return true;
+    }
+    pdfWindow.close();
+    return false;
+}));
+electron_1.ipcMain.handle('delete-folder-recursive', (_event, folderPath) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        yield fs.remove(folderPath);
+        return true;
+    }
+    catch (error) {
+        console.error('Error deleting folder recursively:', error);
+        return false;
+    }
+}));
+electron_1.ipcMain.handle('delete-folder-move-contents', (_event_1, _a) => __awaiter(void 0, [_event_1, _a], void 0, function* (_event, { folderPath, rootPath }) {
+    try {
+        const files = yield getFilesRecursively(folderPath);
+        for (const file of files) {
+            if (file.endsWith('.md')) {
+                const basename = path.basename(file);
+                let targetPath = path.join(rootPath, basename);
+                // Handle collisions in root
+                let counter = 1;
+                while (yield fs.pathExists(targetPath)) {
+                    const ext = path.extname(basename);
+                    const name = path.basename(basename, ext);
+                    targetPath = path.join(rootPath, `${name}_${counter}${ext}`);
+                    counter++;
+                }
+                yield fs.move(file, targetPath);
+            }
+        }
+        // After moving files, delete the empty folder tree
+        yield fs.remove(folderPath);
+        return true;
+    }
+    catch (error) {
+        console.error('Error moving contents and deleting folder:', error);
+        return false;
+    }
+}));
+electron_1.ipcMain.on('start-watch', (_event, folderPath) => {
+    if (watcher)
+        watcher.close();
+    // Recursive watch is default for chokidar
+    watcher = (0, chokidar_1.watch)(folderPath, { ignored: /(^|[\/\\])\../, persistent: true, ignoreInitial: true });
+    watcher.on('all', (event, filePath) => {
+        mainWindow === null || mainWindow === void 0 ? void 0 : mainWindow.webContents.send('file-changed', { type: event, path: filePath });
     });
 });
