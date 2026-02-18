@@ -1,13 +1,15 @@
 import { useRef, useState, useEffect } from 'react';
 import {
     Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
+    Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart,
     Plus, Settings, Trash2, PanelLeftClose, PanelLeftOpen, Pencil
 } from 'lucide-react';
 import clsx from 'clsx';
 import type { AppMetadata } from '../types';
 
 const ICON_MAP: Record<string, any> = {
-    Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout
+    Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
+    Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart, Settings, Trash2
 };
 
 const COLOR_MAP: Record<string, any> = {

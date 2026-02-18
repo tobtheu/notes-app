@@ -13,6 +13,32 @@
   --color-primary-800: var(--primary-800);
   --color-primary-900: var(--primary-900);
   --color-primary-950: var(--primary-950);
+  --animate-in: animate-in 0.2s ease-out;
+  --animate-out: animate-out 0.2s ease-in;
+}
+
+@keyframes animate-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes animate-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -123,118 +149,43 @@ body,
   position: relative !important;
 }
 
-/* Milkdown Block Handle & Slash Menu */
-.milkdown-block-handle-container,
-.milkdown-slash-menu-container {
-  position: absolute;
-  z-index: 100;
-  visibility: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease-out, top 0.15s ease-out;
+/* Tiptap Placeholder */
+.tiptap p.is-editor-empty:first-child::before {
+  @apply text-gray-400 dark:text-gray-500 float-left h-0 pointer-events-none;
+  content: attr(data-placeholder);
 }
 
-.hide-block-handle .milkdown-block-handle-container {
-  display: none !important;
+/* Tiptap Task List Styles */
+.tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
 }
 
-.milkdown-block-handle-container>*,
-.milkdown-slash-menu-container>* {
-  pointer-events: auto;
-}
-
-/* ProseMirror Drop Cursor */
-.ProseMirror-dropcursor,
-.milkdown-dropcursor,
-.milkdown-drop-cursor,
-[class*="dropcursor"],
-[class*="drop-indicator"] {
-  background: #3b82f6 !important;
-  height: 3px !important;
-  width: auto !important;
-  z-index: 10000 !important;
-  pointer-events: none !important;
-}
-
-.ProseMirror-dropcursor::after {
-  content: '';
-  display: block;
-  height: 3px;
-  width: 100%;
-  background: #3b82f6 !important;
-}
-
-.milkdown-block-handle:hover {
-  @apply bg-gray-50/50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-700;
-}
-
-.milkdown-slash-menu {
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3);
-  @apply backdrop-blur-md bg-white/90 dark:bg-gray-800/90;
-  @apply transform transition-all duration-150 ease-out;
-}
-
-.dark .milkdown-slash-menu {
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
-}
-
-.milkdown-slash-menu button {
-  @apply transition-transform active:scale-95;
-}
-
-.milkdown .ProseMirror-selectednode .milkdown-block-handle {
-  @apply hidden;
-}
-
-.milkdown-wrapper .milkdown {
-  @apply relative overflow-visible;
-}
-
-.milkdown .ProseMirror {
-  outline: none !important;
-}
-
-.milkdown {
-  background: transparent !important;
-  color: inherit !important;
-  font-family: inherit !important;
-  box-shadow: none !important;
-}
-
-.milkdown .editor {
-  flex: 1;
-  padding: 0 !important;
-  outline: none !important;
-}
-
-.milkdown-wrapper .milkdown {
-  width: 100%;
-  flex: 1;
+.tiptap ul[data-type="taskList"] li {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  @apply gap-2 my-1;
 }
 
-.milkdown-wrapper .ProseMirror,
-.milkdown-wrapper .ProseMirror:focus {
-  outline: none !important;
-  box-shadow: none !important;
-  border: none !important;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.tiptap ul[data-type="taskList"] li>label {
+  flex: 0 0 auto;
+  user-select: none;
+  @apply mt-1;
 }
 
-.milkdown-wrapper .ProseMirror p {
-  margin-top: 0 !important;
-  margin-bottom: 0px !important;
-  line-height: 1.5 !important;
+.tiptap ul[data-type="taskList"] li>div {
+  flex: 1 1 auto;
 }
 
-.milkdown-wrapper .ProseMirror>*:first-child {
-  margin-top: 0 !important;
+.tiptap ul[data-type="taskList"] input[type="checkbox"] {
+  @apply h-4 w-4 rounded border-gray-300 accent-primary-600 cursor-pointer;
 }
 
-/* Explicit Styles for Editor Content */
+.tiptap ul[data-type="taskList"] li[data-checked="true"]>div {
+  @apply line-through text-gray-400 dark:text-gray-500;
+}
+
+/* Standard Tailwind Colors & General Styles */
 .prose h1 {
   @apply !text-4xl !font-bold !mb-2 !mt-4;
 }
@@ -271,56 +222,7 @@ body,
   @apply !bg-gray-100 !rounded !px-1 !py-0.5 !font-mono !text-sm;
 }
 
-/* Checklist / Task List Styling */
-.milkdown li[data-item-type="task"] {
-  list-style: none !important;
-  position: relative !important;
-  padding-left: 1.8rem !important;
-}
 
-.milkdown li[data-item-type="task"]::marker {
-  content: none !important;
-}
-
-.milkdown li[data-item-type="task"]::before {
-  content: "" !important;
-  position: absolute !important;
-  left: 0 !important;
-  top: 0.35rem !important;
-  width: 1.1rem !important;
-  height: 1.1rem !important;
-  border: 2px solid #d1d5db !important;
-  border-radius: 4px !important;
-  background-color: white !important;
-  transition: all 0.2s !important;
-  cursor: pointer !important;
-}
-
-.milkdown li[data-item-type="task"][data-checked="true"]::before {
-  background-color: var(--primary-500) !important;
-  border-color: var(--primary-500) !important;
-}
-
-.milkdown li[data-item-type="task"][data-checked="true"]::after {
-  content: "✓" !important;
-  position: absolute !important;
-  left: 0.22rem !important;
-  top: 0.3rem !important;
-  color: white !important;
-  font-size: 0.85rem !important;
-  font-weight: bold !important;
-  pointer-events: none !important;
-}
-
-.dark .milkdown li[data-item-type="task"]::before {
-  background-color: #1f2937 !important;
-  border-color: #4b5563 !important;
-}
-
-.dark .milkdown li[data-item-type="task"][data-checked="true"]::before {
-  background-color: var(--primary-500) !important;
-  border-color: var(--primary-500) !important;
-}
 
 .dark .prose h1 {
   color: #f3f4f6 !important;
