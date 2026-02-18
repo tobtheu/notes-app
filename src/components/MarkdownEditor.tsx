@@ -1,7 +1,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Editor, rootCtx, defaultValueCtx, editorViewOptionsCtx, editorViewCtx, serializerCtx } from '@milkdown/core';
-import { Selection, TextSelection } from '@milkdown/prose/state';
+import { Selection, TextSelection, Plugin, PluginKey } from '@milkdown/prose/state';
 import { commonmark } from '@milkdown/preset-commonmark';
 import { gfm } from '@milkdown/preset-gfm';
 import { Milkdown, useEditor, MilkdownProvider, useInstance } from '@milkdown/react';
@@ -95,8 +95,11 @@ const SlashMenu: React.FC = () => {
         { id: 'h2', label: 'Heading 2', desc: 'Medium header', icon: 'H2' },
         { id: 'h3', label: 'Heading 3', desc: 'Small header', icon: 'H3' },
         { id: 'bullet', label: 'Bullet List', desc: 'Simple bulleted list', icon: '•' },
+        { id: 'ordered', label: 'Ordered List', desc: 'Numbered list', icon: '1.' },
         { id: 'todo', label: 'To-do List', desc: 'Track tasks', icon: '☑' },
+        { id: 'table', label: 'Table', desc: 'Insert a table', icon: '▦' },
         { id: 'quote', label: 'Quote', desc: 'Capture a quote', icon: '"' },
+        { id: 'divider', label: 'Divider', desc: 'Visual separation', icon: '—' },
         { id: 'code', label: 'Code Block', desc: 'Code with highlighting', icon: '</>' },
     ], []);
 
@@ -129,6 +132,8 @@ const SlashMenu: React.FC = () => {
                     setBlockType(schema.nodes.heading, { level: 3 })(innerState, innerView.dispatch);
                 } else if (type === 'bullet') {
                     wrapIn(schema.nodes.bullet_list)(innerState, innerView.dispatch);
+                } else if (type === 'ordered') {
+                    wrapIn(schema.nodes.ordered_list)(innerState, innerView.dispatch);
                 } else if (type === 'todo') {
                     // Check if task_list_item exists
                     const listItemType = schema.nodes.task_list_item || schema.nodes.list_item;
@@ -155,8 +160,27 @@ const SlashMenu: React.FC = () => {
                     } else {
                         innerView.dispatch(innerState.tr.insertText('- [ ] '));
                     }
+                } else if (type === 'table') {
+                    if (schema.nodes.table) {
+                        const table = schema.nodes.table.create(null, [
+                            schema.nodes.table_row.create(null, [
+                                schema.nodes.table_header.create(null, schema.text('Header')),
+                                schema.nodes.table_header.create(null, schema.text('Header'))
+                            ]),
+                            schema.nodes.table_row.create(null, [
+                                schema.nodes.table_cell.create(null, schema.text('Cell')),
+                                schema.nodes.table_cell.create(null, schema.text('Cell'))
+                            ])
+                        ]);
+                        const tr = innerState.tr.replaceSelectionWith(table);
+                        const nextSelection = TextSelection.create(tr.doc, tr.selection.from + 4); // Attempt to select inside first cell
+                        innerView.dispatch(tr.setSelection(nextSelection));
+                    }
                 } else if (type === 'quote') {
                     wrapIn(schema.nodes.blockquote)(innerState, innerView.dispatch);
+                } else if (type === 'divider') {
+                    const tr = innerState.tr.replaceSelectionWith(schema.nodes.horizontal_rule.create());
+                    innerView.dispatch(tr);
                 } else if (type === 'code') {
                     setBlockType(schema.nodes.code_block)(innerState, innerView.dispatch);
                 }
@@ -315,6 +339,99 @@ const EditorComponent: React.FC<MarkdownEditorProps> = ({ content, onChange }) =
                         list_item: nodeViewFactory({ component: ListItem }),
                         task_list_item: nodeViewFactory({ component: ListItem })
                     },
+                    plugins: [
+                        ...(prev.plugins || []),
+                        new Plugin({
+                            key: new PluginKey('milkdown-block-handle'),
+                            view: (view) => {
+                                const pluginView = pluginViewFactory({ component: BlockHandle })(view);
+                                const provider = new BlockProvider({
+                                    ctx,
+                                    content: (pluginView as any).dom as HTMLElement,
+                                });
+                                return {
+                                    update: (view, prevState) => {
+                                        pluginView.update?.(view, prevState);
+                                        provider.update();
+                                    },
+                                    destroy: () => {
+                                        pluginView.destroy?.();
+                                        provider.destroy();
+                                    }
+                                };
+                            }
+                        }),
+                        new Plugin({
+                            key: new PluginKey('milkdown-slash-menu'),
+                            view: (view) => {
+                                const pluginView = pluginViewFactory({ component: SlashMenu })(view);
+                                const provider = new SlashProvider({
+                                    content: (pluginView as any).dom as HTMLElement,
+                                });
+                                return {
+                                    update: (view, prevState) => {
+                                        pluginView.update?.(view, prevState);
+                                        provider.update(view, prevState);
+                                    },
+                                    destroy: () => {
+                                        pluginView.destroy?.();
+                                        provider.destroy();
+                                    }
+                                };
+                            }
+                        }),
+                        new Plugin({
+                            key: new PluginKey('milkdown-state-tracker'),
+                            view: () => ({
+                                update: (view) => {
+                                    const { state } = view;
+                                    const { selection, schema } = state;
+                                    const { $from } = selection;
+                                    const activeItems: string[] = [];
+
+                                    // Check Marks
+                                    const isMarkActive = (markType: any) => {
+                                        if (selection.empty) {
+                                            return !!(state.storedMarks?.find(m => m.type === markType) || $from.marks().find(m => m.type === markType));
+                                        }
+                                        return state.doc.rangeHasMark(selection.from, selection.to, markType);
+                                    };
+
+                                    if (schema.marks.strong && isMarkActive(schema.marks.strong)) activeItems.push('bold');
+                                    if (schema.marks.emphasis && isMarkActive(schema.marks.emphasis)) activeItems.push('italic');
+                                    if (schema.marks.code && isMarkActive(schema.marks.code)) activeItems.push('code_inline');
+
+                                    // Check Blocks
+                                    const block = $from.parent;
+
+                                    if (block.type === schema.nodes.heading) {
+                                        activeItems.push(`h${block.attrs.level}`);
+                                    } else if (block.type === schema.nodes.paragraph) {
+                                        activeItems.push('paragraph');
+                                    } else if (block.type === schema.nodes.code_block) {
+                                        activeItems.push('code_block');
+                                    } else if (block.type === schema.nodes.blockquote) {
+                                        activeItems.push('quote');
+                                    }
+
+                                    // Check Lists
+                                    let curr: any = $from;
+                                    let depth = curr.depth;
+                                    while (depth > 0) {
+                                        const node = curr.node(depth);
+                                        if (node.type === schema.nodes.bullet_list) activeItems.push('bullet_list');
+                                        if (node.type === schema.nodes.ordered_list) activeItems.push('ordered_list');
+                                        if (node.type === schema.nodes.task_list_item || (node.type === schema.nodes.list_item && typeof node.attrs.checked === 'boolean')) {
+                                            activeItems.push('task_list');
+                                        }
+                                        depth--;
+                                    }
+
+                                    window.dispatchEvent(new CustomEvent('milkdown-state-update', { detail: activeItems }));
+                                }
+                            })
+                        })
+                    ],
                     handleDOMEvents: {
                         ...(prev.handleDOMEvents || {}),
                         focus: (view) => {
@@ -347,98 +464,6 @@ const EditorComponent: React.FC<MarkdownEditorProps> = ({ content, onChange }) =
                         }
                     }
                 }));
-
-                // Block Handle Bridge
-                ctx.set(block.key, {
-                    view: (view) => {
-                        const div = document.createElement('div');
-                        div.className = 'milkdown-block-handle-container';
-                        rootElement.appendChild(div);
-
-                        const provider = new BlockProvider({
-                            ctx,
-                            content: div
-                        } as any);
-                        const pluginView = pluginViewFactory({
-                            component: BlockHandle,
-                            root: () => div,
-                        })(view);
-
-                        return {
-                            update: (v, prevState) => {
-                                provider.update(v, prevState);
-                                div.style.visibility = 'visible';
-                                div.style.opacity = '1';
-                                pluginView.update?.(v, prevState);
-                            },
-                            destroy: () => {
-                                provider.destroy();
-                                pluginView.destroy?.();
-                                div.remove();
-                            }
-                        };
-                    }
-                });
-
-                // Slash Menu Bridge
-                ctx.set(slash.key, {
-                    view: (view) => {
-                        const div = document.createElement('div');
-                        div.className = 'milkdown-slash-menu-container';
-                        rootElement.appendChild(div);
-
-                        const provider = new SlashProvider({
-                            content: div,
-                            shouldShow: (v) => {
-                                const { selection } = v.state;
-                                const { $from } = selection;
-                                const isParagraph = $from.parent.type.name === 'paragraph';
-                                const text = $from.parent.textContent;
-                                return selection.empty && isParagraph && text === '/';
-                            }
-                        });
-                        const pluginView = pluginViewFactory({
-                            component: SlashMenu,
-                            root: () => div,
-                        })(view);
-
-                        const handleClose = () => {
-                            provider.hide();
-                            div.style.visibility = 'hidden';
-                            div.style.opacity = '0';
-                        };
-                        div.addEventListener('slash-internal-close', handleClose);
-
-                        return {
-                            update: (v, prevState) => {
-                                provider.update(v, prevState);
-
-                                // Explicit visibility logic for SlashProvider
-                                const { selection } = v.state;
-                                const { $from } = selection;
-                                const isParagraph = $from.parent.type.name === 'paragraph';
-                                const text = $from.parent.textContent;
-                                const shouldShow = selection.empty && isParagraph && text === '/';
-
-                                if (shouldShow) {
-                                    div.style.visibility = 'visible';
-                                    div.style.opacity = '1';
-                                } else {
-                                    div.style.visibility = 'hidden';
-                                    div.style.opacity = '0';
-                                }
-
-                                pluginView.update?.(v, prevState);
-                            },
-                            destroy: () => {
-                                div.removeEventListener('slash-internal-close', handleClose);
-                                provider.destroy();
-                                pluginView.destroy?.();
-                                div.remove();
-                            }
-                        };
-                    }
-                });
 
                 ctx.get(listenerCtx).markdownUpdated((_, markdown, prevMarkdown) => {
                     if (markdown !== prevMarkdown) {
@@ -492,11 +517,14 @@ const EditorComponent: React.FC<MarkdownEditorProps> = ({ content, onChange }) =
     return <Milkdown />;
 };
 
+import { EditorToolbar } from './EditorToolbar';
+
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = (props) => {
     return (
         <div className="milkdown-wrapper prose dark:prose-invert max-w-none flex-1 flex flex-col relative px-8">
             <MilkdownProvider>
                 <ProsemirrorAdapterProvider>
+                    <EditorToolbar />
                     <EditorComponent {...props} />
                 </ProsemirrorAdapterProvider>
             </MilkdownProvider>
