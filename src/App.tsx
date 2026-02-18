@@ -18,7 +18,10 @@ function App() {
   const [categoryToEdit, setCategoryToEdit] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string>(Date.now().toString());
   const { theme, setTheme } = useTheme();
-  const { markdownEnabled, setMarkdownEnabled, accentColor, setAccentColor } = useSettings();
+  const {
+    markdownEnabled, setMarkdownEnabled,
+    accentColor, setAccentColor
+  } = useSettings();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-accent', accentColor);

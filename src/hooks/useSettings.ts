@@ -10,6 +10,7 @@ export function useSettings() {
         return localStorage.getItem('accent-color') || 'blue';
     });
 
+
     useEffect(() => {
         localStorage.setItem('markdown-enabled', String(markdownEnabled));
     }, [markdownEnabled]);
@@ -18,10 +19,11 @@ export function useSettings() {
         localStorage.setItem('accent-color', accentColor);
     }, [accentColor]);
 
+
     return {
         markdownEnabled,
         setMarkdownEnabled,
         accentColor,
-        setAccentColor
+        setAccentColor,
     };
 }

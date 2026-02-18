@@ -252,3 +252,54 @@ body,
   background-color: #1f2937 !important;
   color: #f472b6 !important;
 }
+/* Tiptap Table Styles */
+.tiptap table {
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  table-layout: fixed;
+  width: 100%;
+  overflow: hidden;
+}
+
+.tiptap table td,
+.tiptap table th {
+  min-width: 1em;
+  border: 1px solid #cbd5e1;
+  padding: 8px 12px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.dark .tiptap table td,
+.dark .tiptap table th {
+  border-color: #475569;
+}
+
+.tiptap table th {
+  font-weight: bold;
+  text-align: left;
+  background-color: #f8fafc;
+}
+
+.dark .tiptap table th {
+  background-color: #1e293b;
+}
+
+.tiptap .tableWrapper {
+  overflow-x: auto;
+  margin: 1.5rem 0;
+}
+
+/* Tiptap Highlight Styles */
+.tiptap mark {
+  background-color: #fef08a;
+  color: inherit;
+  padding: 0.125rem 0;
+  border-radius: 0.125rem;
+}
+
+.dark .tiptap mark {
+  background-color: #854d0e;
+  color: #fde68a;
+}
