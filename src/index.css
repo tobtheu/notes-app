@@ -164,7 +164,7 @@ body,
 .tiptap ul[data-type="taskList"] li {
   display: flex;
   align-items: flex-start;
-  @apply gap-2 my-1;
+  @apply gap-2 my-0;
 }
 
 .tiptap ul[data-type="taskList"] li>label {
@@ -252,6 +252,7 @@ body,
   background-color: #1f2937 !important;
   color: #f472b6 !important;
 }
+
 /* Tiptap Table Styles */
 .tiptap table {
   border-collapse: collapse;
@@ -302,4 +303,28 @@ body,
 .dark .tiptap mark {
   background-color: #854d0e;
   color: #fde68a;
+}
+
+/* Automatic Accent Colors */
+.prose a {
+  color: var(--color-primary-600) !important;
+  text-decoration: none !important;
+}
+
+.prose a:hover {
+  text-decoration: underline !important;
+}
+
+.prose th {
+  background-color: var(--color-primary-100) !important;
+  color: inherit !important;
+}
+
+.dark .prose a {
+  color: var(--color-primary-400) !important;
+}
+
+.dark .prose th {
+  background-color: var(--color-primary-900) !important;
+  color: inherit !important;
 }

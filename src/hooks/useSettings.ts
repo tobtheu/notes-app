@@ -11,6 +11,7 @@ export function useSettings() {
     });
 
 
+
     useEffect(() => {
         localStorage.setItem('markdown-enabled', String(markdownEnabled));
     }, [markdownEnabled]);

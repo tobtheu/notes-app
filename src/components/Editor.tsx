@@ -103,7 +103,7 @@ export function Editor({ note, onSave, onUpdateLocally, markdownEnabled }: Edito
             </div>
 
             <div
-                className="max-w-4xl w-full mx-auto px-8 pt-16 pb-32 flex-1 flex flex-col cursor-text"
+                className="max-w-4xl w-full mx-auto px-8 pt-16 flex-1 flex flex-col cursor-text overflow-hidden"
                 onClick={() => {
                     // Only jump if nothing is selected (prevents killing a fresh drag-selection)
                     if (window.getSelection()?.type === 'Range') return;
@@ -129,7 +129,7 @@ export function Editor({ note, onSave, onUpdateLocally, markdownEnabled }: Edito
                 />
 
                 {markdownEnabled ? (
-                    <div className="flex-1 flex flex-col">
+                    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                         <MarkdownEditor
                             content={body}
                             onChange={handleBodyChange}

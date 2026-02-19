@@ -21,8 +21,8 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ icon: Icon, label, action
         className={clsx(
             "p-1.5 rounded-md transition-colors flex items-center justify-center",
             isActive
-                ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400"
-                : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                ? "bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400"
+                : "text-gray-500 dark:text-gray-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 dark:hover:text-primary-400"
         )}
         title={label}
     >
@@ -42,7 +42,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
 
     return (
         <div className={clsx(
-            "flex items-center gap-1 p-1 bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 rounded-lg animate-in fade-in zoom-in duration-200",
+            "flex items-center gap-1 p-1 bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 rounded-lg animate-in fade-in zoom-in duration-200 w-fit",
             isCompact ? "bg-opacity-90 backdrop-blur-sm" : ""
         )}>
             <ToolbarButton
@@ -66,13 +66,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
 
             {!isCompact && (
                 <>
-                    <ToolbarButton
-                        icon={Code}
-                        label="Inline Code"
-                        action={() => editor.chain().focus().toggleCode().run()}
-                        isActive={editor.isActive('code')}
-                    />
-
                     <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
 
                     <ToolbarButton
@@ -116,6 +109,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                         label="Quote"
                         action={() => editor.chain().focus().toggleBlockquote().run()}
                         isActive={editor.isActive('blockquote')}
+                    />
+                    <ToolbarButton
+                        icon={Code}
+                        label="Inline Code"
+                        action={() => editor.chain().focus().toggleCode().run()}
+                        isActive={editor.isActive('code')}
                     />
 
                     <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />

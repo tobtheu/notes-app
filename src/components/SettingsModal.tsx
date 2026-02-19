@@ -137,6 +137,7 @@ export function SettingsModal({
                     </div>
                 </div>
 
+
                 {/* Editor Settings */}
                 <div className="mt-8 border-t border-gray-100 dark:border-gray-700 pt-6">
                     <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Editor</h3>
