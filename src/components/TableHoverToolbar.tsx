@@ -6,7 +6,7 @@ import { Editor } from '@tiptap/react'
 interface TableHoverToolbarProps {
     editor: Editor
     node: any // Using any to avoid import issues with ProseMirror Node
-    getPos: boolean | (() => number)
+    getPos: boolean | (() => number | undefined)
 }
 
 export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, node, getPos }) => {
@@ -17,6 +17,7 @@ export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, no
 
         if (typeof getPos !== 'function') return
         const pos = getPos()
+        if (pos === undefined) return
         command(pos)
     }
 

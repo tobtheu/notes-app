@@ -316,7 +316,7 @@ body,
 }
 
 .prose th {
-  background-color: var(--color-primary-100) !important;
+  @apply !bg-primary-50/50;
   color: inherit !important;
 }
 
@@ -325,6 +325,6 @@ body,
 }
 
 .dark .prose th {
-  background-color: var(--color-primary-900) !important;
+  @apply !bg-primary-900/20;
   color: inherit !important;
 }

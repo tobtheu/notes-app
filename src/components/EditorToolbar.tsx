@@ -1,7 +1,7 @@
 
 import React from 'react';
 import type { Editor } from '@tiptap/react';
-import { Bold, Italic, Heading1, Heading2, Heading3, List, CheckSquare, Quote, Code, Table, Highlighter, type LucideIcon } from 'lucide-react';
+import { Bold, Italic, Heading1, Heading2, Heading3, List, CheckSquare, Quote, Code, Table, Highlighter, Link as LinkIcon, Image as ImageIcon, type LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 
 interface ToolbarButtonProps {
@@ -33,9 +33,11 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ icon: Icon, label, action
 interface EditorToolbarProps {
     editor: Editor | null;
     mode?: 'full' | 'compact';
+    onLinkClick?: () => void;
+    onImageClick?: () => void;
 }
 
-export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'full' }) => {
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'full', onLinkClick, onImageClick }) => {
     if (!editor) return null;
 
     const isCompact = mode === 'compact';
@@ -127,6 +129,45 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                     />
                 </>
             )}
+
+            <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
+
+            <ToolbarButton
+                icon={LinkIcon}
+                label="Link"
+                action={() => {
+                    // Check if handler is provided, otherwise fallback or do nothing
+                    if (onLinkClick) {
+                        onLinkClick();
+                    } else {
+                        // Fallback or legacy behavior (though getting rid of prompt is the goal)
+                        const previousUrl = editor.getAttributes('link').href;
+                        const url = window.prompt('URL', previousUrl);
+                        if (url === null) return;
+                        if (url === '') {
+                            editor.chain().focus().extendMarkRange('link').unsetLink().run();
+                            return;
+                        }
+                        editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+                    }
+                }}
+                isActive={editor.isActive('link')}
+            />
+            <ToolbarButton
+                icon={ImageIcon}
+                label="Image"
+                action={() => {
+                    if (onImageClick) {
+                        onImageClick();
+                    } else {
+                        const url = window.prompt('Image URL');
+                        if (url) {
+                            editor.chain().focus().setImage({ src: url }).run();
+                        }
+                    }
+                }}
+                isActive={editor.isActive('image')}
+            />
         </div>
     );
 };
