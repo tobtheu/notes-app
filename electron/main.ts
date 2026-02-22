@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import * as fs from 'fs-extra';
 import { watch } from 'chokidar';
@@ -263,4 +264,47 @@ ipcMain.on('start-watch', (_event, folderPath: string) => {
   watcher.on('all', (event: string, filePath: string) => {
     mainWindow?.webContents.send('file-changed', { type: event, path: filePath });
   });
+});
+
+// Auto-updater configuration and handlers
+autoUpdater.autoDownload = false;
+
+autoUpdater.on('checking-for-update', () => {
+  mainWindow?.webContents.send('update-status', { type: 'checking' });
+});
+
+autoUpdater.on('update-available', (info) => {
+  mainWindow?.webContents.send('update-status', { type: 'available', version: info.version });
+});
+
+autoUpdater.on('update-not-available', () => {
+  mainWindow?.webContents.send('update-status', { type: 'not-available' });
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  mainWindow?.webContents.send('update-status', { type: 'downloading', progress: progressObj.percent });
+});
+
+autoUpdater.on('update-downloaded', () => {
+  mainWindow?.webContents.send('update-status', { type: 'downloaded' });
+});
+
+autoUpdater.on('error', (err) => {
+  mainWindow?.webContents.send('update-status', { type: 'error', error: err.message });
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+ipcMain.handle('check-for-updates', () => {
+  autoUpdater.checkForUpdatesAndNotify();
+});
+
+ipcMain.handle('download-update', () => {
+  autoUpdater.downloadUpdate();
+});
+
+ipcMain.handle('quit-and-install', () => {
+  autoUpdater.quitAndInstall();
 });

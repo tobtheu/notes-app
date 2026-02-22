@@ -1,16 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Note } from '../types';
 import { MarkdownEditor } from './MarkdownEditor';
+import clsx from 'clsx';
 
 interface EditorProps {
     note: Note;
+    allNotes?: Note[];
     onSave: (filename: string, content: string, folder?: string) => void;
     onUpdateLocally: (filename: string, content: string, folder?: string) => void;
+    onNavigate?: (id: string, anchor?: string) => void;
     markdownEnabled: boolean;
 }
 
-export function Editor({ note, onSave, onUpdateLocally, markdownEnabled }: EditorProps) {
+export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, markdownEnabled }: EditorProps) {
     const [content, setContent] = useState(note.content);
+    const [isScrolling, setIsScrolling] = useState(false);
+    const scrollTimeoutRef = useRef<any>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const titleRef = useRef<HTMLTextAreaElement>(null);
     const lastNoteId = useRef(`${note.folder}/${note.filename}`);
@@ -83,13 +88,35 @@ export function Editor({ note, onSave, onUpdateLocally, markdownEnabled }: Edito
         return () => clearTimeout(handler);
     }, [content, note.filename, note.folder, onSave]);
 
+    const handleScroll = useCallback(() => {
+        setIsScrolling(true);
+        if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current);
+        }
+        scrollTimeoutRef.current = setTimeout(() => {
+            setIsScrolling(false);
+        }, 1000);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+        };
+    }, []);
+
     const handleExport = async () => {
         const html = `<html><body><h1>${title}</h1><pre>${body}</pre></body></html>`;
         await window.electronAPI.exportPdf(html);
     };
 
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-gray-900 overflow-y-auto custom-scrollbar">
+        <div
+            className={clsx(
+                "flex flex-col h-full bg-white dark:bg-gray-900 overflow-y-auto custom-scrollbar",
+                isScrolling && "is-scrolling"
+            )}
+            onScroll={handleScroll}
+        >
             <div className="absolute top-4 right-4 z-10 flex gap-2">
                 <div className="text-xs text-gray-300 self-center mr-2 italic">
                     {content !== note.content ? 'Saving...' : 'Saved'}
@@ -132,7 +159,9 @@ export function Editor({ note, onSave, onUpdateLocally, markdownEnabled }: Edito
                     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                         <MarkdownEditor
                             content={body}
+                            allNotes={allNotes}
                             onChange={handleBodyChange}
+                            onNavigate={onNavigate}
                         />
                     </div>
                 ) : (

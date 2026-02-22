@@ -43,6 +43,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
+const electron_updater_1 = require("electron-updater");
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs-extra"));
 const chokidar_1 = require("chokidar");
@@ -64,6 +65,13 @@ const createWindow = () => {
     else {
         mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
+    // Open external links in the default browser
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        if (url.startsWith('http:') || url.startsWith('https:')) {
+            require('electron').shell.openExternal(url);
+        }
+        return { action: 'deny' };
+    });
 };
 electron_1.app.whenReady().then(createWindow);
 electron_1.app.on('window-all-closed', () => {
@@ -283,4 +291,36 @@ electron_1.ipcMain.on('start-watch', (_event, folderPath) => {
     watcher.on('all', (event, filePath) => {
         mainWindow === null || mainWindow === void 0 ? void 0 : mainWindow.webContents.send('file-changed', { type: event, path: filePath });
     });
+});
+// Auto-updater configuration and handlers
+electron_updater_1.autoUpdater.autoDownload = false;
+electron_updater_1.autoUpdater.on('checking-for-update', () => {
+    mainWindow === null || mainWindow === void 0 ? void 0 : mainWindow.webContents.send('update-status', { type: 'checking' });
+});
+electron_updater_1.autoUpdater.on('update-available', (info) => {
+    mainWindow === null || mainWindow === void 0 ? void 0 : mainWindow.webContents.send('update-status', { type: 'available', version: info.version });
+});
+electron_updater_1.autoUpdater.on('update-not-available', () => {
+    mainWindow === null || mainWindow === void 0 ? void 0 : mainWindow.webContents.send('update-status', { type: 'not-available' });
+});
+electron_updater_1.autoUpdater.on('download-progress', (progressObj) => {
+    mainWindow === null || mainWindow === void 0 ? void 0 : mainWindow.webContents.send('update-status', { type: 'downloading', progress: progressObj.percent });
+});
+electron_updater_1.autoUpdater.on('update-downloaded', () => {
+    mainWindow === null || mainWindow === void 0 ? void 0 : mainWindow.webContents.send('update-status', { type: 'downloaded' });
+});
+electron_updater_1.autoUpdater.on('error', (err) => {
+    mainWindow === null || mainWindow === void 0 ? void 0 : mainWindow.webContents.send('update-status', { type: 'error', error: err.message });
+});
+electron_1.ipcMain.handle('get-app-version', () => {
+    return electron_1.app.getVersion();
+});
+electron_1.ipcMain.handle('check-for-updates', () => {
+    electron_updater_1.autoUpdater.checkForUpdatesAndNotify();
+});
+electron_1.ipcMain.handle('download-update', () => {
+    electron_updater_1.autoUpdater.downloadUpdate();
+});
+electron_1.ipcMain.handle('quit-and-install', () => {
+    electron_updater_1.autoUpdater.quitAndInstall();
 });

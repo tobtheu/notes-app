@@ -31,6 +31,16 @@ export interface ElectronAPI {
     exportPdf: (html: string) => Promise<boolean>;
     startWatch: (folderPath: string) => void;
     onFileChanged: (callback: (data: { type: 'add' | 'change' | 'unlink'; path: string }) => void) => () => void;
+    getAppVersion: () => Promise<string>;
+    checkForUpdates: () => Promise<void>;
+    downloadUpdate: () => Promise<void>;
+    quitAndInstall: () => Promise<void>;
+    onUpdateStatus: (callback: (status: {
+        type: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+        progress?: number;
+        error?: string;
+        version?: string;
+    }) => void) => () => void;
 }
 
 declare global {

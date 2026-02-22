@@ -22,5 +22,16 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         return () => {
             electron_1.ipcRenderer.removeListener('file-changed', subscription);
         };
+    },
+    getAppVersion: () => electron_1.ipcRenderer.invoke('get-app-version'),
+    checkForUpdates: () => electron_1.ipcRenderer.invoke('check-for-updates'),
+    downloadUpdate: () => electron_1.ipcRenderer.invoke('download-update'),
+    quitAndInstall: () => electron_1.ipcRenderer.invoke('quit-and-install'),
+    onUpdateStatus: (callback) => {
+        const subscription = (_, data) => callback(data);
+        electron_1.ipcRenderer.on('update-status', subscription);
+        return () => {
+            electron_1.ipcRenderer.removeListener('update-status', subscription);
+        };
     }
 });

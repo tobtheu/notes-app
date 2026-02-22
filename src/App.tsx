@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNotes } from './hooks/useNotes';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
@@ -8,7 +8,7 @@ import { DeleteFolderModal } from './components/DeleteFolderModal';
 import { useTheme } from './hooks/useTheme';
 import { useSettings } from './hooks/useSettings';
 import { FolderEditModal } from './components/FolderEditModal';
-import type { FolderMetadata } from './types';
+import type { Note, FolderMetadata } from './types';
 import { Folder } from 'lucide-react';
 
 function App() {
@@ -17,6 +17,8 @@ function App() {
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [categoryToEdit, setCategoryToEdit] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string>(Date.now().toString());
+  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
+
   const { theme, setTheme } = useTheme();
   const {
     markdownEnabled, setMarkdownEnabled,
@@ -30,6 +32,7 @@ function App() {
   const {
     currentFolder,
     notes,
+    allNotes, // allNotes is already destructured here
     folders,
     metadata,
     selectedNote,
@@ -52,6 +55,38 @@ function App() {
     getNoteId,
   } = useNotes();
 
+  const handleNavigate = useCallback((id: string, anchor?: string) => {
+    if (id) {
+      // Find note by ID (lowercase path)
+      const note = allNotes.find((n: Note) => getNoteId(n) === id.toLowerCase());
+      if (note) {
+        setSelectedNote(getNoteId(note));
+        setEditingSessionId(Date.now().toString());
+        if (anchor) setPendingAnchor(anchor);
+      }
+    } else if (anchor) {
+      // Internal anchor scroll
+      const element = document.getElementById(anchor);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [allNotes, getNoteId, setSelectedNote]);
+
+  // Effect to handle pending anchor scrolling after editor loads
+  useEffect(() => {
+    if (pendingAnchor && selectedNote) { // Use selectedNote directly
+      // Short delay to ensure editor has rendered the content
+      const timer = setTimeout(() => {
+        const element = document.getElementById(pendingAnchor);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+          setPendingAnchor(null);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedNote, pendingAnchor]);
 
 
   if (!currentFolder) {
@@ -136,8 +171,10 @@ function App() {
           <Editor
             key={editingSessionId}
             note={selectedNote}
+            allNotes={allNotes}
             onSave={saveNote}
             onUpdateLocally={updateNoteLocally}
+            onNavigate={handleNavigate}
             markdownEnabled={markdownEnabled}
           />
         ) : (

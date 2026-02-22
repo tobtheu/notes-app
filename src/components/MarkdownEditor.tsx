@@ -1,5 +1,6 @@
-import React, { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
-import { useEditor, EditorContent, ReactRenderer, Extension, ReactNodeViewRenderer } from '@tiptap/react';
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useRef } from 'react';
+import type { Note } from '../types';
+import { useEditor, EditorContent, ReactRenderer, Extension, ReactNodeViewRenderer, mergeAttributes } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
@@ -12,22 +13,28 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import Highlight from '@tiptap/extension-highlight';
 import Link from '@tiptap/extension-link';
-import Image from '@tiptap/extension-image';
+import Heading from '@tiptap/extension-heading';
+// Image import removed as it is replaced by ImageWithCaption
+import { ImageWithCaption } from '../extensions/ImageWithCaption';
 import Suggestion from '@tiptap/suggestion';
 import tippy, { type Instance } from 'tippy.js';
 import { EditorToolbar } from './EditorToolbar';
 import {
     Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, Quote, Minus,
-    Code as CodeIcon, Table as TableIcon, Link as LinkIcon, ExternalLink, Edit2, Trash2
+    Code as CodeIcon, Table as TableIcon, Link as LinkIcon, ExternalLink, Edit2, Trash2,
+    Upload, Maximize, Settings, X
 } from 'lucide-react';
 import clsx from 'clsx';
 
 import { TableNode } from './TableNode';
 import { UrlInputModal } from './UrlInputModal';
+import { toggleSmartMark } from '../utils/editor';
 
 interface MarkdownEditorProps {
     content: string;
+    allNotes?: Note[];
     onChange: (markdown: string) => void;
+    onNavigate?: (id: string, anchor?: string) => void;
 }
 
 // suggestion items definition
@@ -46,7 +53,7 @@ const items = [
 
 const SlashMenu = forwardRef((props: any, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const containerRef = React.useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const selectItem = (index: number) => {
         const item = props.items[index];
@@ -88,15 +95,19 @@ const SlashMenu = forwardRef((props: any, ref) => {
                     key={index}
                     onClick={() => selectItem(index)}
                     onMouseEnter={() => setSelectedIndex(index)}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg flex items-center gap-3 group transition-all ${index === selectedIndex
-                        ? 'bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
-                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                        }`}
+                    className={clsx(
+                        "w-full text-left px-3 py-2 text-sm rounded-lg flex items-center gap-3 group transition-all",
+                        index === selectedIndex
+                            ? 'bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
+                            : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                    )}
                 >
-                    <div className={`w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center font-bold transition-colors ${index === selectedIndex
-                        ? 'bg-primary-100 dark:bg-primary-800 text-primary-600 dark:text-primary-200'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
-                        }`}>
+                    <div className={clsx(
+                        "w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center font-bold transition-colors",
+                        index === selectedIndex
+                            ? 'bg-primary-100 dark:bg-primary-800 text-primary-600 dark:text-primary-200'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                    )}>
                         <item.icon size={16} />
                     </div>
                     <span className="font-semibold">{item.title}</span>
@@ -174,14 +185,34 @@ const BubbleToolbarContent: React.FC<{
     onLinkClick: (url?: string, text?: string) => void;
     onRemoveLink?: () => void;
     hoveredLink?: { href: string; pos: number; rect: DOMRect } | null;
-}> = ({ editor, onLinkClick, onRemoveLink, hoveredLink }) => {
+    onImageEdit?: () => void;
+    onImagePreview?: () => void;
+}> = ({ editor, onLinkClick, onRemoveLink, hoveredLink, onImageEdit, onImagePreview }) => {
+    // Add a local state to force re-renders when the editor state changes
+    const [, setUpdateCount] = useState(0);
+
+    useEffect(() => {
+        if (!editor) return;
+
+        const updateHandler = () => {
+            setUpdateCount(prev => prev + 1);
+        };
+
+        editor.on('transaction', updateHandler);
+
+        return () => {
+            editor.off('transaction', updateHandler);
+        };
+    }, [editor]);
+
     // Show link actions if hovering or selection is purely a link
     const isLinkActive = hoveredLink || (editor.isActive('link') && editor.state.selection.empty);
+    const isImageActive = editor.isActive('image');
 
     return (
         <div className="bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 rounded-lg p-1 flex items-center gap-1">
             <button
-                onClick={() => editor.chain().focus().toggleBold().run()}
+                onClick={() => toggleSmartMark(editor, 'bold')}
                 className={clsx(
                     "p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors",
                     editor.isActive('bold') && "bg-primary-50 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
@@ -191,7 +222,7 @@ const BubbleToolbarContent: React.FC<{
                 <span className="font-bold text-sm">B</span>
             </button>
             <button
-                onClick={() => editor.chain().focus().toggleItalic().run()}
+                onClick={() => toggleSmartMark(editor, 'italic')}
                 className={clsx(
                     "p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors",
                     editor.isActive('italic') && "bg-primary-50 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
@@ -201,7 +232,7 @@ const BubbleToolbarContent: React.FC<{
                 <span className="italic font-serif text-sm">I</span>
             </button>
             <button
-                onClick={() => editor.chain().focus().toggleHighlight().run()}
+                onClick={() => toggleSmartMark(editor, 'highlight')}
                 className={clsx(
                     "p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors",
                     editor.isActive('highlight') && "bg-primary-50 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
@@ -256,8 +287,7 @@ const BubbleToolbarContent: React.FC<{
                     </button>
                 </>
             )}
-
-            {!isLinkActive && (
+            {!isLinkActive && !isImageActive && (
                 <>
                     <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1" />
                     <button
@@ -272,17 +302,51 @@ const BubbleToolbarContent: React.FC<{
                     </button>
                 </>
             )}
+
+            {/* Image Specific Actions */}
+            {isImageActive && (
+                <>
+                    <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1" />
+                    <button
+                        onClick={onImagePreview}
+                        className="p-1.5 rounded-md hover:bg-primary-50 dark:hover:bg-primary-900/40 text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                        title="Preview"
+                    >
+                        <Maximize size={14} />
+                    </button>
+                    <button
+                        onClick={onImageEdit}
+                        className="p-1.5 rounded-md hover:bg-primary-50 dark:hover:bg-primary-900/40 text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                        title="Edit Details"
+                    >
+                        <Settings size={14} />
+                    </button>
+                    <button
+                        onClick={() => editor.chain().focus().deleteSelection().run()}
+                        className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                        title="Delete Image"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                </>
+            )}
         </div>
     );
 };
 
-export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ content, onChange }) => {
-    const [modalOpen, setModalOpen] = useState(false);
-    const [modalType, setModalType] = useState<'link' | 'image'>('link');
-    const [modalUrl, setModalUrl] = useState('');
-    const [modalText, setModalText] = useState('');
+
+export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate }: MarkdownEditorProps) => {
+    const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+    const [linkModalData, setLinkModalData] = useState<{ url: string; text: string }>({ url: '', text: '' });
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+    const [imageModalData, setImageModalData] = useState<{ src: string; caption: string }>({ src: '', caption: '' });
     const [hoveredLink, setHoveredLink] = useState<{ href: string, text: string, pos: number, rect: DOMRect } | null>(null);
-    const hideTimeoutRef = React.useRef<any>(null);
+    const [lightboxImage, setLightboxImage] = useState<{ src: string, caption?: string } | null>(null);
+    const [isScrolling, setIsScrolling] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
+    const hideTimeoutRef = useRef<any>(null);
+    const scrollTimeoutRef = useRef<any>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const clearHideTimeout = () => {
         if (hideTimeoutRef.current) {
@@ -299,10 +363,42 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ content, onChang
         }, 300);
     };
 
+    const handleScroll = useCallback(() => {
+        setIsScrolling(true);
+        if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current);
+        }
+        scrollTimeoutRef.current = setTimeout(() => {
+            setIsScrolling(false);
+        }, 1000);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+        };
+    }, []);
+
     const editor = useEditor({
         extensions: [
             StarterKit.configure({
-                link: false,
+                heading: false,
+            }),
+            Heading.extend({
+                renderHTML({ node, HTMLAttributes }) {
+                    const hasLevel = this.options.levels.includes(node.attrs.level);
+                    const level = hasLevel ? node.attrs.level : this.options.levels[0];
+
+                    // Generate ID from heading text
+                    const text = node.textContent;
+                    const id = text
+                        .toLowerCase()
+                        .replace(/[^a-z0-9äöüß ]/gi, '')
+                        .trim()
+                        .replace(/\s+/g, '-');
+
+                    return [`h${level}`, mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { id }), 0];
+                },
             }),
             Markdown,
             TaskList,
@@ -313,10 +409,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ content, onChang
                 multicolor: true,
             }),
             Link.configure({
-                openOnClick: true,
+                openOnClick: false, // Handle manually to intercept internal links
                 autolink: true,
+                HTMLAttributes: {
+                    class: 'cursor-pointer text-primary-600 hover:text-primary-700 underline underline-offset-4',
+                },
             }),
-            Image,
+            ImageWithCaption,
             Table.extend({
                 addNodeView() {
                     return ReactNodeViewRenderer(TableNode)
@@ -344,46 +443,96 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ content, onChang
             }
         },
         editorProps: {
-            attributes: {
-                class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[300px] pb-32',
-            },
             handleDOMEvents: {
+                click: (_view, event) => {
+                    const target = event.target as HTMLElement;
+                    const anchor = target.closest('a');
+                    if (anchor && onNavigate) {
+                        const href = anchor.getAttribute('href');
+                        if (href) {
+                            if (href.startsWith('#')) {
+                                // Anchor within current note
+                                event.preventDefault();
+                                onNavigate('', href.substring(1));
+                                return true;
+                            } else if (href.startsWith('note://') || href.endsWith('.md')) {
+                                // Internal note link
+                                event.preventDefault();
+                                const cleanHref = href.replace('note://', '');
+                                const [id, anchor] = cleanHref.split('#');
+                                onNavigate(id, anchor);
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                },
                 mousedown: () => {
                     setHoveredLink(null);
                     clearHideTimeout();
                     return false;
                 },
-                mouseover: (view, event) => {
+                mouseover: (view: any, event: any) => {
                     if (!view.state.selection.empty) return false;
 
-                    const target = event.target as HTMLElement;
-                    const anchor = target.closest('a');
+                    const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
+                    if (!pos) return false;
 
-                    if (anchor) {
+                    const _node = view.state.doc.nodeAt(pos.pos);
+                    const mark = view.state.doc.marksAt(pos.pos).find((m: any) => m.type.name === 'link');
+
+                    if (mark) {
+                        const start = view.state.doc.resolve(pos.pos).start();
+                        const end = view.state.doc.resolve(pos.pos).end();
+                        const text = view.state.doc.textBetween(start, end);
+                        const rect = view.coordsAtPos(pos.pos);
+
+                        setHoveredLink({
+                            href: mark.attrs.href,
+                            text,
+                            pos: pos.pos,
+                            rect: new DOMRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top)
+                        });
                         clearHideTimeout();
-                        const href = anchor.getAttribute('href');
-                        if (href) {
-                            const rect = anchor.getBoundingClientRect();
-                            const pos = view.posAtDOM(anchor, 0);
-                            const text = anchor.innerText;
-                            setHoveredLink({ href, text, pos, rect });
-                        }
-                    }
-                    return false;
-                },
-                mouseout: (_view, event) => {
-                    const target = event.target as HTMLElement;
-                    const relatedTarget = event.relatedTarget as HTMLElement;
-
-                    // If we're leaving the link and not entering its children/buttons
-                    const anchor = target.closest('a');
-                    if (anchor && !anchor.contains(relatedTarget)) {
+                    } else {
                         startHideTimeout();
                     }
                     return false;
                 },
+                mouseleave: () => {
+                    startHideTimeout();
+                    return false;
+                },
+                dragenter: () => {
+                    setIsDragging(true);
+                    return false;
+                },
+                dragover: () => {
+                    setIsDragging(true);
+                    return false;
+                },
+                dragleave: (view: any, event: any) => {
+                    const rect = view.dom.getBoundingClientRect();
+                    if (
+                        event.clientX <= rect.left ||
+                        event.clientX >= rect.right ||
+                        event.clientY <= rect.top ||
+                        event.clientY >= rect.bottom
+                    ) {
+                        setIsDragging(false);
+                    }
+                    return false;
+                },
+                drop: () => {
+                    setIsDragging(false);
+                    return false;
+                },
+            },
+            attributes: {
+                class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[300px] pb-32',
             },
             handleDrop: (view, event, _slice, moved) => {
+                setIsDragging(false);
                 if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
                     const file = event.dataTransfer.files[0];
                     if (file.type.startsWith('image/')) {
@@ -392,7 +541,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ content, onChang
                             const { schema } = view.state;
                             const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
                             if (coordinates && e.target?.result) {
-                                const node = schema.nodes.image.create({ src: e.target.result });
+                                const node = schema.nodes.image.create({ src: e.target.result as string });
                                 const transaction = view.state.tr.insert(coordinates.pos, node);
                                 view.dispatch(transaction);
                             }
@@ -404,60 +553,75 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ content, onChang
                 return false;
             },
         },
-    });
+    }, [onNavigate]);
 
-    const openLinkModal = React.useCallback((initialUrl?: string, initialText?: string) => {
+    const openLinkModal = useCallback((initialUrl?: string, initialText?: string) => {
         if (!editor) return;
-
-        if (editor.isActive('link')) {
-            editor.chain().focus().extendMarkRange('link').run();
-        }
-
-        const { from, to, empty } = editor.state.selection;
-        const text = initialText ?? (!empty ? editor.state.doc.textBetween(from, to, ' ') : '');
-        const url = initialUrl ?? (editor.getAttributes('link').href || '');
-
-        setModalUrl(url);
-        setModalText(text);
-        setModalType('link');
-        setModalOpen(true);
+        setLinkModalData({
+            url: initialUrl || editor.getAttributes('link').href || '',
+            text: initialText || editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to) || ''
+        });
+        setIsLinkModalOpen(true);
     }, [editor]);
 
-    const openImageModal = React.useCallback(() => {
+    const openImageModal = useCallback((initialAttrs?: { src?: string, alt?: string }) => {
         if (!editor) return;
-        setModalUrl('');
-        setModalText('');
-        setModalType('image');
-        setModalOpen(true);
+        setImageModalData({
+            src: initialAttrs?.src || '',
+            caption: initialAttrs?.alt || ''
+        });
+        setIsImageModalOpen(true);
     }, [editor]);
 
-    const handleModalSave = (url: string, text?: string) => {
+    const saveLink = (url: string, text?: string) => {
         if (!editor) return;
 
-        if (modalType === 'link') {
-            if (url === '') {
-                editor.chain().focus().extendMarkRange('link').unsetLink().run();
+        if (url === '') {
+            editor.chain().focus().extendMarkRange('link').unsetLink().run();
+        } else {
+            if (text) {
+                editor.chain()
+                    .focus()
+                    .extendMarkRange('link')
+                    .insertContent({
+                        type: 'text',
+                        text: text,
+                        marks: [{ type: 'link', attrs: { href: url } }]
+                    })
+                    .run();
             } else {
-                if (text) {
-                    editor.chain()
-                        .focus()
-                        .extendMarkRange('link')
-                        .insertContent({
-                            type: 'text',
-                            text: text,
-                            marks: [{ type: 'link', attrs: { href: url } }]
-                        })
-                        .run();
-                } else {
-                    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-                }
-            }
-        } else if (modalType === 'image') {
-            if (url) {
-                editor.chain().focus().setImage({ src: url }).run();
+                editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
             }
         }
-        setModalOpen(false);
+        setIsLinkModalOpen(false);
+    };
+
+    const saveImage = (src: string, caption?: string) => {
+        if (!editor) return;
+
+        if (src) {
+            if (editor.isActive('image')) {
+                editor.chain().focus().updateAttributes('image', { src, alt: caption }).run();
+            } else {
+                (editor.chain().focus() as any).setImage({ src, alt: caption }).run();
+            }
+        }
+        setIsImageModalOpen(false);
+    };
+
+    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && editor) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                if (event.target?.result) {
+                    (editor.chain().focus() as any).setImage({ src: event.target.result as string }).run();
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+        // Reset input value so same file can be selected again
+        if (e.target) e.target.value = '';
     };
 
     if (!editor) {
@@ -466,16 +630,31 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ content, onChang
 
     return (
         <div
-            className="flex flex-col h-full w-full bg-white dark:bg-gray-900 relative"
+            className={clsx(
+                "flex flex-col h-full w-full bg-white dark:bg-gray-900 relative",
+                isScrolling && "is-scrolling"
+            )}
             onMouseLeave={() => setHoveredLink(null)}
         >
             <UrlInputModal
-                isOpen={modalOpen}
-                type={modalType}
-                initialUrl={modalUrl}
-                initialText={modalText}
-                onClose={() => setModalOpen(false)}
-                onSave={handleModalSave}
+                isOpen={isLinkModalOpen}
+                type="link"
+                initialUrl={linkModalData.url}
+                initialText={linkModalData.text}
+                allNotes={allNotes}
+                onClose={() => setIsLinkModalOpen(false)}
+                onSave={saveLink}
+            />
+
+            {/* Image Modal (reusing UrlInputModal for now, but type is 'image') */}
+            <UrlInputModal
+                isOpen={isImageModalOpen}
+                type="image"
+                initialUrl={imageModalData.src}
+                initialCaption={imageModalData.caption}
+                onClose={() => setIsImageModalOpen(false)}
+                onSave={saveImage}
+                onBrowseFiles={() => fileInputRef.current?.click()}
             />
 
             {/* Merged Formatting & Link Menu */}
@@ -484,22 +663,31 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ content, onChang
                     pluginKey="formattingMenu"
                     editor={editor}
                     updateDelay={0}
-                    shouldShow={({ from, to }) => {
-                        return from !== to;
+                    shouldShow={({ from, to, editor }) => {
+                        return from !== to || editor.isActive('image');
                     }}
                 >
                     <BubbleToolbarContent
                         editor={editor}
                         onLinkClick={openLinkModal}
                         onRemoveLink={() => setHoveredLink(null)}
+                        onImageEdit={() => {
+                            const attrs = editor.getAttributes('image');
+                            openImageModal(attrs);
+                        }}
+                        onImagePreview={() => {
+                            const attrs = editor.getAttributes('image');
+                            setLightboxImage({ src: attrs.src, caption: attrs.alt });
+                        }}
                     />
                 </BubbleMenu>
             )}
 
+
             {/* Hover-based Link Toolbar */}
             {hoveredLink && editor.state.selection.empty && (
                 <div
-                    className="fixed z-[100] animate-in fade-in zoom-in duration-150"
+                    className="fixed z-[100] animate-fade-in-up"
                     style={{
                         top: hoveredLink.rect.top - 45,
                         left: Math.max(10, Math.min(window.innerWidth - 250, hoveredLink.rect.left + (hoveredLink.rect.width / 2) - 100))
@@ -516,8 +704,50 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ content, onChang
                 </div>
             )}
 
+            {/* Image Lightbox */}
+            {lightboxImage && (
+                <div
+                    className="image-lightbox"
+                    onClick={() => setLightboxImage(null)}
+                >
+                    <button className="image-lightbox-close">
+                        <X size={24} />
+                    </button>
+                    <div className="image-lightbox-content" onClick={e => e.stopPropagation()}>
+                        <img src={lightboxImage.src} alt={lightboxImage.caption || 'Preview'} />
+                        {lightboxImage.caption && (
+                            <div className="image-lightbox-caption">
+                                {lightboxImage.caption}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Drop Indicator */}
+            {isDragging && (
+                <div className="drop-indicator">
+                    <div className="drop-indicator-text">
+                        <Upload size={20} />
+                        <span>Drop images to insert</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Hidden File Input */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={onFileChange}
+                className="hidden"
+            />
+
             {/* Scrollable Editor Content */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
+            <div
+                className="flex-1 overflow-y-auto custom-scrollbar min-h-0"
+                onScroll={handleScroll}
+            >
                 <div className="max-w-4xl mx-auto py-8 px-4">
                     <EditorContent editor={editor} />
                 </div>

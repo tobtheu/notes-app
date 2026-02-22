@@ -345,6 +345,7 @@ export function useNotes() {
     return {
         currentFolder: baseFolder,
         notes: filteredNotes,
+        allNotes: notes,
         folders,
         metadata,
         selectedNote,

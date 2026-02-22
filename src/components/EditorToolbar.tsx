@@ -3,6 +3,7 @@ import React from 'react';
 import type { Editor } from '@tiptap/react';
 import { Bold, Italic, Heading1, Heading2, Heading3, List, CheckSquare, Quote, Code, Table, Highlighter, Link as LinkIcon, Image as ImageIcon, type LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
+import { toggleSmartMark } from '../utils/editor';
 
 interface ToolbarButtonProps {
     icon: LucideIcon;
@@ -38,6 +39,23 @@ interface EditorToolbarProps {
 }
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'full', onLinkClick, onImageClick }) => {
+    // Add a local state to force re-renders when the editor state changes (selection, formatting, etc.)
+    const [, setUpdateCount] = React.useState(0);
+
+    React.useEffect(() => {
+        if (!editor) return;
+
+        const updateHandler = () => {
+            setUpdateCount(prev => prev + 1);
+        };
+
+        editor.on('transaction', updateHandler);
+
+        return () => {
+            editor.off('transaction', updateHandler);
+        };
+    }, [editor]);
+
     if (!editor) return null;
 
     const isCompact = mode === 'compact';
@@ -50,19 +68,19 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
             <ToolbarButton
                 icon={Bold}
                 label="Bold"
-                action={() => editor.chain().focus().toggleBold().run()}
+                action={() => toggleSmartMark(editor, 'bold')}
                 isActive={editor.isActive('bold')}
             />
             <ToolbarButton
                 icon={Italic}
                 label="Italic"
-                action={() => editor.chain().focus().toggleItalic().run()}
+                action={() => toggleSmartMark(editor, 'italic')}
                 isActive={editor.isActive('italic')}
             />
             <ToolbarButton
                 icon={Highlighter}
                 label="Highlight"
-                action={() => editor.chain().focus().toggleHighlight().run()}
+                action={() => toggleSmartMark(editor, 'highlight')}
                 isActive={editor.isActive('highlight')}
             />
 
