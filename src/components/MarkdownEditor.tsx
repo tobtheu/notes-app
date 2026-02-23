@@ -479,7 +479,6 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                     const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
                     if (!pos) return false;
 
-                    const _node = view.state.doc.nodeAt(pos.pos);
                     const mark = view.state.doc.marksAt(pos.pos).find((m: any) => m.type.name === 'link');
 
                     if (mark) {
