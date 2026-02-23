@@ -35,6 +35,7 @@ interface MarkdownEditorProps {
     allNotes?: Note[];
     onChange: (markdown: string) => void;
     onNavigate?: (id: string, anchor?: string) => void;
+    toolbarVisible?: boolean;
 }
 
 // suggestion items definition
@@ -335,7 +336,7 @@ const BubbleToolbarContent: React.FC<{
 };
 
 
-export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate }: MarkdownEditorProps) => {
+export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolbarVisible = true }: MarkdownEditorProps) => {
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [linkModalData, setLinkModalData] = useState<{ url: string; text: string }>({ url: '', text: '' });
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -754,13 +755,15 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate }: Mark
             </div>
 
             {/* Fixed Footer Toolbar */}
-            <div className="z-[150] shrink-0 py-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-gray-100 dark:border-gray-800 flex justify-center">
-                <EditorToolbar
-                    editor={editor}
-                    onLinkClick={() => openLinkModal()}
-                    onImageClick={openImageModal}
-                />
-            </div>
+            {toolbarVisible && (
+                <div className="z-[150] shrink-0 py-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-gray-100 dark:border-gray-800 flex justify-center">
+                    <EditorToolbar
+                        editor={editor}
+                        onLinkClick={() => openLinkModal()}
+                        onImageClick={openImageModal}
+                    />
+                </div>
+            )}
         </div>
     );
 };

@@ -31,6 +31,8 @@ const createWindow = () => {
     }
     return { action: 'deny' };
   });
+  // Auto-update check on startup
+  autoUpdater.checkForUpdatesAndNotify();
 };
 
 app.whenReady().then(createWindow);

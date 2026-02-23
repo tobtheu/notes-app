@@ -260,21 +260,39 @@ body,
 
 /* Tiptap Table Styles */
 .tiptap table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   margin: 1.5rem 0;
   table-layout: fixed;
   width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
   overflow: hidden;
 }
 
 .tiptap table td,
 .tiptap table th {
   min-width: 1em;
-  border: 1px solid #cbd5e1;
-  padding: 8px 12px;
+  border-right: 1px solid #cbd5e1;
+  border-bottom: 1px solid #cbd5e1;
+  padding: 0px 10px;
   vertical-align: top;
   box-sizing: border-box;
   position: relative;
+}
+
+.tiptap table td:last-child,
+.tiptap table th:last-child {
+  border-right: 0;
+}
+
+.tiptap table tr:last-child td,
+.tiptap table tr:last-child th {
+  border-bottom: 0;
+}
+
+.dark .tiptap table {
+  border-color: #475569;
 }
 
 .dark .tiptap table td,

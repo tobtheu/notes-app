@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Note } from '../types';
 import { MarkdownEditor } from './MarkdownEditor';
 import clsx from 'clsx';
+import { MoreVertical, FileDown, Eye, EyeOff } from 'lucide-react';
 
 interface EditorProps {
     note: Note;
@@ -10,9 +11,11 @@ interface EditorProps {
     onUpdateLocally: (filename: string, content: string, folder?: string) => void;
     onNavigate?: (id: string, anchor?: string) => void;
     markdownEnabled: boolean;
+    toolbarVisible: boolean;
+    setToolbarVisible: (visible: boolean) => void;
 }
 
-export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, markdownEnabled }: EditorProps) {
+export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, markdownEnabled, toolbarVisible, setToolbarVisible }: EditorProps) {
     const [content, setContent] = useState(note.content);
     const [isScrolling, setIsScrolling] = useState(false);
     const scrollTimeoutRef = useRef<any>(null);
@@ -21,6 +24,8 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
     const lastNoteId = useRef(`${note.folder}/${note.filename}`);
 
     const lastSavedContent = useRef(note.content);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
 
     // Sync internal state only when a DIFFERENT note is loaded
     useEffect(() => {
@@ -99,6 +104,21 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
     }, []);
 
     useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+
+        if (isMenuOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isMenuOpen]);
+
+    useEffect(() => {
         return () => {
             if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
         };
@@ -117,16 +137,54 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
             )}
             onScroll={handleScroll}
         >
-            <div className="absolute top-4 right-4 z-10 flex gap-2">
+            <div className="absolute top-4 right-4 z-10 flex gap-2" ref={menuRef}>
                 <div className="text-xs text-gray-300 self-center mr-2 italic">
                     {content !== note.content ? 'Saving...' : 'Saved'}
                 </div>
-                <button
-                    onClick={handleExport}
-                    className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded text-sm transition shadow-sm border border-gray-200 dark:border-gray-700"
-                >
-                    Export PDF
-                </button>
+                <div className="relative">
+                    <button
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg transition shadow-sm border border-gray-200 dark:border-gray-700"
+                        title="Actions"
+                    >
+                        <MoreVertical size={18} />
+                    </button>
+
+                    {isMenuOpen && (
+                        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 p-1.5 animate-in fade-in zoom-in duration-200 backdrop-blur-xl">
+                            <button
+                                onClick={() => {
+                                    handleExport();
+                                    setIsMenuOpen(false);
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
+                            >
+                                <div className="w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 transition-colors group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                                    <FileDown size={16} />
+                                </div>
+                                <span className="font-medium">Export PDF</span>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    setToolbarVisible(!toolbarVisible);
+                                    setIsMenuOpen(false);
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
+                            >
+                                <div className={clsx(
+                                    "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                                    toolbarVisible
+                                        ? "bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
+                                        : "bg-gray-100 dark:bg-gray-700 text-gray-500 group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400"
+                                )}>
+                                    {toolbarVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </div>
+                                <span className="font-medium">{toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div
@@ -162,6 +220,7 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
                             allNotes={allNotes}
                             onChange={handleBodyChange}
                             onNavigate={onNavigate}
+                            toolbarVisible={toolbarVisible}
                         />
                     </div>
                 ) : (

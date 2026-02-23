@@ -10,6 +10,7 @@ import { useSettings } from './hooks/useSettings';
 import { FolderEditModal } from './components/FolderEditModal';
 import type { Note, FolderMetadata } from './types';
 import { Folder } from 'lucide-react';
+import { UpdateModal } from './components/UpdateModal';
 
 function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -18,11 +19,14 @@ function App() {
   const [categoryToEdit, setCategoryToEdit] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string>(Date.now().toString());
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
   const { theme, setTheme } = useTheme();
   const {
     markdownEnabled, setMarkdownEnabled,
-    accentColor, setAccentColor
+    accentColor, setAccentColor,
+    toolbarVisible, setToolbarVisible
   } = useSettings();
 
   useEffect(() => {
@@ -87,6 +91,35 @@ function App() {
       return () => clearTimeout(timer);
     }
   }, [selectedNote, pendingAnchor]);
+
+  // Handle auto-updates
+  useEffect(() => {
+    const removeListener = window.electronAPI.onUpdateStatus((status: any) => {
+      if (status.type === 'available') {
+        const skippedVersion = localStorage.getItem('skipped-update-version');
+        if (skippedVersion !== status.version) {
+          setUpdateVersion(status.version);
+          setIsUpdateModalOpen(true);
+        }
+      }
+    });
+
+    return () => {
+      if (typeof removeListener === 'function') removeListener();
+    };
+  }, []);
+
+  const handleUpdate = () => {
+    window.electronAPI.downloadUpdate();
+    setIsUpdateModalOpen(false);
+  };
+
+  const handleSkipUpdate = () => {
+    if (updateVersion) {
+      localStorage.setItem('skipped-update-version', updateVersion);
+    }
+    setIsUpdateModalOpen(false);
+  };
 
 
   if (!currentFolder) {
@@ -176,6 +209,8 @@ function App() {
             onUpdateLocally={updateNoteLocally}
             onNavigate={handleNavigate}
             markdownEnabled={markdownEnabled}
+            toolbarVisible={toolbarVisible}
+            setToolbarVisible={setToolbarVisible}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-400 p-8 text-center animate-in fade-in duration-500">
@@ -214,6 +249,15 @@ function App() {
           folderName={categoryToDelete}
           onClose={() => setCategoryToDelete(null)}
           onConfirm={handleDeleteCategory}
+        />
+      )}
+
+      {isUpdateModalOpen && updateVersion && (
+        <UpdateModal
+          version={updateVersion}
+          onUpdate={handleUpdate}
+          onSkip={handleSkipUpdate}
+          onCancel={() => setIsUpdateModalOpen(false)}
         />
       )}
     </div>

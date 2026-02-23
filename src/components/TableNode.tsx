@@ -33,7 +33,7 @@ export const TableNode: React.FC<NodeViewProps> = (props) => {
             </div>
 
             {/* The Actual Table */}
-            <table className="w-full border-collapse table-fixed" style={{ width: '100%' }}>
+            <table className="w-full table-fixed" style={{ width: '100%' }}>
                 {/* @ts-ignore */}
                 <NodeViewContent as="tbody" />
             </table>
