@@ -30,7 +30,7 @@ import { TableNode } from './TableNode';
 import { UrlInputModal } from './UrlInputModal';
 import { toggleSmartMark } from '../utils/editor';
 import { WikiLinkMenu } from './WikiLinkMenu';
-import { TextSelection } from '@tiptap/pm/state';
+import { TextSelection, PluginKey } from '@tiptap/pm/state';
 
 interface MarkdownEditorProps {
     content: string;
@@ -135,6 +135,7 @@ const WikiLinkSuggestion = Extension.create({
             Suggestion({
                 editor: this.editor,
                 char: '[[',
+                pluginKey: new PluginKey('wikiLinkSuggestion'),
                 command: ({ editor, range, props }: any) => {
                     const { id, anchor, label } = props;
                     const encodedId = id.split('/').map((s: string) => encodeURIComponent(s)).join('/');
@@ -210,6 +211,7 @@ const SlashCommands = Extension.create({
             Suggestion({
                 editor: this.editor,
                 char: '/',
+                pluginKey: new PluginKey('slashCommands'),
                 command: ({ editor, range, props }: any) => {
                     props.command({ editor, range });
                 },
@@ -500,6 +502,8 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
             }),
             Markdown.configure({
                 linkify: true,
+                // The Markdown extension might accidentally include its own link extension
+                // Logic to handle this depends on the version, but ensuring Link is configured separately is key
             }),
             TaskList,
             TaskItem.configure({

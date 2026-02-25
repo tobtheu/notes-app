@@ -108,6 +108,9 @@ function App() {
       }
     });
 
+    // Initial check on mount
+    window.electronAPI.checkForUpdates();
+
     return () => {
       if (typeof removeListener === 'function') removeListener();
     };
