@@ -8,7 +8,7 @@ interface EditorProps {
     note: Note;
     allNotes?: Note[];
     onSave: (filename: string, content: string, folder?: string) => void;
-    onUpdateLocally: (filename: string, content: string, folder?: string) => void;
+    onUpdateLocally: (filename: string, content: string, folder?: string, updateTimestamp?: boolean) => void;
     onNavigate?: (id: string, anchor?: string) => void;
     markdownEnabled: boolean;
     toolbarVisible: boolean;
@@ -22,6 +22,7 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const titleRef = useRef<HTMLTextAreaElement>(null);
     const lastNoteId = useRef(`${note.folder}/${note.filename}`);
+    const isMounting = useRef(true);
 
     const lastSavedContent = useRef(note.content);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -34,6 +35,14 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
             setContent(note.content);
             lastSavedContent.current = note.content;
             lastNoteId.current = currentNoteId;
+            isMounting.current = true;
+
+            // Allow a "settling" period of 1.5s where updates are ignored
+            // This prevents Tiptap's initial normalization from triggering a re-sort
+            const timer = setTimeout(() => {
+                isMounting.current = false;
+            }, 1500);
+            return () => clearTimeout(timer);
         }
     }, [note.folder, note.filename, note.content]);
 
@@ -76,8 +85,16 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
 
     // Sync to local notes state (optimistic update)
     useEffect(() => {
+        if (isMounting.current) return;
+
         if (content !== note.content) {
-            onUpdateLocally(note.filename, content, note.folder);
+            // Only trigger an update if the content change is significant (not just normalization)
+            // This ensures the notes list remains absolutely stable on opening a note.
+            const isSignificantChange = content.trim() !== note.content.trim();
+            if (isSignificantChange) {
+                // updateTimestamp: false ensures the note doesn't jump to top during editing
+                onUpdateLocally(note.filename, content, note.folder, false);
+            }
         }
     }, [content, note.filename, note.folder, onUpdateLocally, note.content]);
 
@@ -85,7 +102,11 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
     useEffect(() => {
         const handler = setTimeout(() => {
             if (content !== lastSavedContent.current) {
-                onSave(note.filename, content, note.folder);
+                // Only save to disk if the change is significant to avoid updating mtime on normalization
+                const isSignificant = content.trim() !== lastSavedContent.current.trim();
+                if (isSignificant) {
+                    onSave(note.filename, content, note.folder);
+                }
                 lastSavedContent.current = content;
             }
         }, 1000);
@@ -130,14 +151,8 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
     };
 
     return (
-        <div
-            className={clsx(
-                "flex flex-col h-full bg-white dark:bg-gray-900 overflow-y-auto custom-scrollbar",
-                isScrolling && "is-scrolling"
-            )}
-            onScroll={handleScroll}
-        >
-            <div className="absolute top-4 right-4 z-10 flex gap-2" ref={menuRef}>
+        <div className="flex flex-col h-full bg-white dark:bg-gray-900 overflow-hidden relative">
+            <div className="fixed top-4 right-8 z-50 flex gap-2" ref={menuRef}>
                 <div className="text-xs text-gray-300 self-center mr-2 italic">
                     {content !== note.content ? 'Saving...' : 'Saved'}
                 </div>
@@ -187,55 +202,60 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
                 </div>
             </div>
 
-            <div
-                className="max-w-4xl w-full mx-auto px-8 pt-16 flex-1 flex flex-col cursor-text overflow-hidden"
-                onClick={() => {
-                    // Only jump if nothing is selected (prevents killing a fresh drag-selection)
-                    if (window.getSelection()?.type === 'Range') return;
-
-                    if (markdownEnabled) {
-                        const editor = document.querySelector('.milkdown .ProseMirror') as HTMLElement;
-                        editor?.focus();
-                    } else {
-                        textareaRef.current?.focus();
+            {markdownEnabled ? (
+                <MarkdownEditor
+                    content={body}
+                    allNotes={allNotes}
+                    onChange={handleBodyChange}
+                    onNavigate={onNavigate}
+                    toolbarVisible={toolbarVisible}
+                    header={
+                        <textarea
+                            ref={titleRef}
+                            className="w-full p-0 text-4xl font-bold bg-transparent border-none outline-none resize-none font-sans text-gray-900 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700"
+                            placeholder="Note Title"
+                            value={title}
+                            onChange={(e) => handleTitleChange(e.target.value)}
+                            onFocus={handleEndFocus}
+                            onClick={handleEndFocus}
+                            spellCheck={false}
+                            rows={1}
+                        />
                     }
-                }}
-            >
-                <textarea
-                    ref={titleRef}
-                    className="w-full p-0 text-4xl font-bold bg-transparent border-none outline-none resize-none font-sans text-gray-900 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700"
-                    placeholder="Note Title"
-                    value={title}
-                    onChange={(e) => handleTitleChange(e.target.value)}
-                    onFocus={handleEndFocus}
-                    onClick={handleEndFocus}
-                    spellCheck={false}
-                    rows={1}
                 />
-
-                {markdownEnabled ? (
-                    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                        <MarkdownEditor
-                            content={body}
-                            allNotes={allNotes}
-                            onChange={handleBodyChange}
-                            onNavigate={onNavigate}
-                            toolbarVisible={toolbarVisible}
+            ) : (
+                <div
+                    className={clsx(
+                        "flex-1 overflow-y-auto custom-scrollbar px-8 pt-16 flex flex-col cursor-text",
+                        isScrolling && "is-scrolling"
+                    )}
+                    onScroll={handleScroll}
+                >
+                    <div className="max-w-4xl w-full mx-auto flex-1 flex flex-col">
+                        <textarea
+                            ref={titleRef}
+                            className="w-full p-0 text-4xl font-bold bg-transparent border-none outline-none resize-none font-sans text-gray-900 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700 shrink-0"
+                            placeholder="Note Title"
+                            value={title}
+                            onChange={(e) => handleTitleChange(e.target.value)}
+                            onFocus={handleEndFocus}
+                            onClick={handleEndFocus}
+                            spellCheck={false}
+                            rows={1}
+                        />
+                        <textarea
+                            ref={textareaRef}
+                            className="w-full p-0 text-lg bg-transparent border-none outline-none resize-none font-sans text-gray-800 dark:text-gray-300 leading-relaxed flex-1"
+                            placeholder="Start typing your note here..."
+                            value={body}
+                            onChange={(e) => handleBodyChange(e.target.value)}
+                            onFocus={handleEndFocus}
+                            onClick={handleEndFocus}
+                            spellCheck={false}
                         />
                     </div>
-                ) : (
-                    <textarea
-                        ref={textareaRef}
-                        className="w-full p-0 text-lg bg-transparent border-none outline-none resize-none font-sans text-gray-800 dark:text-gray-300 leading-relaxed flex-1"
-                        placeholder="Start typing your note here..."
-                        value={body}
-                        onChange={(e) => handleBodyChange(e.target.value)}
-                        onFocus={handleEndFocus}
-                        onClick={handleEndFocus}
-                        spellCheck={false}
-                    />
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }

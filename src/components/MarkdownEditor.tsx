@@ -36,6 +36,7 @@ interface MarkdownEditorProps {
     onChange: (markdown: string) => void;
     onNavigate?: (id: string, anchor?: string) => void;
     toolbarVisible?: boolean;
+    header?: React.ReactNode;
 }
 
 // suggestion items definition
@@ -188,7 +189,8 @@ const BubbleToolbarContent: React.FC<{
     hoveredLink?: { href: string; pos: number; rect: DOMRect } | null;
     onImageEdit?: () => void;
     onImagePreview?: () => void;
-}> = ({ editor, onLinkClick, onRemoveLink, hoveredLink, onImageEdit, onImagePreview }) => {
+    onNavigate?: (id: string, anchor?: string) => void;
+}> = ({ editor, onLinkClick, onRemoveLink, hoveredLink, onImageEdit, onImagePreview, onNavigate }) => {
     // Add a local state to force re-renders when the editor state changes
     const [, setUpdateCount] = useState(0);
 
@@ -251,7 +253,17 @@ const BubbleToolbarContent: React.FC<{
                         onClick={(e) => {
                             e.preventDefault();
                             const href = hoveredLink?.href || editor.getAttributes('link').href;
-                            if (href) window.open(href, '_blank');
+                            if (href) {
+                                if (href.startsWith('note://') || href.startsWith('id:')) {
+                                    const cleanHref = href.replace('note://', '').replace('id:', '');
+                                    const [id, anchor] = cleanHref.split('#');
+                                    onNavigate?.(decodeURIComponent(id), anchor);
+                                } else if (href.startsWith('#')) {
+                                    onNavigate?.('', href.substring(1));
+                                } else {
+                                    window.open(href, '_blank');
+                                }
+                            }
                         }}
                         className="p-1.5 rounded-md hover:bg-primary-50 dark:hover:bg-primary-900/40 text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                         title="Open Link"
@@ -336,7 +348,7 @@ const BubbleToolbarContent: React.FC<{
 };
 
 
-export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolbarVisible = true }: MarkdownEditorProps) => {
+export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolbarVisible = true, header }: MarkdownEditorProps) => {
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [linkModalData, setLinkModalData] = useState<{ url: string; text: string }>({ url: '', text: '' });
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -364,6 +376,7 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
         }, 300);
     };
 
+
     const handleScroll = useCallback(() => {
         setIsScrolling(true);
         if (scrollTimeoutRef.current) {
@@ -379,6 +392,8 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
             if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
         };
     }, []);
+
+    const isInitialRender = useRef(true);
 
     const editor = useEditor({
         extensions: [
@@ -401,7 +416,9 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                     return [`h${level}`, mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { id }), 0];
                 },
             }),
-            Markdown,
+            Markdown.configure({
+                linkify: true,
+            }),
             TaskList,
             TaskItem.configure({
                 nested: true,
@@ -412,6 +429,8 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
             Link.configure({
                 openOnClick: false, // Handle manually to intercept internal links
                 autolink: true,
+                protocols: ['note', 'id'],
+                validate: href => /^https?:\/\/|^note:\/\/|^id:|^#|^\//.test(href),
                 HTMLAttributes: {
                     class: 'cursor-pointer text-primary-600 hover:text-primary-700 underline underline-offset-4',
                 },
@@ -434,6 +453,10 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
         ],
         content: content,
         onUpdate: ({ editor }) => {
+            if (isInitialRender.current) {
+                isInitialRender.current = false;
+                return;
+            }
             const markdown = (editor.storage as any).markdown.getMarkdown();
             onChange(markdown);
         },
@@ -450,25 +473,39 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                     const anchor = target.closest('a');
                     if (anchor && onNavigate) {
                         const href = anchor.getAttribute('href');
+                        console.log('Link clicked:', { href });
+
                         if (href) {
-                            if (href.startsWith('#')) {
-                                // Anchor within current note
+                            const isInternal = href.startsWith('note://') || href.startsWith('id:') || href.startsWith('#') || href.endsWith('.md');
+                            if (isInternal) {
                                 event.preventDefault();
-                                onNavigate('', href.substring(1));
-                                return true;
-                            } else if (href.startsWith('note://') || href.endsWith('.md')) {
-                                // Internal note link
-                                event.preventDefault();
-                                const cleanHref = href.replace('note://', '');
-                                const [id, anchor] = cleanHref.split('#');
-                                onNavigate(id, anchor);
+                                event.stopPropagation();
+
+                                if (href.startsWith('#')) {
+                                    onNavigate('', href.substring(1));
+                                } else {
+                                    const cleanHref = href.replace('note://', '').replace('id:', '');
+                                    const [id, anchor] = cleanHref.split('#');
+                                    // Decode specifically for navigation (in case it was encoded for markdown)
+                                    onNavigate(decodeURIComponent(id), anchor);
+                                }
                                 return true;
                             }
                         }
                     }
                     return false;
                 },
-                mousedown: () => {
+                mousedown: (_, event) => {
+                    const target = event.target as HTMLElement;
+                    const anchor = target.closest('a');
+                    if (anchor) {
+                        const href = anchor.getAttribute('href');
+                        if (href && (href.startsWith('note://') || href.startsWith('id:') || href.startsWith('#'))) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            return true;
+                        }
+                    }
                     setHoveredLink(null);
                     clearHideTimeout();
                     return false;
@@ -553,7 +590,20 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                 return false;
             },
         },
-    }, [onNavigate]);
+    }, []); // STABLE: Empty dependency array to prevent re-creation
+
+    // Handle content updates (e.g. when switching notes)
+    useEffect(() => {
+        if (!editor) return;
+
+        // Only update if content is fundamentally different (e.g. switching notes)
+        // This prevents the "cursor jump" because it only runs when the external content
+        // is no longer what the editor currently has (and it's not from a local change)
+        const currentMarkdown = (editor.storage as any).markdown.getMarkdown();
+        if (content !== currentMarkdown) {
+            editor.commands.setContent(content, { emitUpdate: false });
+        }
+    }, [editor, content]);
 
     const openLinkModal = useCallback((initialUrl?: string, initialText?: string) => {
         if (!editor) return;
@@ -631,7 +681,7 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
     return (
         <div
             className={clsx(
-                "flex flex-col h-full w-full bg-white dark:bg-gray-900 relative",
+                "flex flex-col flex-1 w-full bg-white dark:bg-gray-900 relative overflow-hidden",
                 isScrolling && "is-scrolling"
             )}
             onMouseLeave={() => setHoveredLink(null)}
@@ -679,6 +729,7 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                             const attrs = editor.getAttributes('image');
                             setLightboxImage({ src: attrs.src, caption: attrs.alt });
                         }}
+                        onNavigate={onNavigate}
                     />
                 </BubbleMenu>
             )}
@@ -700,6 +751,7 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                         onLinkClick={openLinkModal}
                         onRemoveLink={() => setHoveredLink(null)}
                         hoveredLink={hoveredLink}
+                        onNavigate={onNavigate}
                     />
                 </div>
             )}
@@ -743,19 +795,20 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                 className="hidden"
             />
 
-            {/* Scrollable Editor Content */}
+            {/* Content area - isolated scroll area */}
             <div
                 className="flex-1 overflow-y-auto custom-scrollbar min-h-0"
                 onScroll={handleScroll}
             >
-                <div className="max-w-4xl mx-auto py-8 px-4">
+                <div className="max-w-4xl mx-auto py-8 px-8">
+                    {header}
                     <EditorContent editor={editor} />
                 </div>
             </div>
 
-            {/* Fixed Footer Toolbar */}
+            {/* Footer Toolbar - stays fixed at bottom of MarkdownEditor */}
             {toolbarVisible && (
-                <div className="z-[150] shrink-0 py-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-gray-100 dark:border-gray-800 flex justify-center">
+                <div className="shrink-0 py-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex justify-center w-full">
                     <EditorToolbar
                         editor={editor}
                         onLinkClick={() => openLinkModal()}

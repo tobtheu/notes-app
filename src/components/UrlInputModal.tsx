@@ -80,7 +80,9 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
         let finalUrl = url;
         if (type === 'link' && linkType === 'internal' && selectedNote) {
             const notePath = selectedNote.folder ? `${selectedNote.folder}/${selectedNote.filename}` : selectedNote.filename;
-            finalUrl = `note://${notePath}${selectedHeadline ? `#${selectedHeadline.toLowerCase().replace(/[^a-z0-9äöüß ]/gi, '').trim().replace(/\s+/g, '-')}` : ''}`;
+            // Encode the path to ensure spaces and special characters don't break the markdown link
+            const encodedPath = notePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+            finalUrl = `note://${encodedPath}${selectedHeadline ? `#${selectedHeadline.toLowerCase().replace(/[^a-z0-9äöüß ]/gi, '').trim().replace(/\s+/g, '-')}` : ''}`;
         }
         onSave(finalUrl, text, caption);
         onClose();

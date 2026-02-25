@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNotes } from './hooks/useNotes';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
@@ -17,7 +17,6 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [categoryToEdit, setCategoryToEdit] = useState<string | null>(null);
-  const [editingSessionId, setEditingSessionId] = useState<string>(Date.now().toString());
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
@@ -59,13 +58,18 @@ function App() {
     getNoteId,
   } = useNotes();
 
+  const allNotesRef = useRef(allNotes);
+  useEffect(() => {
+    allNotesRef.current = allNotes;
+  }, [allNotes]);
+
   const handleNavigate = useCallback((id: string, anchor?: string) => {
+    console.log('handleNavigate called:', { id, anchor });
     if (id) {
       // Find note by ID (lowercase path)
-      const note = allNotes.find((n: Note) => getNoteId(n) === id.toLowerCase());
+      const note = allNotesRef.current.find((n: Note) => getNoteId(n) === id.toLowerCase());
       if (note) {
         setSelectedNote(getNoteId(note));
-        setEditingSessionId(Date.now().toString());
         if (anchor) setPendingAnchor(anchor);
       }
     } else if (anchor) {
@@ -75,7 +79,7 @@ function App() {
         element.scrollIntoView({ behavior: 'smooth' });
       }
     }
-  }, [allNotes, getNoteId, setSelectedNote]);
+  }, [getNoteId, setSelectedNote]);
 
   // Effect to handle pending anchor scrolling after editor loads
   useEffect(() => {
@@ -189,7 +193,6 @@ function App() {
         selectedNote={selectedNote}
         onSelectNote={(note) => {
           setSelectedNote(getNoteId(note));
-          setEditingSessionId(Date.now().toString());
         }}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
@@ -202,7 +205,6 @@ function App() {
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {selectedNote ? (
           <Editor
-            key={editingSessionId}
             note={selectedNote}
             allNotes={allNotes}
             onSave={saveNote}

@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Note, AppMetadata, FolderMetadata } from '../types';
 
 export function useNotes() {
     const [baseFolder, setBaseFolder] = useState<string | null>(null);
     const [notes, setNotes] = useState<Note[]>([]);
     const [folders, setFolders] = useState<string[]>([]);
-    const [metadata, setMetadata] = useState<AppMetadata>({ folders: {} });
+    const [metadata, setMetadata] = useState<AppMetadata>({ folders: {}, pinnedNotes: [] });
     const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); // This is now the relative path: "folder/filename.md" or "filename.md" (lowercased)
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -30,6 +30,8 @@ export function useNotes() {
         // Normalize pinned notes in metadata to lowercase for consistency
         if (meta.pinnedNotes) {
             meta.pinnedNotes = meta.pinnedNotes.map(p => p.toLowerCase());
+        } else {
+            meta.pinnedNotes = [];
         }
         setMetadata(meta);
     }, [baseFolder]);
@@ -49,7 +51,11 @@ export function useNotes() {
             });
             const uniqueNotes = Array.from(uniqueMap.values());
 
-            setNotes(uniqueNotes.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+            setNotes(uniqueNotes.sort((a, b) => {
+                const timeDiff = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+                if (timeDiff !== 0) return timeDiff;
+                return a.filename.localeCompare(b.filename);
+            }));
 
             const loadedFolders = await window.electronAPI.listFolders(baseFolder);
             setFolders(loadedFolders);
@@ -64,11 +70,17 @@ export function useNotes() {
         loadNotes();
     }, [loadNotes]);
 
+    const lastSaveTime = useRef<number>(0);
+
     // Setup Watcher
     useEffect(() => {
         if (!baseFolder) return;
         window.electronAPI.startWatch(baseFolder);
         const cleanup = window.electronAPI.onFileChanged(() => {
+            // Ignore events if we just saved (prevent "save-reload-loop")
+            const now = Date.now();
+            if (now - lastSaveTime.current < 3000) return;
+
             loadNotes();
         });
         return cleanup;
@@ -86,11 +98,15 @@ export function useNotes() {
         }
     };
 
-    const updateNoteLocally = (filename: string, content: string, folder: string = "") => {
+    const updateNoteLocally = (filename: string, content: string, folder: string = "", updateTimestamp: boolean = false) => {
         const id = folder ? `${folder}/${filename}`.toLowerCase() : filename.toLowerCase();
         setNotes(prev => prev.map(n =>
             getNoteId(n) === id
-                ? { ...n, content, updatedAt: new Date().toISOString() }
+                ? {
+                    ...n,
+                    content,
+                    updatedAt: updateTimestamp ? new Date().toISOString() : n.updatedAt
+                }
                 : n
         ));
     };
@@ -161,6 +177,7 @@ export function useNotes() {
         });
 
         if (result) {
+            lastSaveTime.current = Date.now();
             await loadNotes();
         }
     };
@@ -332,7 +349,9 @@ export function useNotes() {
             if (aPinned && !bPinned) return -1;
             if (!aPinned && bPinned) return 1;
 
-            return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+            const timeDiff = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+            if (timeDiff !== 0) return timeDiff;
+            return a.filename.localeCompare(b.filename);
         });
 
     // Auto-deselect if note is filtered out
