@@ -29,6 +29,8 @@ import clsx from 'clsx';
 import { TableNode } from './TableNode';
 import { UrlInputModal } from './UrlInputModal';
 import { toggleSmartMark } from '../utils/editor';
+import { WikiLinkMenu } from './WikiLinkMenu';
+import { TextSelection } from '@tiptap/pm/state';
 
 interface MarkdownEditorProps {
     content: string;
@@ -120,6 +122,86 @@ const SlashMenu = forwardRef((props: any, ref) => {
 });
 
 SlashMenu.displayName = 'SlashMenu';
+
+const WikiLinkSuggestion = Extension.create({
+    name: 'wikiLinkSuggestion',
+    addOptions() {
+        return {
+            allNotes: [] as Note[],
+        };
+    },
+    addProseMirrorPlugins() {
+        return [
+            Suggestion({
+                editor: this.editor,
+                char: '[[',
+                command: ({ editor, range, props }: any) => {
+                    const { id, anchor, label } = props;
+                    const encodedId = id.split('/').map((s: string) => encodeURIComponent(s)).join('/');
+                    const url = `note://${encodedId}${anchor ? `#${anchor}` : ''}`;
+
+                    editor
+                        .chain()
+                        .focus()
+                        .deleteRange(range)
+                        .setLink({ href: url })
+                        .insertContent(`[[${label}]]`)
+                        .run();
+                },
+                items: ({ query }: { query: string }) => {
+                    const allNotes = this.options.allNotes as Note[];
+                    return allNotes.filter(note =>
+                        note.filename.toLowerCase().includes(query.toLowerCase()) ||
+                        (note.folder && note.folder.toLowerCase().includes(query.toLowerCase()))
+                    ).slice(0, 10);
+                },
+                render: () => {
+                    let component: any;
+                    let popup: Instance[];
+
+                    return {
+                        onStart: props => {
+                            component = new ReactRenderer(WikiLinkMenu, {
+                                props,
+                                editor: props.editor,
+                            });
+
+                            popup = tippy('body', {
+                                getReferenceClientRect: props.clientRect as any,
+                                appendTo: () => document.body,
+                                content: component.element,
+                                showOnCreate: true,
+                                interactive: true,
+                                trigger: 'manual',
+                                placement: 'bottom-start',
+                                zIndex: 999,
+                            });
+                        },
+                        onUpdate(props) {
+                            component.updateProps(props);
+                            if (popup && popup[0]) {
+                                popup[0].setProps({
+                                    getReferenceClientRect: props.clientRect as any,
+                                });
+                            }
+                        },
+                        onKeyDown(props) {
+                            if (props.event.key === 'Escape') {
+                                popup?.[0]?.hide();
+                                return true;
+                            }
+                            return component.ref?.onKeyDown(props);
+                        },
+                        onExit() {
+                            popup?.[0]?.destroy();
+                            component.destroy();
+                        },
+                    };
+                },
+            }),
+        ];
+    },
+});
 
 const SlashCommands = Extension.create({
     name: 'slashCommands',
@@ -450,6 +532,9 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                 placeholder: "Type '/' for commands...",
             }),
             SlashCommands,
+            WikiLinkSuggestion.configure({
+                allNotes: allNotes || [],
+            }),
         ],
         content: content,
         onUpdate: ({ editor }) => {
@@ -489,6 +574,35 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                                     // Decode specifically for navigation (in case it was encoded for markdown)
                                     onNavigate(decodeURIComponent(id), anchor);
                                 }
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                },
+                keydown: (view, event) => {
+                    if (event.key === '[') {
+                        const { selection } = view.state;
+                        const { from } = selection;
+                        const prevChar = view.state.doc.textBetween(from - 1, from);
+
+                        if (prevChar === '[') {
+                            // User typed the second [, auto-close with ]]
+                            view.dispatch(view.state.tr.insertText(']]', from).setSelection(TextSelection.near(view.state.doc.resolve(from))));
+                            // Note: Suggestion will trigger because matches '[['
+                        }
+                    }
+
+                    if (event.key === 'Backspace') {
+                        const { selection } = view.state;
+                        if (selection.empty) {
+                            const { from } = selection;
+                            const textBefore = view.state.doc.textBetween(from - 2, from);
+                            const textAfter = view.state.doc.textBetween(from, from + 2);
+
+                            if (textBefore === '[[' && textAfter === ']]') {
+                                // Delete both pairs
+                                view.dispatch(view.state.tr.delete(from - 2, from + 2));
                                 return true;
                             }
                         }
