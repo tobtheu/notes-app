@@ -28,7 +28,8 @@ const stripMarkdown = (text: string) => {
         .replace(/^#+\s+/, '') // Remove headers
         .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1') // Remove image syntax, keep alt
         .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Remove link syntax, keep text
-        .replace(/[#*`_~]/g, '') // Remove Markdown characters
+        // Only strip #*`_~ if they are likely part of markdown syntax (not just symbols)
+        .replace(/(^|\s)[#*`_~]+|[#*`_~]+(\s|$)/g, '$1$2')
         .replace(/\[[x ]\]/g, '') // Remove task list brackets
         .replace(/<[^>]*>/g, '') // Remove HTML tags
         .trim();

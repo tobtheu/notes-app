@@ -20,23 +20,15 @@ function App() {
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<{
+    type: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
+    progress?: number;
+    error?: string;
+    version?: string;
+  }>({ type: 'idle' });
 
   const { theme, setTheme } = useTheme();
-  const {
-    markdownEnabled, setMarkdownEnabled,
-    accentColor, setAccentColor,
-    fontFamily, setFontFamily,
-    fontSize, setFontSize,
-    toolbarVisible, setToolbarVisible
-  } = useSettings();
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-accent', accentColor);
-  }, [accentColor]);
-
-  useEffect(() => {
-    document.documentElement.style.fontSize = fontSize === 'small' ? '14px' : fontSize === 'large' ? '18px' : '16px';
-  }, [fontSize]);
 
   const {
     currentFolder,
@@ -58,6 +50,7 @@ function App() {
     createFolder,
     renameFolder,
     updateFolderMetadata,
+    saveSettings,
     deleteFolder,
     reorderFolders,
     moveNote,
@@ -65,6 +58,23 @@ function App() {
     isNotePinned,
     getNoteId,
   } = useNotes();
+
+  const {
+    markdownEnabled, setMarkdownEnabled,
+    accentColor, setAccentColor,
+    fontFamily, setFontFamily,
+    fontSize, setFontSize,
+    toolbarVisible, setToolbarVisible,
+    spellcheckEnabled, setSpellcheckEnabled
+  } = useSettings(metadata.settings, saveSettings);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-accent', accentColor);
+  }, [accentColor]);
+
+  useEffect(() => {
+    document.documentElement.style.fontSize = fontSize === 'small' ? '14px' : fontSize === 'large' ? '18px' : '16px';
+  }, [fontSize]);
 
   const allNotesRef = useRef(allNotes);
   useEffect(() => {
@@ -107,6 +117,7 @@ function App() {
   // Handle auto-updates
   useEffect(() => {
     const removeListener = window.electronAPI.onUpdateStatus((status: any) => {
+      setUpdateStatus(status);
       if (status.type === 'available') {
         const skippedVersion = localStorage.getItem('skipped-update-version');
         if (skippedVersion !== status.version) {
@@ -126,7 +137,11 @@ function App() {
 
   const handleUpdate = () => {
     window.electronAPI.downloadUpdate();
-    setIsUpdateModalOpen(false);
+    // Do not close modal, status will update to 'downloading'
+  };
+
+  const handleInstallUpdate = () => {
+    window.electronAPI.quitAndInstall();
   };
 
   const handleSkipUpdate = () => {
@@ -226,6 +241,7 @@ function App() {
             onUpdateLocally={updateNoteLocally}
             onNavigate={handleNavigate}
             markdownEnabled={markdownEnabled}
+            spellcheckEnabled={spellcheckEnabled}
             toolbarVisible={toolbarVisible}
             setToolbarVisible={setToolbarVisible}
           />
@@ -263,6 +279,8 @@ function App() {
         setFontFamily={setFontFamily}
         fontSize={fontSize}
         setFontSize={setFontSize}
+        spellcheckEnabled={spellcheckEnabled}
+        onToggleSpellcheck={setSpellcheckEnabled}
       />
 
       {categoryToDelete && (
@@ -279,6 +297,8 @@ function App() {
           onUpdate={handleUpdate}
           onSkip={handleSkipUpdate}
           onCancel={() => setIsUpdateModalOpen(false)}
+          onInstall={handleInstallUpdate}
+          status={updateStatus}
         />
       )}
     </div>

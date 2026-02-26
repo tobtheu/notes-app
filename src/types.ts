@@ -14,6 +14,7 @@ export interface AppMetadata {
     folders: Record<string, FolderMetadata>;
     pinnedNotes: string[];
     folderOrder?: string[];
+    settings?: any;
 }
 
 export interface ElectronAPI {

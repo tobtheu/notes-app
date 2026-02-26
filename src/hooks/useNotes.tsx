@@ -107,7 +107,7 @@ export function useNotes() {
         const cleanup = window.electronAPI.onFileChanged(() => {
             // Ignore events if we just saved (prevent "save-reload-loop")
             const now = Date.now();
-            if (now - lastSaveTime.current < 3000) return;
+            if (now - lastSaveTime.current < 1000) return;
 
             loadNotes();
         });
@@ -439,6 +439,14 @@ export function useNotes() {
         await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMetadata });
     };
 
+    const saveSettings = async (settings: any) => {
+        if (!baseFolder) return;
+        const newMetadata = { ...metadata, settings: { ...metadata.settings, ...settings } };
+        setMetadata(newMetadata);
+        lastSaveTime.current = Date.now();
+        await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMetadata });
+    };
+
     // Helper to check if a note is pinned
     const isNotePinned = (note: Note) => {
         const notePath = getNoteId(note);
@@ -502,6 +510,7 @@ export function useNotes() {
         createFolder,
         renameFolder,
         updateFolderMetadata,
+        saveSettings,
         deleteFolder,
         reorderFolders,
         moveNote,

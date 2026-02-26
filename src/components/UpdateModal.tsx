@@ -5,9 +5,15 @@ interface UpdateModalProps {
     onUpdate: () => void;
     onSkip: () => void;
     onCancel: () => void;
+    onInstall: () => void;
+    status: {
+        type: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
+        progress?: number;
+        error?: string;
+    };
 }
 
-export function UpdateModal({ version, onUpdate, onSkip, onCancel }: UpdateModalProps) {
+export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, status }: UpdateModalProps) {
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in zoom-in-95 duration-200">
@@ -30,12 +36,48 @@ export function UpdateModal({ version, onUpdate, onSkip, onCancel }: UpdateModal
                     </p>
 
                     <div className="space-y-3">
-                        <button
-                            onClick={onUpdate}
-                            className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-all shadow-md shadow-primary-500/20 active:scale-[0.98]"
-                        >
-                            Update & Restart
-                        </button>
+                        {status.type === 'available' && (
+                            <button
+                                onClick={onUpdate}
+                                className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-all shadow-md shadow-primary-500/20 active:scale-[0.98]"
+                            >
+                                Update & Restart
+                            </button>
+                        )}
+
+                        {status.type === 'downloading' && (
+                            <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-700">
+                                <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-wider">
+                                    <span className="text-gray-500">Downloading...</span>
+                                    <span className="text-primary-600 dark:text-primary-400">{Math.round(status.progress || 0)}%</span>
+                                </div>
+                                <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-primary-500 transition-all duration-300 ease-out"
+                                        style={{ width: `${status.progress || 0}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {status.type === 'downloaded' && (
+                            <button
+                                onClick={onInstall}
+                                className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-all shadow-md shadow-green-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Start Installation
+                            </button>
+                        )}
+
+                        {status.type === 'error' && (
+                            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-xs">
+                                <p className="font-bold mb-1">Update failed</p>
+                                <p className="opacity-80">{status.error}</p>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-3">
                             <button

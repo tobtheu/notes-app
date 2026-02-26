@@ -23,6 +23,8 @@ pub struct AppMetadata {
     pub pinned_notes: Vec<String>,
     #[serde(default)]
     pub folder_order: Option<Vec<String>>,
+    #[serde(default)]
+    pub settings: Option<serde_json::Value>,
 }
 
 fn get_files_recursively(dir: &Path) -> Vec<PathBuf> {
@@ -118,29 +120,56 @@ async fn rename_note(folder_path: String, old_filename: String, new_filename: St
 
 #[tauri::command]
 async fn read_metadata(root_path: String) -> Result<AppMetadata, String> {
-    let meta_path = Path::new(&root_path).join(".notizapp-metadata.json");
-    if meta_path.exists() {
-        let content = fs::read_to_string(meta_path).map_err(|e| e.to_string())?;
+    let config_path = Path::new(&root_path).join("notizapp-config.json");
+    let legacy_path = Path::new(&root_path).join(".notizapp-metadata.json");
+
+    let mut needs_migration = !config_path.exists() && legacy_path.exists();
+
+    // Migration robustness: If config exists but is effectively empty (no folders, no settings),
+    // and we have a legacy file, we should still attempt to migrate.
+    if config_path.exists() && legacy_path.exists() {
+        if let Ok(content) = fs::read_to_string(&config_path) {
+            if let Ok(metadata) = serde_json::from_str::<serde_json::Value>(&content) {
+                // If the new config has no folder groupings yet, it's safe to migrate from legacy.
+                let folders = metadata.get("folders");
+                let folders_empty = folders.map_or(true, |f| f.is_object() && f.as_object().unwrap().is_empty());
+                if folders_empty {
+                    needs_migration = true;
+                }
+            }
+        }
+    }
+
+    if needs_migration {
+        if let Ok(content) = fs::read_to_string(&legacy_path) {
+            let _ = fs::write(&config_path, content);
+        }
+    }
+
+    if config_path.exists() {
+        let content = fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
         let metadata: AppMetadata = serde_json::from_str(&content).unwrap_or_else(|_| AppMetadata { 
             folders: serde_json::json!({}), 
             pinned_notes: Vec::new(),
-            folder_order: None
+            folder_order: None,
+            settings: None,
         });
         Ok(metadata)
     } else {
         Ok(AppMetadata { 
             folders: serde_json::json!({}), 
             pinned_notes: Vec::new(),
-            folder_order: None
+            folder_order: None,
+            settings: None,
         })
     }
 }
 
 #[tauri::command]
 async fn save_metadata(root_path: String, metadata: AppMetadata) -> Result<(), String> {
-    let meta_path = Path::new(&root_path).join(".notizapp-metadata.json");
+    let config_path = Path::new(&root_path).join("notizapp-config.json");
     let content = serde_json::to_string_pretty(&metadata).map_err(|e| e.to_string())?;
-    fs::write(meta_path, content).map_err(|e| e.to_string())?;
+    fs::write(config_path, content).map_err(|e| e.to_string())?;
     Ok(())
 }
 

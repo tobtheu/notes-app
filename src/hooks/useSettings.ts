@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-export function useSettings() {
+export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: any) => void) {
     const [markdownEnabled, setMarkdownEnabled] = useState<boolean>(() => {
         const saved = localStorage.getItem('markdown-enabled');
         return saved === null ? true : saved === 'true';
@@ -20,32 +20,52 @@ export function useSettings() {
         return (saved === 'small' || saved === 'medium' || saved === 'large') ? saved : 'medium';
     });
 
-
-
     const [toolbarVisible, setToolbarVisible] = useState<boolean>(() => {
         const saved = localStorage.getItem('toolbar-visible');
         return saved === null ? true : saved === 'true';
     });
 
+    const [spellcheckEnabled, setSpellcheckEnabled] = useState<boolean>(() => {
+        const saved = localStorage.getItem('spellcheck-enabled');
+        return saved === null ? true : saved === 'true';
+    });
+
+    const hasLoadedMetadata = useRef(false);
+
+    // Update from metadata if available (cloud sync)
+    useEffect(() => {
+        if (metadataSettings) {
+            if (metadataSettings.markdownEnabled !== undefined) setMarkdownEnabled(metadataSettings.markdownEnabled);
+            if (metadataSettings.accentColor !== undefined) setAccentColor(metadataSettings.accentColor);
+            if (metadataSettings.fontFamily !== undefined) setFontFamily(metadataSettings.fontFamily);
+            if (metadataSettings.fontSize !== undefined) setFontSize(metadataSettings.fontSize);
+            if (metadataSettings.toolbarVisible !== undefined) setToolbarVisible(metadataSettings.toolbarVisible);
+            if (metadataSettings.spellcheckEnabled !== undefined) setSpellcheckEnabled(metadataSettings.spellcheckEnabled);
+            hasLoadedMetadata.current = true;
+        }
+    }, [metadataSettings]);
+
+    // Save to local storage and trigger metadata save
     useEffect(() => {
         localStorage.setItem('markdown-enabled', String(markdownEnabled));
-    }, [markdownEnabled]);
-
-    useEffect(() => {
         localStorage.setItem('accent-color', accentColor);
-    }, [accentColor]);
-
-    useEffect(() => {
         localStorage.setItem('font-family', fontFamily);
-    }, [fontFamily]);
-
-    useEffect(() => {
         localStorage.setItem('font-size', fontSize);
-    }, [fontSize]);
-
-    useEffect(() => {
         localStorage.setItem('toolbar-visible', String(toolbarVisible));
-    }, [toolbarVisible]);
+        localStorage.setItem('spellcheck-enabled', String(spellcheckEnabled));
+
+        // Sync with cloud metadata if callback provided AND we have already loaded metadata once
+        if (onSaveSettings && hasLoadedMetadata.current) {
+            onSaveSettings({
+                markdownEnabled,
+                accentColor,
+                fontFamily,
+                fontSize,
+                toolbarVisible,
+                spellcheckEnabled,
+            });
+        }
+    }, [markdownEnabled, accentColor, fontFamily, fontSize, toolbarVisible, spellcheckEnabled, onSaveSettings]);
 
     return {
         markdownEnabled,
@@ -58,5 +78,7 @@ export function useSettings() {
         setFontSize,
         toolbarVisible,
         setToolbarVisible,
+        spellcheckEnabled,
+        setSpellcheckEnabled,
     };
 }

@@ -17,6 +17,8 @@ interface SettingsModalProps {
     setFontFamily: (fontFamily: 'inter' | 'roboto' | 'system') => void;
     fontSize: 'small' | 'medium' | 'large';
     setFontSize: (fontSize: 'small' | 'medium' | 'large') => void;
+    spellcheckEnabled: boolean;
+    onToggleSpellcheck: (enabled: boolean) => void;
 }
 
 export function SettingsModal({
@@ -33,7 +35,9 @@ export function SettingsModal({
     fontFamily,
     setFontFamily,
     fontSize,
-    setFontSize
+    setFontSize,
+    spellcheckEnabled,
+    onToggleSpellcheck
 }: SettingsModalProps) {
     const [version, setVersion] = useState<string>('0.0.0');
     const [updateStatus, setUpdateStatus] = useState<{
@@ -268,7 +272,8 @@ export function SettingsModal({
                     {/* Editor Settings */}
                     <div className="mt-8 border-t border-gray-100 dark:border-gray-700 pt-6">
                         <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Editor</h3>
-                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+
+                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg mb-3">
                             <div className="flex flex-col">
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Markdown Formatting</span>
                                 <span className="text-xs text-gray-500">Live preview and auto-formatting</span>
@@ -284,6 +289,27 @@ export function SettingsModal({
                                     className={clsx(
                                         "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
                                         markdownEnabled ? "translate-x-6" : "translate-x-1"
+                                    )}
+                                />
+                            </button>
+                        </div>
+
+                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                            <div className="flex flex-col">
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Spellcheck</span>
+                                <span className="text-xs text-gray-500">Enable Windows spellcheck lines</span>
+                            </div>
+                            <button
+                                onClick={() => onToggleSpellcheck(!spellcheckEnabled)}
+                                className={clsx(
+                                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+                                    spellcheckEnabled ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-700"
+                                )}
+                            >
+                                <span
+                                    className={clsx(
+                                        "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                                        spellcheckEnabled ? "translate-x-6" : "translate-x-1"
                                     )}
                                 />
                             </button>

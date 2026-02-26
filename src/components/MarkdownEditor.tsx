@@ -35,6 +35,7 @@ import { UrlInputModal } from './UrlInputModal';
 import { toggleSmartMark } from '../utils/editor';
 import { WikiLinkMenu } from './WikiLinkMenu';
 import { TextSelection, PluginKey } from '@tiptap/pm/state';
+import { CodeBlockComponent } from './CodeBlockComponent';
 
 const lowlight = createLowlight(all);
 
@@ -44,6 +45,7 @@ interface MarkdownEditorProps {
     onChange: (markdown: string) => void;
     onNavigate?: (id: string, anchor?: string) => void;
     toolbarVisible?: boolean;
+    spellcheckEnabled?: boolean;
     header?: React.ReactNode;
 }
 
@@ -448,7 +450,7 @@ const BubbleToolbarContent: React.FC<{
 };
 
 
-export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolbarVisible = true, header }: MarkdownEditorProps) => {
+export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolbarVisible = true, spellcheckEnabled = true, header }: MarkdownEditorProps) => {
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [linkModalData, setLinkModalData] = useState<{ url: string; text: string }>({ url: '', text: '' });
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -501,7 +503,11 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                 heading: false,
                 codeBlock: false,
             }),
-            CodeBlockLowlight.configure({
+            CodeBlockLowlight.extend({
+                addNodeView() {
+                    return ReactNodeViewRenderer(CodeBlockComponent)
+                },
+            }).configure({
                 lowlight,
             }),
             Heading.extend({
@@ -576,6 +582,10 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
             }
         },
         editorProps: {
+            attributes: {
+                class: 'prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl focus:outline-none min-h-[500px]',
+                spellcheck: spellcheckEnabled ? 'true' : 'false',
+            },
             handleDOMEvents: {
                 click: (_view, event) => {
                     const target = event.target as HTMLElement;
@@ -703,9 +713,6 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                     return false;
                 },
             },
-            attributes: {
-                class: 'prose dark:prose-invert max-w-none focus:outline-none min-h-[300px] pb-32',
-            },
             handleDrop: (view, event, _slice, moved) => {
                 setIsDragging(false);
                 if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
@@ -728,7 +735,7 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
                 return false;
             },
         },
-    }, []); // STABLE: Empty dependency array to prevent re-creation
+    }, [spellcheckEnabled]); // Depend on spellcheckEnabled to re-create/re-configure if needed
 
     // Handle content updates (e.g. when switching notes)
     useEffect(() => {

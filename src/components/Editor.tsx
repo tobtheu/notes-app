@@ -13,9 +13,10 @@ interface EditorProps {
     markdownEnabled: boolean;
     toolbarVisible: boolean;
     setToolbarVisible: (visible: boolean) => void;
+    spellcheckEnabled: boolean;
 }
 
-export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, markdownEnabled, toolbarVisible, setToolbarVisible }: EditorProps) {
+export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, markdownEnabled, spellcheckEnabled, toolbarVisible, setToolbarVisible }: EditorProps) {
     const [content, setContent] = useState(note.content);
     const [isScrolling, setIsScrolling] = useState(false);
     const scrollTimeoutRef = useRef<any>(null);
@@ -77,11 +78,7 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
         });
     }, [content]);
 
-    const handleEndFocus = useCallback((e: React.FocusEvent<HTMLTextAreaElement> | React.MouseEvent<HTMLTextAreaElement>) => {
-        const target = e.currentTarget;
-        const val = target.value;
-        target.setSelectionRange(val.length, val.length);
-    }, []);
+
 
     // Sync to local notes state (optimistic update)
     useEffect(() => {
@@ -209,6 +206,7 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
                     onChange={handleBodyChange}
                     onNavigate={onNavigate}
                     toolbarVisible={toolbarVisible}
+                    spellcheckEnabled={spellcheckEnabled}
                     header={
                         <textarea
                             ref={titleRef}
@@ -216,9 +214,7 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
                             placeholder="Note Title"
                             value={title}
                             onChange={(e) => handleTitleChange(e.target.value)}
-                            onFocus={handleEndFocus}
-                            onClick={handleEndFocus}
-                            spellCheck={false}
+                            spellCheck={spellcheckEnabled}
                             rows={1}
                         />
                     }
@@ -238,9 +234,7 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
                             placeholder="Note Title"
                             value={title}
                             onChange={(e) => handleTitleChange(e.target.value)}
-                            onFocus={handleEndFocus}
-                            onClick={handleEndFocus}
-                            spellCheck={false}
+                            spellCheck={spellcheckEnabled}
                             rows={1}
                         />
                         <textarea
@@ -249,9 +243,7 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
                             placeholder="Start typing your note here..."
                             value={body}
                             onChange={(e) => handleBodyChange(e.target.value)}
-                            onFocus={handleEndFocus}
-                            onClick={handleEndFocus}
-                            spellCheck={false}
+                            spellCheck={spellcheckEnabled}
                         />
                     </div>
                 </div>
