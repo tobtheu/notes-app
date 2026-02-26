@@ -24,17 +24,6 @@ export function useNotes() {
         }
     }, []);
 
-    const loadMetadata = useCallback(async () => {
-        if (!baseFolder) return;
-        const meta = await window.electronAPI.readMetadata(baseFolder);
-        // Normalize pinned notes in metadata to lowercase for consistency
-        if (meta.pinnedNotes) {
-            meta.pinnedNotes = meta.pinnedNotes.map(p => p.toLowerCase());
-        } else {
-            meta.pinnedNotes = [];
-        }
-        setMetadata(meta);
-    }, [baseFolder]);
 
     const loadNotes = useCallback(async () => {
         if (!baseFolder) return;
@@ -58,13 +47,52 @@ export function useNotes() {
             }));
 
             const loadedFolders = await window.electronAPI.listFolders(baseFolder);
-            setFolders(loadedFolders);
+            const meta = await window.electronAPI.readMetadata(baseFolder);
 
-            await loadMetadata();
+            // Normalize pinned notes in metadata to lowercase for consistency
+            if (meta.pinnedNotes) {
+                meta.pinnedNotes = meta.pinnedNotes.map(p => p.toLowerCase());
+            } else {
+                meta.pinnedNotes = [];
+            }
+            setMetadata(meta);
+
+            // Sort folders based on metadata order
+            let order = meta.folderOrder || [];
+            let needsMetadataSave = false;
+
+            // Guarantee that any folder existing on disk is in the order array
+            loadedFolders.forEach(folder => {
+                if (!order.includes(folder)) {
+                    order.push(folder);
+                    needsMetadataSave = true;
+                }
+            });
+
+            // If we found missing folders, update the metadata immediately
+            if (needsMetadataSave) {
+                meta.folderOrder = order;
+                setMetadata(meta);
+                lastSaveTime.current = Date.now(); // Prevent save loop
+                // We fire this asynchronously so we don't block note loading
+                window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: meta }).catch(e => {
+                    console.error("Failed to automatically repair folder order in metadata", e);
+                });
+            }
+
+            const sortedFolders = [...loadedFolders].sort((a, b) => {
+                const indexA = order.indexOf(a);
+                const indexB = order.indexOf(b);
+                if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+                if (indexA === -1) return 1;
+                if (indexB === -1) return -1;
+                return indexA - indexB;
+            });
+            setFolders(sortedFolders);
         } catch (error) {
             console.error("Failed to load notes or folders", error);
         }
-    }, [baseFolder, loadMetadata]);
+    }, [baseFolder]);
 
     useEffect(() => {
         loadNotes();
@@ -182,6 +210,62 @@ export function useNotes() {
         }
     };
 
+    const moveNote = async (noteId: string, targetFolder: string | null) => {
+        if (!baseFolder) return;
+
+        const note = notes.find(n => getNoteId(n) === noteId);
+        if (!note) return;
+
+        // Note is already in the target folder
+        if (note.folder === (targetFolder || "")) return;
+
+        const oldFilename = note.folder ? `${note.folder}/${note.filename}` : note.filename;
+        const newFilename = targetFolder ? `${targetFolder}/${note.filename}` : note.filename;
+
+        // Check collision in target folder
+        if (notes.some(n => n.filename === note.filename && n.folder === (targetFolder || ""))) {
+            console.error("A note with this name already exists in the target folder.");
+            return;
+        }
+
+        const renameResult = await window.electronAPI.renameNote({
+            folderPath: baseFolder,
+            oldFilename,
+            newFilename
+        });
+
+        if (renameResult.success) {
+            const newPath = newFilename.toLowerCase();
+
+            // Handle pinned notes update
+            if (metadata.pinnedNotes?.includes(noteId)) {
+                const newMeta = { ...metadata };
+                newMeta.pinnedNotes = (newMeta.pinnedNotes || []).map(p =>
+                    p.toLowerCase() === noteId ? newPath : p.toLowerCase()
+                );
+                setMetadata(newMeta);
+                lastSaveTime.current = Date.now();
+                await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
+            }
+
+            // Optimistic update
+            setNotes(prev => prev.map(n =>
+                getNoteId(n) === noteId
+                    ? { ...n, folder: targetFolder || "" }
+                    : n
+            ));
+
+            if (selectedNoteId === noteId) {
+                setSelectedNoteId(newPath);
+            }
+
+            lastSaveTime.current = Date.now();
+            await loadNotes();
+        } else {
+            console.error("Failed to move note:", renameResult.error);
+        }
+    };
+
     const createNote = async () => {
         if (!baseFolder) return;
 
@@ -233,12 +317,17 @@ export function useNotes() {
         const newMeta = { ...metadata };
         delete newMeta.folders[folderRelative];
 
+        if (newMeta.folderOrder) {
+            newMeta.folderOrder = newMeta.folderOrder.filter(f => f !== folderRelative);
+        }
+
         // Remove pins for notes in this folder
         if (newMeta.pinnedNotes) {
             const prefix = `${folderRelative.toLowerCase()}/`;
             newMeta.pinnedNotes = newMeta.pinnedNotes.filter(p => !p.toLowerCase().startsWith(prefix));
         }
 
+        lastSaveTime.current = Date.now();
         await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
 
         if (selectedCategory === folderRelative) {
@@ -252,7 +341,31 @@ export function useNotes() {
         // Always create at root
         const target = `${baseFolder}/${folderName}`;
         await window.electronAPI.createFolder(target);
+
+        // Update order metadata to include the new folder at the end
+        const newMeta = { ...metadata };
+        if (newMeta.folderOrder) {
+            if (!newMeta.folderOrder.includes(folderName)) {
+                newMeta.folderOrder = [...newMeta.folderOrder, folderName];
+            }
+        } else {
+            newMeta.folderOrder = [...folders, folderName];
+        }
+        lastSaveTime.current = Date.now();
+        await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
+
         await loadNotes();
+    };
+
+    const reorderFolders = async (newOrder: string[]) => {
+        if (!baseFolder) return;
+
+        const newMeta = { ...metadata, folderOrder: newOrder };
+        setMetadata(newMeta);
+        setFolders(newOrder); // Optimistic update
+
+        lastSaveTime.current = Date.now(); // Prevent file watcher from immediately reloading state
+        await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
     };
 
     const renameFolder = async (oldName: string, newName: string) => {
@@ -281,6 +394,12 @@ export function useNotes() {
                 });
             }
 
+            // Update folderOrder if it exists
+            if (newMeta.folderOrder) {
+                newMeta.folderOrder = newMeta.folderOrder.map(f => f === oldName ? newName : f);
+            }
+
+            lastSaveTime.current = Date.now();
             await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
 
             if (selectedCategory === oldName) {
@@ -304,6 +423,7 @@ export function useNotes() {
         }
 
         setMetadata(newMeta);
+        lastSaveTime.current = Date.now();
         await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
     };
 
@@ -315,6 +435,7 @@ export function useNotes() {
             ...meta
         };
         setMetadata(newMetadata);
+        lastSaveTime.current = Date.now();
         await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMetadata });
     };
 
@@ -382,6 +503,8 @@ export function useNotes() {
         renameFolder,
         updateFolderMetadata,
         deleteFolder,
+        reorderFolders,
+        moveNote,
         togglePinNote,
         isNotePinned,
         reloadNotes: loadNotes,

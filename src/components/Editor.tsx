@@ -212,7 +212,7 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
                     header={
                         <textarea
                             ref={titleRef}
-                            className="w-full p-0 text-4xl font-bold bg-transparent border-none outline-none resize-none font-sans text-gray-900 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700"
+                            className="w-full p-0 text-4xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700"
                             placeholder="Note Title"
                             value={title}
                             onChange={(e) => handleTitleChange(e.target.value)}
@@ -234,7 +234,7 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
                     <div className="max-w-4xl w-full mx-auto flex-1 flex flex-col">
                         <textarea
                             ref={titleRef}
-                            className="w-full p-0 text-4xl font-bold bg-transparent border-none outline-none resize-none font-sans text-gray-900 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700 shrink-0"
+                            className="w-full p-0 text-4xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700 shrink-0"
                             placeholder="Note Title"
                             value={title}
                             onChange={(e) => handleTitleChange(e.target.value)}
@@ -245,7 +245,7 @@ export function Editor({ note, allNotes, onSave, onUpdateLocally, onNavigate, ma
                         />
                         <textarea
                             ref={textareaRef}
-                            className="w-full p-0 text-lg bg-transparent border-none outline-none resize-none font-sans text-gray-800 dark:text-gray-300 leading-relaxed flex-1"
+                            className="w-full p-0 text-lg bg-transparent border-none outline-none resize-none text-gray-800 dark:text-gray-300 leading-relaxed flex-1"
                             placeholder="Start typing your note here..."
                             value={body}
                             onChange={(e) => handleBodyChange(e.target.value)}

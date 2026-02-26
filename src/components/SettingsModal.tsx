@@ -13,6 +13,10 @@ interface SettingsModalProps {
     onToggleMarkdown: (enabled: boolean) => void;
     accentColor: string;
     setAccentColor: (color: string) => void;
+    fontFamily: 'inter' | 'roboto' | 'system';
+    setFontFamily: (fontFamily: 'inter' | 'roboto' | 'system') => void;
+    fontSize: 'small' | 'medium' | 'large';
+    setFontSize: (fontSize: 'small' | 'medium' | 'large') => void;
 }
 
 export function SettingsModal({
@@ -25,7 +29,11 @@ export function SettingsModal({
     markdownEnabled,
     onToggleMarkdown,
     accentColor,
-    setAccentColor
+    setAccentColor,
+    fontFamily,
+    setFontFamily,
+    fontSize,
+    setFontSize
 }: SettingsModalProps) {
     const [version, setVersion] = useState<string>('0.0.0');
     const [updateStatus, setUpdateStatus] = useState<{
@@ -183,6 +191,77 @@ export function SettingsModal({
                                 ))}
                             </div>
                         </div>
+
+                        {/* Font Settings */}
+                        <div className="mt-6">
+                            <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Typography</h4>
+
+                            <div className="flex items-center gap-2 mb-4 p-1 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
+                                <button
+                                    onClick={() => setFontFamily('system')}
+                                    className={clsx(
+                                        "flex-1 text-xs font-medium py-1.5 px-3 rounded-md transition-all",
+                                        fontFamily === 'system' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                    )}
+                                    style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}
+                                >
+                                    System
+                                </button>
+                                <button
+                                    onClick={() => setFontFamily('inter')}
+                                    className={clsx(
+                                        "flex-1 text-xs font-medium py-1.5 px-3 rounded-md transition-all",
+                                        fontFamily === 'inter' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                    )}
+                                    style={{ fontFamily: "'Inter', sans-serif" }}
+                                >
+                                    Inter
+                                </button>
+                                <button
+                                    onClick={() => setFontFamily('roboto')}
+                                    className={clsx(
+                                        "flex-1 text-xs font-medium py-1.5 px-3 rounded-md transition-all",
+                                        fontFamily === 'roboto' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                    )}
+                                    style={{ fontFamily: "'Roboto', sans-serif" }}
+                                >
+                                    Roboto
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-2 p-1 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
+                                <button
+                                    onClick={() => setFontSize('small')}
+                                    className={clsx(
+                                        "flex-1 py-1.5 px-3 rounded-md transition-all flex items-center justify-center",
+                                        fontSize === 'small' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                    )}
+                                    title="Small Text"
+                                >
+                                    <span className="text-[12px] font-medium leading-none">Small</span>
+                                </button>
+                                <button
+                                    onClick={() => setFontSize('medium')}
+                                    className={clsx(
+                                        "flex-1 py-1.5 px-3 rounded-md transition-all flex items-center justify-center",
+                                        fontSize === 'medium' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                    )}
+                                    title="Medium Text"
+                                >
+                                    <span className="font-medium text-[14px] leading-none">Medium</span>
+                                </button>
+                                <button
+                                    onClick={() => setFontSize('large')}
+                                    className={clsx(
+                                        "flex-1 py-1.5 px-3 rounded-md transition-all flex items-center justify-center",
+                                        fontSize === 'large' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                                    )}
+                                    title="Large Text"
+                                >
+                                    <span className="font-medium text-[16px] leading-none">Large</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
 
@@ -315,6 +394,6 @@ export function SettingsModal({
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

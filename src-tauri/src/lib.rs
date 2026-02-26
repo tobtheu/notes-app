@@ -21,6 +21,8 @@ pub struct AppMetadata {
     pub folders: serde_json::Value,
     #[serde(default)]
     pub pinned_notes: Vec<String>,
+    #[serde(default)]
+    pub folder_order: Option<Vec<String>>,
 }
 
 fn get_files_recursively(dir: &Path) -> Vec<PathBuf> {
@@ -121,13 +123,15 @@ async fn read_metadata(root_path: String) -> Result<AppMetadata, String> {
         let content = fs::read_to_string(meta_path).map_err(|e| e.to_string())?;
         let metadata: AppMetadata = serde_json::from_str(&content).unwrap_or_else(|_| AppMetadata { 
             folders: serde_json::json!({}), 
-            pinned_notes: Vec::new() 
+            pinned_notes: Vec::new(),
+            folder_order: None
         });
         Ok(metadata)
     } else {
         Ok(AppMetadata { 
             folders: serde_json::json!({}), 
-            pinned_notes: Vec::new() 
+            pinned_notes: Vec::new(),
+            folder_order: None
         })
     }
 }

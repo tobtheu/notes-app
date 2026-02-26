@@ -2,10 +2,29 @@ import { useRef, useState, useEffect } from 'react';
 import {
     Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
     Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart,
-    Plus, Settings, Trash2, PanelLeftClose, PanelLeftOpen, Pencil
+    Plus, Settings, Trash2, PanelLeftClose, PanelLeftOpen, Pencil, GripVertical
 } from 'lucide-react';
 import clsx from 'clsx';
 import type { AppMetadata } from '../types';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragOverlay,
+    defaultDropAnimationSideEffects,
+} from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+    useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const ICON_MAP: Record<string, any> = {
     Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
@@ -36,9 +55,141 @@ interface SidebarProps {
     onDeleteCategory: (name: string) => void;
     onEditCategory: (name: string) => void;
     onSelectCategory: (name: string | null) => void;
+    onReorderFolders?: (newOrder: string[]) => void;
     onToggleCollapse: () => void;
     onOpenSettings?: () => void;
 }
+
+interface FolderItemProps {
+    folder: string;
+    metadata: AppMetadata;
+    selectedCategory: string | null;
+    isCollapsed: boolean;
+    onSelectCategory?: (name: string | null) => void;
+    onEditCategory?: (name: string) => void;
+    onDeleteCategory?: (name: string) => void;
+    isDragging?: boolean;
+    isOverlay?: boolean;
+    setNodeRef?: (node: HTMLElement | null) => void;
+    attributes?: any;
+    listeners?: any;
+    style?: React.CSSProperties;
+}
+
+const FolderItem = ({
+    folder, metadata, selectedCategory, isCollapsed, onSelectCategory,
+    onEditCategory, onDeleteCategory, isDragging, isOverlay,
+    setNodeRef, attributes, listeners, style
+}: FolderItemProps) => {
+    const folderMeta = metadata.folders[folder] || {};
+    const IconComponent = ICON_MAP[folderMeta.icon || 'Folder'] || Folder;
+    const colorStyles = COLOR_MAP[folderMeta.color || 'gray'];
+    const isSelected = selectedCategory === folder;
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={clsx(
+                "group relative flex items-center transition-all rounded-lg cursor-pointer mb-0.5 outline-none",
+                isCollapsed ? "justify-center py-3" : "px-1 py-2.5 gap-2 text-sm font-medium",
+                isSelected
+                    ? "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100"
+                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700",
+                isDragging && "opacity-40",
+                isOverlay && "shadow-lg scale-105 opacity-90 cursor-grabbing bg-white dark:bg-gray-800"
+            )}
+            title={isCollapsed ? folder : undefined}
+            onClick={() => onSelectCategory && !isCollapsed && onSelectCategory(folder)}
+        >
+            <div
+                className={clsx("flex items-center gap-2 shrink-0 flex-1 min-w-0 pr-1", isCollapsed ? "justify-center pr-0" : "")}
+            >
+                {!isCollapsed && (
+                    <div
+                        {...attributes}
+                        {...listeners}
+                        className="text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity shrink-0 outline-none"
+                    >
+                        <GripVertical size={14} />
+                    </div>
+                )}
+                <div className={clsx(
+                    "p-1 rounded-md transition-colors shrink-0",
+                    isSelected ? colorStyles.bg + " " + colorStyles.darkBg : "bg-transparent"
+                )}>
+                    <IconComponent
+                        size={isCollapsed ? 20 : 18}
+                        className={clsx(colorStyles.text, colorStyles.darkText)}
+                    />
+                </div>
+                {!isCollapsed && <span className="truncate flex-1 py-0.5">{folder}</span>}
+            </div>
+            {!isCollapsed && onEditCategory && onDeleteCategory && (
+                <div className="absolute right-1.5 px-1 py-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-md shadow-sm border border-gray-100/50 dark:border-gray-700/50 z-20">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEditCategory(folder);
+                        }}
+                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary-500 rounded transition-all outline-none"
+                        title="Edit Category"
+                    >
+                        <Pencil size={12} />
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteCategory(folder);
+                        }}
+                        className="p-1 hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-500 hover:text-red-500 rounded transition-all outline-none"
+                        title="Delete Category"
+                    >
+                        <Trash2 size={12} />
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
+interface SortableFolderItemProps {
+    id: string;
+    folder: string;
+    metadata: AppMetadata;
+    selectedCategory: string | null;
+    isCollapsed: boolean;
+    onSelectCategory: (name: string | null) => void;
+    onEditCategory: (name: string) => void;
+    onDeleteCategory: (name: string) => void;
+}
+
+const SortableFolderItem = (props: SortableFolderItemProps) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: props.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    return (
+        <FolderItem
+            {...props}
+            setNodeRef={setNodeRef}
+            style={style}
+            attributes={attributes}
+            listeners={listeners}
+            isDragging={isDragging}
+        />
+    );
+};
 
 export function Sidebar({
     className,
@@ -51,12 +202,25 @@ export function Sidebar({
     onDeleteCategory,
     onEditCategory,
     onSelectCategory,
+    onReorderFolders,
     onToggleCollapse,
     onOpenSettings
 }: SidebarProps) {
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
+    const [activeId, setActiveId] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 5,
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     const handleCreateFolder = (e: React.FormEvent) => {
         e.preventDefault();
@@ -73,12 +237,36 @@ export function Sidebar({
         }
     }, [isCreatingFolder]);
 
+    const handleDragStart = (event: any) => {
+        setActiveId(event.active.id);
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        setActiveId(null);
+        const { active, over } = event;
+
+        if (over && active.id !== over.id && onReorderFolders) {
+            const oldIndex = folders.indexOf(active.id as string);
+            const newIndex = folders.indexOf(over.id as string);
+
+            if (oldIndex !== -1 && newIndex !== -1) {
+                onReorderFolders(arrayMove(folders, oldIndex, newIndex));
+            }
+        }
+    };
+
     return (
-        <div className={clsx(
-            "flex flex-col h-full bg-gray-50 dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 transition-all duration-300",
-            isCollapsed ? "w-16" : "w-64",
-            className
-        )}>
+        <div
+            className={clsx(
+                "flex flex-col h-full bg-gray-50 dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 transition-all duration-300",
+                isCollapsed ? "w-16" : "w-64",
+                className
+            )}
+            onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+            }}
+        >
             {/* Header */}
             <div className={clsx("p-4 flex items-center shrink-0", isCollapsed ? "justify-center" : "justify-between")}>
                 {!isCollapsed && (
@@ -98,8 +286,8 @@ export function Sidebar({
                 </button>
             </div>
 
-            {/* Main Navigation */}
-            <div className="flex-1 overflow-y-auto px-2 py-4 custom-scrollbar overflow-x-hidden">
+            {/* Main Navigation (Fixed Header) */}
+            <div className="px-2 pt-4 pb-2">
                 <div className={clsx("mb-6 px-1 lg:px-2", isCollapsed ? "flex flex-col items-center" : "block")}>
                     <button
                         onClick={onCreateNote}
@@ -123,105 +311,85 @@ export function Sidebar({
                         <button
                             onClick={() => setIsCreatingFolder(true)}
                             className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="New Folder"
                         >
                             <Plus size={14} />
                         </button>
                     </div>
                 )}
+            </div>
 
-                {/* Folder List */}
-                <div className="space-y-0.5 mb-4 px-1">
-                    <button
-                        onClick={() => onSelectCategory(null)}
-                        className={clsx(
-                            "w-full flex items-center transition-colors rounded-lg",
-                            isCollapsed ? "justify-center py-3" : "px-3 py-2.5 gap-3 text-sm font-medium",
-                            !selectedCategory ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+            {/* Folder List (Scrollable) */}
+            <div className="flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar overflow-x-hidden">
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onDragCancel={() => setActiveId(null)}
+                >
+                    <div className="space-y-0.5 mb-4 px-1">
+                        <button
+                            onClick={() => onSelectCategory(null)}
+                            className={clsx(
+                                "w-full flex items-center transition-colors rounded-lg",
+                                isCollapsed ? "justify-center py-3" : "px-3 py-2.5 gap-3 text-sm font-medium",
+                                !selectedCategory ? "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100" : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                            )}
+                            title="All Notes"
+                        >
+                            <Folder size={isCollapsed ? 20 : 18} className={!selectedCategory ? "text-primary-500" : "text-gray-400"} />
+                            {!isCollapsed && <span>All Notes</span>}
+                        </button>
+
+                        <SortableContext
+                            items={folders}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            {folders.map(folder => (
+                                <SortableFolderItem
+                                    key={folder}
+                                    id={folder}
+                                    folder={folder}
+                                    metadata={metadata}
+                                    selectedCategory={selectedCategory}
+                                    isCollapsed={isCollapsed}
+                                    onSelectCategory={onSelectCategory}
+                                    onEditCategory={onEditCategory}
+                                    onDeleteCategory={onDeleteCategory}
+                                />
+                            ))}
+                        </SortableContext>
+
+                        <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.4' } } }) }}>
+                            {activeId ? (
+                                <FolderItem
+                                    folder={activeId}
+                                    metadata={metadata}
+                                    selectedCategory={selectedCategory}
+                                    isCollapsed={isCollapsed}
+                                    isOverlay
+                                />
+                            ) : null}
+                        </DragOverlay>
+
+                        {!isCollapsed && isCreatingFolder && (
+                            <form onSubmit={handleCreateFolder} className="px-3 py-2">
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    className="w-full bg-white dark:bg-gray-800 border border-primary-500 outline-none rounded px-2 py-1 text-sm dark:text-gray-100"
+                                    placeholder="New category..."
+                                    value={newFolderName}
+                                    onChange={(e) => setNewFolderName(e.target.value)}
+                                    onBlur={() => {
+                                        if (!newFolderName.trim()) setIsCreatingFolder(false);
+                                    }}
+                                />
+                            </form>
                         )}
-                        title="All Notes"
-                    >
-                        <Folder size={isCollapsed ? 20 : 18} className={!selectedCategory ? "text-primary-500" : "text-gray-400"} />
-                        {!isCollapsed && <span>All Notes</span>}
-                    </button>
-
-                    {folders.map(folder => {
-                        const folderMeta = metadata.folders[folder] || {};
-                        const IconComponent = ICON_MAP[folderMeta.icon || 'Folder'] || Folder;
-                        const colorStyles = COLOR_MAP[folderMeta.color || 'gray'];
-                        const isSelected = selectedCategory === folder;
-
-                        return (
-                            <div
-                                key={folder}
-                                className={clsx(
-                                    "group flex items-center transition-all rounded-lg cursor-pointer mb-0.5",
-                                    isCollapsed ? "justify-center py-3" : "justify-between px-3 py-2.5 gap-2 text-sm font-medium",
-                                    isSelected
-                                        ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-gray-100"
-                                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                                )}
-                                title={isCollapsed ? folder : undefined}
-                                onClick={() => isCollapsed && onSelectCategory(folder)}
-                            >
-                                <div
-                                    className={clsx("flex items-center gap-3 shrink-0", isCollapsed ? "justify-center" : "flex-1 truncate")}
-                                    onClick={() => !isCollapsed && onSelectCategory(folder)}
-                                >
-                                    <div className={clsx(
-                                        "p-1 rounded-md transition-colors",
-                                        isSelected ? colorStyles.bg + " " + colorStyles.darkBg : "bg-transparent"
-                                    )}>
-                                        <IconComponent
-                                            size={isCollapsed ? 20 : 18}
-                                            className={clsx(colorStyles.text, colorStyles.darkText)}
-                                        />
-                                    </div>
-                                    {!isCollapsed && <span className="truncate">{folder}</span>}
-                                </div>
-                                {!isCollapsed && (
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onEditCategory(folder);
-                                            }}
-                                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-primary-500 rounded-md transition-all"
-                                            title="Edit Category"
-                                        >
-                                            <Pencil size={14} />
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onDeleteCategory(folder);
-                                            }}
-                                            className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 rounded-md transition-all"
-                                            title="Delete Category"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-
-                    {!isCollapsed && isCreatingFolder && (
-                        <form onSubmit={handleCreateFolder} className="px-3 py-2">
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                className="w-full bg-white dark:bg-gray-800 border border-primary-500 outline-none rounded px-2 py-1 text-sm dark:text-gray-100"
-                                placeholder="New category..."
-                                value={newFolderName}
-                                onChange={(e) => setNewFolderName(e.target.value)}
-                                onBlur={() => {
-                                    if (!newFolderName.trim()) setIsCreatingFolder(false);
-                                }}
-                            />
-                        </form>
-                    )}
-                </div>
+                    </div>
+                </DndContext>
             </div>
 
             {/* Footer / Settings */}

@@ -14,6 +14,10 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import Highlight from '@tiptap/extension-highlight';
 import Link from '@tiptap/extension-link';
 import Heading from '@tiptap/extension-heading';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { createLowlight, all } from 'lowlight';
+import 'highlight.js/styles/github-dark.css';
+
 // Image import removed as it is replaced by ImageWithCaption
 import { ImageWithCaption } from '../extensions/ImageWithCaption';
 import Suggestion from '@tiptap/suggestion';
@@ -31,6 +35,8 @@ import { UrlInputModal } from './UrlInputModal';
 import { toggleSmartMark } from '../utils/editor';
 import { WikiLinkMenu } from './WikiLinkMenu';
 import { TextSelection, PluginKey } from '@tiptap/pm/state';
+
+const lowlight = createLowlight(all);
 
 interface MarkdownEditorProps {
     content: string;
@@ -58,6 +64,16 @@ const items = [
 const SlashMenu = forwardRef((props: any, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
+    const lastMousePos = useRef({ x: 0, y: 0 });
+
+    const handleMouseMove = (e: React.MouseEvent, index: number) => {
+        if (e.clientX !== lastMousePos.current.x || e.clientY !== lastMousePos.current.y) {
+            lastMousePos.current = { x: e.clientX, y: e.clientY };
+            if (selectedIndex !== index) {
+                setSelectedIndex(index);
+            }
+        }
+    };
 
     const selectItem = (index: number) => {
         const item = props.items[index];
@@ -98,7 +114,7 @@ const SlashMenu = forwardRef((props: any, ref) => {
                 <button
                     key={index}
                     onClick={() => selectItem(index)}
-                    onMouseEnter={() => setSelectedIndex(index)}
+                    onMouseMove={(e) => handleMouseMove(e, index)}
                     className={clsx(
                         "w-full text-left px-3 py-2 text-sm rounded-lg flex items-center gap-3 group transition-all",
                         index === selectedIndex
@@ -483,6 +499,10 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
         extensions: [
             StarterKit.configure({
                 heading: false,
+                codeBlock: false,
+            }),
+            CodeBlockLowlight.configure({
+                lowlight,
             }),
             Heading.extend({
                 renderHTML({ node, HTMLAttributes }) {

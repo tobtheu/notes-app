@@ -92,7 +92,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-4 animate-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-100">
                         {type === 'link' ? 'Insert Link' : 'Insert Image'}
                     </h3>
                     <button
@@ -144,7 +144,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                                     placeholder="Link text"
                                     value={text}
                                     onChange={(e) => setText(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                 />
                             </div>
 
@@ -188,7 +188,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                                         placeholder="https://example.com"
                                         value={url}
                                         onChange={(e) => setUrl(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                     />
                                 </div>
                             ) : (
@@ -202,7 +202,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                                                     placeholder="Search notes..."
                                                     value={searchNoteTerm}
                                                     onChange={(e) => setSearchNoteTerm(e.target.value)}
-                                                    className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                                    className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                                 />
                                             </div>
                                             <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md">
@@ -300,7 +300,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                                 placeholder="https://example.com/image.png"
                                 value={url}
                                 onChange={(e) => setUrl(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                             />
                         </div>
                     )}
@@ -315,7 +315,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                                 placeholder="Add a caption..."
                                 value={caption}
                                 onChange={(e) => setCaption(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                             />
                         </div>
                     )}

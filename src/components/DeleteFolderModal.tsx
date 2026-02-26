@@ -20,8 +20,8 @@ export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFold
 
                 {/* Body */}
                 <div className="p-6">
-                    <p className="text-gray-600 dark:text-gray-400 mb-6">
-                        How would you like to delete the category <span className="font-semibold text-gray-900 dark:text-gray-100">"{folderName}"</span>?
+                    <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
+                        How would you like to delete the category <span className="font-semibold text-gray-700 dark:text-gray-100">"{folderName}"</span>?
                     </p>
 
                     <div className="space-y-3">
@@ -57,7 +57,7 @@ export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFold
                 <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900/20 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                        className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
                     >
                         Cancel
                     </button>

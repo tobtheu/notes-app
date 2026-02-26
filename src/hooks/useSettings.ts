@@ -10,6 +10,16 @@ export function useSettings() {
         return localStorage.getItem('accent-color') || 'blue';
     });
 
+    const [fontFamily, setFontFamily] = useState<'inter' | 'roboto' | 'system'>(() => {
+        const saved = localStorage.getItem('font-family');
+        return (saved === 'inter' || saved === 'roboto' || saved === 'system') ? saved : 'inter';
+    });
+
+    const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large'>(() => {
+        const saved = localStorage.getItem('font-size');
+        return (saved === 'small' || saved === 'medium' || saved === 'large') ? saved : 'medium';
+    });
+
 
 
     const [toolbarVisible, setToolbarVisible] = useState<boolean>(() => {
@@ -26,6 +36,14 @@ export function useSettings() {
     }, [accentColor]);
 
     useEffect(() => {
+        localStorage.setItem('font-family', fontFamily);
+    }, [fontFamily]);
+
+    useEffect(() => {
+        localStorage.setItem('font-size', fontSize);
+    }, [fontSize]);
+
+    useEffect(() => {
         localStorage.setItem('toolbar-visible', String(toolbarVisible));
     }, [toolbarVisible]);
 
@@ -34,6 +52,10 @@ export function useSettings() {
         setMarkdownEnabled,
         accentColor,
         setAccentColor,
+        fontFamily,
+        setFontFamily,
+        fontSize,
+        setFontSize,
         toolbarVisible,
         setToolbarVisible,
     };

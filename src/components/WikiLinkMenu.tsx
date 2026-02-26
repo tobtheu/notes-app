@@ -16,6 +16,16 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     const [anchors, setAnchors] = useState<{ id: string; text: string }[]>([]);
     const containerRef = useRef<HTMLDivElement>(null);
+    const lastMousePos = useRef({ x: 0, y: 0 });
+
+    const handleMouseMove = (e: React.MouseEvent, index: number) => {
+        if (e.clientX !== lastMousePos.current.x || e.clientY !== lastMousePos.current.y) {
+            lastMousePos.current = { x: e.clientX, y: e.clientY };
+            if (selectedIndex !== index) {
+                setSelectedIndex(index);
+            }
+        }
+    };
 
     const extractAnchors = (content: string) => {
         const headings: { id: string; text: string }[] = [];
@@ -131,7 +141,7 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
                     <button
                         key={note.filename}
                         onClick={() => selectNote(note)}
-                        onMouseEnter={() => setSelectedIndex(index)}
+                        onMouseMove={(e) => handleMouseMove(e, index)}
                         className={clsx(
                             "w-full text-left px-3 py-2 text-sm rounded-lg flex items-center justify-between group transition-all",
                             index === selectedIndex
@@ -161,7 +171,7 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
                     <button
                         key={anchor.id}
                         onClick={() => selectAnchor(anchor)}
-                        onMouseEnter={() => setSelectedIndex(index)}
+                        onMouseMove={(e) => handleMouseMove(e, index)}
                         className={clsx(
                             "w-full text-left px-3 py-2 text-sm rounded-lg flex items-center gap-3 transition-all",
                             index === selectedIndex

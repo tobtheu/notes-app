@@ -25,12 +25,18 @@ function App() {
   const {
     markdownEnabled, setMarkdownEnabled,
     accentColor, setAccentColor,
+    fontFamily, setFontFamily,
+    fontSize, setFontSize,
     toolbarVisible, setToolbarVisible
   } = useSettings();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-accent', accentColor);
   }, [accentColor]);
+
+  useEffect(() => {
+    document.documentElement.style.fontSize = fontSize === 'small' ? '14px' : fontSize === 'large' ? '18px' : '16px';
+  }, [fontSize]);
 
   const {
     currentFolder,
@@ -53,6 +59,8 @@ function App() {
     renameFolder,
     updateFolderMetadata,
     deleteFolder,
+    reorderFolders,
+    moveNote,
     togglePinNote,
     isNotePinned,
     getNoteId,
@@ -174,7 +182,8 @@ function App() {
 
   return (
     <div
-      className="flex h-screen w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden font-sans"
+      className="flex h-screen w-full bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 overflow-hidden"
+      style={{ fontFamily: fontFamily === 'inter' ? "'Inter', sans-serif" : fontFamily === 'roboto' ? "'Roboto', sans-serif" : "ui-sans-serif, system-ui, sans-serif" }}
     >
       <Sidebar
         folders={folders}
@@ -186,6 +195,7 @@ function App() {
         onDeleteCategory={setCategoryToDelete}
         onEditCategory={setCategoryToEdit}
         onSelectCategory={setSelectedCategory}
+        onReorderFolders={reorderFolders}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
@@ -193,6 +203,7 @@ function App() {
       <NoteList
         className="w-80 flex-shrink-0 border-r border-gray-100 dark:border-gray-800"
         notes={notes}
+        folders={folders}
         selectedNote={selectedNote}
         onSelectNote={(note) => {
           setSelectedNote(getNoteId(note));
@@ -200,6 +211,7 @@ function App() {
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         onDeleteNote={deleteNote}
+        onMoveNote={moveNote}
         onTogglePin={togglePinNote}
         isNotePinned={isNotePinned}
         getNoteId={getNoteId}
@@ -247,6 +259,10 @@ function App() {
         onToggleMarkdown={setMarkdownEnabled}
         accentColor={accentColor}
         setAccentColor={setAccentColor}
+        fontFamily={fontFamily}
+        setFontFamily={setFontFamily}
+        fontSize={fontSize}
+        setFontSize={setFontSize}
       />
 
       {categoryToDelete && (
