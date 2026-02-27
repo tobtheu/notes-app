@@ -57,14 +57,19 @@ export function useNotes() {
             }
             setMetadata(meta);
 
-            // Sort folders based on metadata order
+            // Sort folders based on metadata order (case-insensitive)
             let order = meta.folderOrder || [];
             let needsMetadataSave = false;
 
-            // Guarantee that any folder existing on disk is in the order array
+            // Normalize order to handle casing robustly
+            const orderLower = order.map(f => f.toLowerCase());
+
+            // Guarantee that any folder existing on disk is in the order array (case-insensitive check)
             loadedFolders.forEach(folder => {
-                if (!order.includes(folder)) {
+                const folderLower = folder.toLowerCase();
+                if (!orderLower.includes(folderLower)) {
                     order.push(folder);
+                    orderLower.push(folderLower);
                     needsMetadataSave = true;
                 }
             });
@@ -74,16 +79,15 @@ export function useNotes() {
                 meta.folderOrder = order;
                 setMetadata(meta);
                 lastSaveTime.current = Date.now(); // Prevent save loop
-                // We fire this asynchronously so we don't block note loading
                 window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: meta }).catch(e => {
                     console.error("Failed to automatically repair folder order in metadata", e);
                 });
             }
 
             const sortedFolders = [...loadedFolders].sort((a, b) => {
-                const indexA = order.indexOf(a);
-                const indexB = order.indexOf(b);
-                if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+                const indexA = orderLower.indexOf(a.toLowerCase());
+                const indexB = orderLower.indexOf(b.toLowerCase());
+                if (indexA === -1 && indexB === -1) return a.localeCompare(b, undefined, { sensitivity: 'accent' });
                 if (indexA === -1) return 1;
                 if (indexB === -1) return -1;
                 return indexA - indexB;
@@ -449,8 +453,12 @@ export function useNotes() {
     const updateFolderMetadata = async (folderName: string, meta: FolderMetadata) => {
         if (!baseFolder) return;
         const newMetadata = { ...metadata };
-        newMetadata.folders[folderName] = {
-            ...newMetadata.folders[folderName],
+        // Find existing key case-insensitively
+        const existingKey = Object.keys(newMetadata.folders).find(k => k.toLowerCase() === folderName.toLowerCase());
+        const keyToUse = existingKey || folderName;
+
+        newMetadata.folders[keyToUse] = {
+            ...newMetadata.folders[keyToUse],
             ...meta
         };
         setMetadata(newMetadata);

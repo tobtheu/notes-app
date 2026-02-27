@@ -260,7 +260,7 @@ function App() {
         isOpen={!!categoryToEdit}
         onClose={() => setCategoryToEdit(null)}
         folderName={categoryToEdit || ""}
-        metadata={categoryToEdit ? (metadata.folders[categoryToEdit] || {}) : {}}
+        metadata={categoryToEdit ? (metadata.folders[Object.keys(metadata.folders).find(k => k.toLowerCase() === categoryToEdit.toLowerCase()) || categoryToEdit] || {}) : {}}
         onSave={handleEditCategory}
       />
 
