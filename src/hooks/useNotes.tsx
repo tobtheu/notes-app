@@ -519,7 +519,7 @@ export function useNotes() {
 
             // Filter by category (Flat structure: exact match only)
             if (selectedCategory) {
-                return note.folder === selectedCategory;
+                return normalizeStr(note.folder) === normalizeStr(selectedCategory);
             }
 
             return true;

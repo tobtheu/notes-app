@@ -88,7 +88,7 @@ const FolderItem = ({
     const folderMeta = metadata.folders[folderKey] || {};
     const IconComponent = ICON_MAP[folderMeta.icon || 'Folder'] || Folder;
     const colorStyles = COLOR_MAP[folderMeta.color || 'gray'];
-    const isSelected = selectedCategory === folder;
+    const isSelected = !!selectedCategory && normalizeStr(selectedCategory) === normalizeStr(folder);
 
     return (
         <div
