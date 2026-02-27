@@ -107,11 +107,24 @@ export function useNotes() {
         const cleanup = window.electronAPI.onFileChanged(() => {
             // Ignore events if we just saved (prevent "save-reload-loop")
             const now = Date.now();
-            if (now - lastSaveTime.current < 1000) return;
+            // Reduced guard time to 200ms for better responsiveness
+            if (now - lastSaveTime.current < 200) return;
 
             loadNotes();
         });
-        return cleanup;
+
+        // Polling fallback every 30 seconds for cloud sync reliability
+        const pollInterval = setInterval(() => {
+            const now = Date.now();
+            if (now - lastSaveTime.current > 5000) { // Only poll if not recently saved
+                loadNotes();
+            }
+        }, 30000);
+
+        return () => {
+            cleanup();
+            clearInterval(pollInterval);
+        };
     }, [baseFolder, loadNotes]);
 
     const selectFolder = async () => {
@@ -315,7 +328,13 @@ export function useNotes() {
 
         // Clean up metadata
         const newMeta = { ...metadata };
-        delete newMeta.folders[folderRelative];
+        // Find existing key with potential case difference
+        const existingKey = Object.keys(newMeta.folders).find(k => k.toLowerCase() === folderRelative.toLowerCase());
+        if (existingKey) {
+            delete newMeta.folders[existingKey];
+        } else {
+            delete newMeta.folders[folderRelative];
+        }
 
         if (newMeta.folderOrder) {
             newMeta.folderOrder = newMeta.folderOrder.filter(f => f !== folderRelative);

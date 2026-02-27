@@ -14,7 +14,7 @@ export interface AppMetadata {
     folders: Record<string, FolderMetadata>;
     pinnedNotes: string[];
     folderOrder?: string[];
-    settings?: any;
+    settings?: any; // Contains both synced and local-only settings
 }
 
 export interface ElectronAPI {

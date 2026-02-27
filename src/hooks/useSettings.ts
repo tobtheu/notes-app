@@ -37,8 +37,7 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         if (metadataSettings) {
             if (metadataSettings.markdownEnabled !== undefined) setMarkdownEnabled(metadataSettings.markdownEnabled);
             if (metadataSettings.accentColor !== undefined) setAccentColor(metadataSettings.accentColor);
-            if (metadataSettings.fontFamily !== undefined) setFontFamily(metadataSettings.fontFamily);
-            if (metadataSettings.fontSize !== undefined) setFontSize(metadataSettings.fontSize);
+            // fontFamily and fontSize are device-specific and NOT loaded from cloud metadata
             if (metadataSettings.toolbarVisible !== undefined) setToolbarVisible(metadataSettings.toolbarVisible);
             if (metadataSettings.spellcheckEnabled !== undefined) setSpellcheckEnabled(metadataSettings.spellcheckEnabled);
             hasLoadedMetadata.current = true;
@@ -59,8 +58,7 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
             onSaveSettings({
                 markdownEnabled,
                 accentColor,
-                fontFamily,
-                fontSize,
+                // fontFamily and fontSize are device-specific and NOT synced to cloud metadata
                 toolbarVisible,
                 spellcheckEnabled,
             });

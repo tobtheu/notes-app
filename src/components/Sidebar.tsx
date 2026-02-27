@@ -81,7 +81,9 @@ const FolderItem = ({
     onEditCategory, onDeleteCategory, isDragging, isOverlay,
     setNodeRef, attributes, listeners, style
 }: FolderItemProps) => {
-    const folderMeta = metadata.folders[folder] || {};
+    // Case-insensitive lookup for folder metadata
+    const folderKey = Object.keys(metadata.folders).find(k => k.toLowerCase() === folder.toLowerCase()) || folder;
+    const folderMeta = metadata.folders[folderKey] || {};
     const IconComponent = ICON_MAP[folderMeta.icon || 'Folder'] || Folder;
     const colorStyles = COLOR_MAP[folderMeta.color || 'gray'];
     const isSelected = selectedCategory === folder;
