@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Note, AppMetadata, FolderMetadata } from '../types';
 
+const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
+
 export function useNotes() {
     const [baseFolder, setBaseFolder] = useState<string | null>(null);
     const [notes, setNotes] = useState<Note[]>([]);
@@ -13,7 +15,7 @@ export function useNotes() {
     const getNoteId = (note: Note) => {
         const folder = note.folder ? note.folder.replace(/\\/g, '/') : '';
         const path = folder ? `${folder}/${note.filename}` : note.filename;
-        return path.toLowerCase(); // Consistent unique ID
+        return normalizeStr(path); // Consistent unique ID (normalized)
     };
 
     // Load folder from local storage or ask user
@@ -43,33 +45,33 @@ export function useNotes() {
             setNotes(uniqueNotes.sort((a, b) => {
                 const timeDiff = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
                 if (timeDiff !== 0) return timeDiff;
-                return a.filename.localeCompare(b.filename);
+                return normalizeStr(a.filename).localeCompare(normalizeStr(b.filename));
             }));
 
             const loadedFolders = await window.electronAPI.listFolders(baseFolder);
             const meta = await window.electronAPI.readMetadata(baseFolder);
 
-            // Normalize pinned notes in metadata to lowercase for consistency
+            // Normalize pinned notes in metadata to lowercase/NFC for consistency
             if (meta.pinnedNotes) {
-                meta.pinnedNotes = meta.pinnedNotes.map(p => p.toLowerCase());
+                meta.pinnedNotes = meta.pinnedNotes.map(p => normalizeStr(p));
             } else {
                 meta.pinnedNotes = [];
             }
             setMetadata(meta);
 
-            // Sort folders based on metadata order (case-insensitive)
+            // Sort folders based on metadata order (case-insensitive + normalized)
             let order = meta.folderOrder || [];
             let needsMetadataSave = false;
 
-            // Normalize order to handle casing robustly
-            const orderLower = order.map(f => f.toLowerCase());
+            // Normalize order to handle casing and Unicode robustly
+            const orderNormalized = order.map(f => normalizeStr(f));
 
             // Guarantee that any folder existing on disk is in the order array (case-insensitive check)
             loadedFolders.forEach(folder => {
-                const folderLower = folder.toLowerCase();
-                if (!orderLower.includes(folderLower)) {
+                const normalizedFolder = normalizeStr(folder);
+                if (!orderNormalized.includes(normalizedFolder)) {
                     order.push(folder);
-                    orderLower.push(folderLower);
+                    orderNormalized.push(normalizedFolder);
                     needsMetadataSave = true;
                 }
             });
@@ -85,8 +87,8 @@ export function useNotes() {
             }
 
             const sortedFolders = [...loadedFolders].sort((a, b) => {
-                const indexA = orderLower.indexOf(a.toLowerCase());
-                const indexB = orderLower.indexOf(b.toLowerCase());
+                const indexA = orderNormalized.indexOf(normalizeStr(a));
+                const indexB = orderNormalized.indexOf(normalizeStr(b));
                 if (indexA === -1 && indexB === -1) return a.localeCompare(b, undefined, { sensitivity: 'accent' });
                 if (indexA === -1) return 1;
                 if (indexB === -1) return -1;
@@ -332,8 +334,9 @@ export function useNotes() {
 
         // Clean up metadata
         const newMeta = { ...metadata };
-        // Find existing key with potential case difference
-        const existingKey = Object.keys(newMeta.folders).find(k => k.toLowerCase() === folderRelative.toLowerCase());
+        // Find existing key with potential case/Unicode difference
+        const normalizedTarget = normalizeStr(folderRelative);
+        const existingKey = Object.keys(newMeta.folders).find(k => normalizeStr(k) === normalizedTarget);
         if (existingKey) {
             delete newMeta.folders[existingKey];
         } else {
@@ -341,13 +344,13 @@ export function useNotes() {
         }
 
         if (newMeta.folderOrder) {
-            newMeta.folderOrder = newMeta.folderOrder.filter(f => f !== folderRelative);
+            newMeta.folderOrder = newMeta.folderOrder.filter(f => normalizeStr(f) !== normalizedTarget);
         }
 
         // Remove pins for notes in this folder
         if (newMeta.pinnedNotes) {
-            const prefix = `${folderRelative.toLowerCase()}/`;
-            newMeta.pinnedNotes = newMeta.pinnedNotes.filter(p => !p.toLowerCase().startsWith(prefix));
+            const prefix = `${normalizedTarget}/`;
+            newMeta.pinnedNotes = newMeta.pinnedNotes.filter(p => !normalizeStr(p).startsWith(prefix));
         }
 
         lastSaveTime.current = Date.now();
@@ -367,8 +370,9 @@ export function useNotes() {
 
         // Update order metadata to include the new folder at the end
         const newMeta = { ...metadata };
+        const normalizedNew = normalizeStr(folderName);
         if (newMeta.folderOrder) {
-            if (!newMeta.folderOrder.includes(folderName)) {
+            if (!newMeta.folderOrder.some(f => normalizeStr(f) === normalizedNew)) {
                 newMeta.folderOrder = [...newMeta.folderOrder, folderName];
             }
         } else {
@@ -383,11 +387,25 @@ export function useNotes() {
     const reorderFolders = async (newOrder: string[]) => {
         if (!baseFolder) return;
 
-        const newMeta = { ...metadata, folderOrder: newOrder };
-        setMetadata(newMeta);
-        setFolders(newOrder); // Optimistic update
+        // Robust merge: Preserve hidden/non-disk folders in metadata
+        const currentOrder = metadata.folderOrder || folders;
+        const newOrderNormalized = newOrder.map(f => normalizeStr(f));
 
-        lastSaveTime.current = Date.now(); // Prevent file watcher from immediately reloading state
+        // Start with the new order from UI
+        let mergedOrder = [...newOrder];
+
+        // Then append anything that was in the old order but NOT touched by the UI reorder
+        currentOrder.forEach(f => {
+            if (!newOrderNormalized.includes(normalizeStr(f))) {
+                mergedOrder.push(f);
+            }
+        });
+
+        const newMeta = { ...metadata, folderOrder: mergedOrder };
+        setMetadata(newMeta);
+        setFolders(newOrder); // Optimistic update (UI only shows what matters now)
+
+        lastSaveTime.current = Date.now();
         await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
     };
 
@@ -399,27 +417,34 @@ export function useNotes() {
             const newMeta = { ...metadata };
 
             // Update folder meta
-            if (newMeta.folders[oldName]) {
-                newMeta.folders[newName] = newMeta.folders[oldName];
-                delete newMeta.folders[oldName];
+            const normalizedOld = normalizeStr(oldName);
+            const normalizedNew = normalizeStr(newName);
+
+            // Update folder keys in metadata.folders
+            const existingMetaKey = Object.keys(newMeta.folders).find(k => normalizeStr(k) === normalizedOld);
+            if (existingMetaKey) {
+                newMeta.folders[newName] = newMeta.folders[existingMetaKey];
+                if (existingMetaKey !== newName) {
+                    delete newMeta.folders[existingMetaKey];
+                }
             }
 
             // Update pinned notes paths if folder changed
             if (newMeta.pinnedNotes) {
-                const oldPrefix = `${oldName.toLowerCase()}/`;
-                const newPrefix = `${newName.toLowerCase()}/`;
+                const oldPrefix = `${normalizedOld}/`;
+                const newPrefix = `${normalizedNew}/`;
                 newMeta.pinnedNotes = newMeta.pinnedNotes.map(p => {
-                    const lp = p.toLowerCase();
-                    if (lp.startsWith(oldPrefix)) {
-                        return lp.replace(oldPrefix, newPrefix);
+                    const normalizedP = normalizeStr(p);
+                    if (normalizedP.startsWith(oldPrefix)) {
+                        return normalizedP.replace(oldPrefix, newPrefix);
                     }
-                    return lp;
+                    return p;
                 });
             }
 
             // Update folderOrder if it exists
             if (newMeta.folderOrder) {
-                newMeta.folderOrder = newMeta.folderOrder.map(f => f === oldName ? newName : f);
+                newMeta.folderOrder = newMeta.folderOrder.map(f => normalizeStr(f) === normalizedOld ? newName : f);
             }
 
             lastSaveTime.current = Date.now();
@@ -437,7 +462,7 @@ export function useNotes() {
         if (!baseFolder) return;
         const notePath = getNoteId(note);
         const newMeta = { ...metadata };
-        const pinned = (newMeta.pinnedNotes || []).map(p => p.toLowerCase());
+        const pinned = (newMeta.pinnedNotes || []).map(p => normalizeStr(p));
 
         if (pinned.includes(notePath)) {
             newMeta.pinnedNotes = pinned.filter(p => p !== notePath);
@@ -453,8 +478,9 @@ export function useNotes() {
     const updateFolderMetadata = async (folderName: string, meta: FolderMetadata) => {
         if (!baseFolder) return;
         const newMetadata = { ...metadata };
-        // Find existing key case-insensitively
-        const existingKey = Object.keys(newMetadata.folders).find(k => k.toLowerCase() === folderName.toLowerCase());
+        // Find existing key case-insensitively + normalized
+        const normalizedTarget = normalizeStr(folderName);
+        const existingKey = Object.keys(newMetadata.folders).find(k => normalizeStr(k) === normalizedTarget);
         const keyToUse = existingKey || folderName;
 
         newMetadata.folders[keyToUse] = {

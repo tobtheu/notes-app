@@ -76,13 +76,15 @@ interface FolderItemProps {
     style?: React.CSSProperties;
 }
 
+const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
+
 const FolderItem = ({
     folder, metadata, selectedCategory, isCollapsed, onSelectCategory,
     onEditCategory, onDeleteCategory, isDragging, isOverlay,
     setNodeRef, attributes, listeners, style
 }: FolderItemProps) => {
-    // Case-insensitive lookup for folder metadata
-    const folderKey = Object.keys(metadata.folders).find(k => k.toLowerCase() === folder.toLowerCase()) || folder;
+    // Case-insensitive + Unicode-normalized lookup for folder metadata
+    const folderKey = Object.keys(metadata.folders).find(k => normalizeStr(k) === normalizeStr(folder)) || folder;
     const folderMeta = metadata.folders[folderKey] || {};
     const IconComponent = ICON_MAP[folderMeta.icon || 'Folder'] || Folder;
     const colorStyles = COLOR_MAP[folderMeta.color || 'gray'];

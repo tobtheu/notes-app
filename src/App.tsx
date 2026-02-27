@@ -12,6 +12,8 @@ import type { Note, FolderMetadata } from './types';
 import { Folder } from 'lucide-react';
 import { UpdateModal } from './components/UpdateModal';
 
+const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
+
 function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -260,7 +262,7 @@ function App() {
         isOpen={!!categoryToEdit}
         onClose={() => setCategoryToEdit(null)}
         folderName={categoryToEdit || ""}
-        metadata={categoryToEdit ? (metadata.folders[Object.keys(metadata.folders).find(k => k.toLowerCase() === categoryToEdit.toLowerCase()) || categoryToEdit] || {}) : {}}
+        metadata={categoryToEdit ? (metadata.folders[Object.keys(metadata.folders).find(k => normalizeStr(k) === normalizeStr(categoryToEdit)) || categoryToEdit] || {}) : {}}
         onSave={handleEditCategory}
       />
 
