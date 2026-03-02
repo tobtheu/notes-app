@@ -21,6 +21,11 @@ interface SettingsModalProps {
     onToggleSpellcheck: (enabled: boolean) => void;
 }
 
+/**
+ * SettingsModal Component
+ * Manages application-wide configurations including theme, storage path,
+ * typography, and software updates.
+ */
 export function SettingsModal({
     isOpen,
     onClose,
@@ -39,6 +44,9 @@ export function SettingsModal({
     spellcheckEnabled,
     onToggleSpellcheck
 }: SettingsModalProps) {
+    /**
+     * --- LOCAL STATE ---
+     */
     const [version, setVersion] = useState<string>('0.0.0');
     const [updateStatus, setUpdateStatus] = useState<{
         type: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
@@ -48,9 +56,9 @@ export function SettingsModal({
     }>({ type: 'idle' });
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+    // Auto-scroll to update status box when it appears
     useEffect(() => {
         if (updateStatus.type !== 'idle' && scrollContainerRef.current) {
-            // Smoothly scroll to the bottom to reveal the new status box
             setTimeout(() => {
                 scrollContainerRef.current?.scrollTo({
                     top: scrollContainerRef.current.scrollHeight,
@@ -60,14 +68,17 @@ export function SettingsModal({
         }
     }, [updateStatus.type]);
 
+    /**
+     * --- INITIALIZATION & TAURI INTEROP ---
+     */
     useEffect(() => {
         if (!isOpen) return;
 
-        // Fetch app version
-        window.electronAPI.getAppVersion().then(setVersion);
+        // Fetch current app version from the backend
+        window.tauriAPI.getAppVersion().then(setVersion);
 
-        // Listen for update events
-        const unsubscribe = window.electronAPI.onUpdateStatus((status) => {
+        // Subscribe to real-time update events from the Tauri updater
+        const unsubscribe = window.tauriAPI.onUpdateStatus((status) => {
             setUpdateStatus(status);
         });
 
@@ -76,15 +87,15 @@ export function SettingsModal({
 
     const handleCheckForUpdates = () => {
         setUpdateStatus({ type: 'checking' });
-        window.electronAPI.checkForUpdates();
+        window.tauriAPI.checkForUpdates();
     };
 
     const handleDownloadUpdate = () => {
-        window.electronAPI.downloadUpdate();
+        window.tauriAPI.downloadUpdate();
     };
 
     const handleInstallUpdate = () => {
-        window.electronAPI.quitAndInstall();
+        window.tauriAPI.quitAndInstall();
     };
 
     if (!isOpen) return null;
@@ -105,7 +116,7 @@ export function SettingsModal({
                     ref={scrollContainerRef}
                     className="overflow-y-auto max-h-[70vh] pr-2 -mr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700"
                 >
-                    {/* Storage Path */}
+                    {/* --- STORAGE SECTION --- */}
                     <div className="mb-8">
                         <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Storage</h3>
                         <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
@@ -123,11 +134,11 @@ export function SettingsModal({
                         </div>
                     </div>
 
-                    {/* Appearance */}
+                    {/* --- APPEARANCE SECTION --- */}
                     <div>
                         <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Appearance</h3>
 
-                        {/* Theme Toggle */}
+                        {/* Theme Configuration */}
                         <div className="grid grid-cols-3 gap-3 mb-6">
                             <button
                                 onClick={() => setTheme('light')}
@@ -167,7 +178,7 @@ export function SettingsModal({
                             </button>
                         </div>
 
-                        {/* Accent Color */}
+                        {/* Accent Color Selection */}
                         <div>
                             <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Accent Color</h4>
                             <div className="flex items-center gap-3 px-3 py-1 -mx-1">
@@ -196,10 +207,11 @@ export function SettingsModal({
                             </div>
                         </div>
 
-                        {/* Font Settings */}
+                        {/* Typography Configuration */}
                         <div className="mt-6">
                             <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Typography</h4>
 
+                            {/* Font Family Selection */}
                             <div className="flex items-center gap-2 mb-4 p-1 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
                                 <button
                                     onClick={() => setFontFamily('system')}
@@ -233,6 +245,7 @@ export function SettingsModal({
                                 </button>
                             </div>
 
+                            {/* Font Size Selection */}
                             <div className="flex items-center gap-2 p-1 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
                                 <button
                                     onClick={() => setFontSize('small')}
@@ -269,7 +282,7 @@ export function SettingsModal({
                     </div>
 
 
-                    {/* Editor Settings */}
+                    {/* --- EDITOR CONFIGURATION SECTION --- */}
                     <div className="mt-8 border-t border-gray-100 dark:border-gray-700 pt-6">
                         <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Editor</h3>
 
@@ -316,7 +329,7 @@ export function SettingsModal({
                         </div>
                     </div>
 
-                    {/* About & Updates */}
+                    {/* --- ABOUT & UPDATER SECTION --- */}
                     <div className="mt-8 border-t border-gray-100 dark:border-gray-700 pt-6 mb-2">
                         <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">About</h3>
 
@@ -337,6 +350,7 @@ export function SettingsModal({
                             )}
                         </div>
 
+                        {/* Real-time Update Status Display */}
                         {updateStatus.type !== 'idle' && (
                             <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
                                 {updateStatus.type === 'checking' && (

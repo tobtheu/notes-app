@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useRef } from 'react';
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, useRef, useMemo } from 'react';
 import type { Note } from '../types';
 import { useEditor, EditorContent, ReactRenderer, Extension, ReactNodeViewRenderer, mergeAttributes } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
@@ -15,7 +15,7 @@ import Highlight from '@tiptap/extension-highlight';
 import Link from '@tiptap/extension-link';
 import Heading from '@tiptap/extension-heading';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { createLowlight, all } from 'lowlight';
+import { createLowlight, common } from 'lowlight';
 import 'highlight.js/styles/github-dark.css';
 
 // Image import removed as it is replaced by ImageWithCaption
@@ -34,10 +34,10 @@ import { TableNode } from './TableNode';
 import { UrlInputModal } from './UrlInputModal';
 import { toggleSmartMark } from '../utils/editor';
 import { WikiLinkMenu } from './WikiLinkMenu';
-import { TextSelection, PluginKey } from '@tiptap/pm/state';
+import { PluginKey } from '@tiptap/pm/state';
 import { CodeBlockComponent } from './CodeBlockComponent';
 
-const lowlight = createLowlight(all);
+const lowlight = createLowlight(common);
 
 interface MarkdownEditorProps {
     content: string;
@@ -60,6 +60,13 @@ const items = [
     { title: 'Table', icon: TableIcon, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
     { title: 'Blockquote', icon: Quote, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleBlockquote().run() },
     { title: 'Code Block', icon: CodeIcon, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run() },
+    {
+        title: 'Link', icon: LinkIcon, command: ({ editor, range }: any) => {
+            editor.chain().focus().deleteRange(range).run();
+            // Trigger link modal via custom event (handled in MarkdownEditor)
+            window.dispatchEvent(new CustomEvent('tiptap:openLinkModal'));
+        }
+    },
     { title: 'Divider', icon: Minus, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).setHorizontalRule().run() },
 ];
 
@@ -145,7 +152,7 @@ const WikiLinkSuggestion = Extension.create({
     name: 'wikiLinkSuggestion',
     addOptions() {
         return {
-            allNotes: [] as Note[],
+            allNotesRef: { current: [] as Note[] },
         };
     },
     addProseMirrorPlugins() {
@@ -168,7 +175,7 @@ const WikiLinkSuggestion = Extension.create({
                         .run();
                 },
                 items: ({ query }: { query: string }) => {
-                    const allNotes = this.options.allNotes as Note[];
+                    const allNotes = this.options.allNotesRef.current as Note[];
                     return allNotes.filter(note =>
                         note.filename.toLowerCase().includes(query.toLowerCase()) ||
                         (note.folder && note.folder.toLowerCase().includes(query.toLowerCase()))
@@ -450,18 +457,195 @@ const BubbleToolbarContent: React.FC<{
 };
 
 
-export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolbarVisible = true, spellcheckEnabled = true, header }: MarkdownEditorProps) => {
+/**
+ * MarkdownEditor Component
+ * A feature-rich WYSIWYG editor powered by Tiptap.
+ * Provides: Markdown parsing, Slash Commands, Wiki-style internal linking,
+ * Image handling (drag & drop), and dynamic toolbars.
+ */
+export const MarkdownEditor = ({
+    content,
+    allNotes,
+    onChange,
+    onNavigate,
+    toolbarVisible = true,
+    spellcheckEnabled = true,
+    header
+}: MarkdownEditorProps) => {
+    /**
+     * --- LOCAL STATE ---
+     */
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [linkModalData, setLinkModalData] = useState<{ url: string; text: string }>({ url: '', text: '' });
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [imageModalData, setImageModalData] = useState<{ src: string; caption: string }>({ src: '', caption: '' });
+
+    // Tracks current hover state for "quick action" popups on links
     const [hoveredLink, setHoveredLink] = useState<{ href: string, text: string, pos: number, rect: DOMRect } | null>(null);
+
     const [lightboxImage, setLightboxImage] = useState<{ src: string, caption?: string } | null>(null);
     const [isScrolling, setIsScrolling] = useState(false);
-    const [isDragging, setIsDragging] = useState(false);
+    const [isDragging, setIsDragging] = useState(false); // Visual feedback for file drop
+
     const hideTimeoutRef = useRef<any>(null);
     const scrollTimeoutRef = useRef<any>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    /**
+     * --- EDITOR CONFIGURATION ---
+     */
+    const allNotesRef = useRef<Note[]>([]);
+    useEffect(() => { allNotesRef.current = allNotes || []; }, [allNotes]);
+
+    // We memoize extensions with a completely empty dependency array to prevent editor re-creation.
+    // Dynamic values like 'allNotes' are passed via a ref which is internally used by the extension.
+    const extensions = useMemo(() => {
+        const rawExtensions = [
+            StarterKit.configure({
+                heading: false,
+                codeBlock: false,
+            }),
+            CodeBlockLowlight.extend({
+                addNodeView() { return ReactNodeViewRenderer(CodeBlockComponent); },
+            }).configure({ lowlight }),
+
+            Heading.extend({
+                renderHTML({ node, HTMLAttributes }) {
+                    const text = node.textContent;
+                    const id = text.toLowerCase().replace(/[^a-z0-9äöüß ]/gi, '').trim().replace(/\s+/g, '-');
+                    return [`h${node.attrs.level}`, mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { id }), 0];
+                },
+            }),
+
+            Markdown,
+            TaskList,
+            TaskItem.configure({ nested: true }),
+            Highlight.configure({ multicolor: true }),
+
+            Link.configure({
+                openOnClick: false,
+                autolink: true,
+                HTMLAttributes: {
+                    class: 'cursor-pointer text-primary-600 hover:text-primary-700 underline underline-offset-4',
+                },
+            }),
+
+            ImageWithCaption,
+            Table.extend({ addNodeView() { return ReactNodeViewRenderer(TableNode); } }).configure({ resizable: true }),
+            TableRow, TableHeader, TableCell,
+
+            Placeholder.configure({ placeholder: "Type '/' for commands..." }),
+            SlashCommands,
+            WikiLinkSuggestion.configure({ allNotesRef }),
+        ];
+
+        return rawExtensions;
+    }, []);
+
+    // Tracks the editor's current markdown WITHOUT calling the expensive getMarkdown().
+    // Updated in onUpdate (user typing) and setContent (note switching).
+    // Initialized to '' so the first useEffect ALWAYS calls setContent — this is critical
+    // because ReactNodeViewRenderer (for code blocks) is only ready AFTER EditorContent mounts.
+    const editorMarkdownRef = useRef('');
+
+    // Refs for callbacks so the useEditor closure (with [] deps) always has the latest references
+    const onNavigateRef = useRef(onNavigate);
+    onNavigateRef.current = onNavigate;
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
+
+    const editor = useEditor({
+        extensions,
+        content,
+        editorProps: {
+            attributes: {
+                // prose classes are on the EditorContent wrapper — NOT here to avoid double CSS matching
+                class: 'focus:outline-none min-h-[500px] pb-32 px-1',
+                spellcheck: spellcheckEnabled ? 'true' : 'false',
+            },
+            handleDOMEvents: {
+                click: (_view, event) => {
+                    const target = event.target as HTMLElement;
+                    const anchor = target.closest('a');
+                    if (anchor && onNavigateRef.current) {
+                        const href = anchor.getAttribute('href');
+                        if (href) {
+                            const isInternal = href.startsWith('note://') || href.startsWith('id:') || href.startsWith('#');
+                            if (isInternal) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (href.startsWith('#')) {
+                                    onNavigateRef.current('', href.substring(1));
+                                } else {
+                                    const cleanHref = href.replace('note://', '').replace('id:', '');
+                                    const [id, anchor] = cleanHref.split('#');
+                                    onNavigateRef.current(decodeURIComponent(id), anchor);
+                                }
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                }
+            },
+            handleDrop: (view, event, _slice, moved) => {
+                setIsDragging(false);
+                if (!moved && event.dataTransfer?.files.length) {
+                    const file = event.dataTransfer.files[0];
+                    if (file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const coords = view.posAtCoords({ left: event.clientX, top: event.clientY });
+                            if (coords && e.target?.result) {
+                                view.dispatch(view.state.tr.insert(coords.pos, view.state.schema.nodes.image.create({ src: e.target.result })));
+                            }
+                        };
+                        reader.readAsDataURL(file);
+                        return true;
+                    }
+                }
+                return false;
+            },
+        },
+        onUpdate: ({ editor }) => {
+            const markdown = (editor.storage as any).markdown.getMarkdown();
+            editorMarkdownRef.current = markdown; // Track what the editor generated
+            onChangeRef.current(markdown);
+        },
+    }, []); // Empty dependency array ensures stability
+
+    /**
+     * --- SIDE EFFECTS ---
+     */
+
+    // Content synchronization: handles note switching.
+    useEffect(() => {
+        if (!editor || content == null) return;
+        if (content !== editorMarkdownRef.current && !editor.isDestroyed) {
+            editor.commands.setContent(content, { emitUpdate: false });
+            editorMarkdownRef.current = content;
+        }
+    }, [editor, content]);
+
+    // Updates dynamic options without re-creating the editor instance
+    useEffect(() => {
+        if (!editor) return;
+        const timer = setTimeout(() => {
+            editor.setOptions({
+                editorProps: {
+                    attributes: {
+                        spellcheck: spellcheckEnabled ? 'true' : 'false',
+                    }
+                }
+            });
+        }, 0);
+        return () => clearTimeout(timer);
+    }, [editor, spellcheckEnabled]);
+
+
+    /**
+     * --- HELPER METHODS ---
+     */
 
     const clearHideTimeout = () => {
         if (hideTimeoutRef.current) {
@@ -477,7 +661,6 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
             hideTimeoutRef.current = null;
         }, 300);
     };
-
 
     const handleScroll = useCallback(() => {
         setIsScrolling(true);
@@ -495,261 +678,6 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
         };
     }, []);
 
-    const isInitialRender = useRef(true);
-
-    const editor = useEditor({
-        extensions: [
-            StarterKit.configure({
-                heading: false,
-                codeBlock: false,
-            }),
-            CodeBlockLowlight.extend({
-                addNodeView() {
-                    return ReactNodeViewRenderer(CodeBlockComponent)
-                },
-            }).configure({
-                lowlight,
-            }),
-            Heading.extend({
-                renderHTML({ node, HTMLAttributes }) {
-                    const hasLevel = this.options.levels.includes(node.attrs.level);
-                    const level = hasLevel ? node.attrs.level : this.options.levels[0];
-
-                    // Generate ID from heading text
-                    const text = node.textContent;
-                    const id = text
-                        .toLowerCase()
-                        .replace(/[^a-z0-9äöüß ]/gi, '')
-                        .trim()
-                        .replace(/\s+/g, '-');
-
-                    return [`h${level}`, mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { id }), 0];
-                },
-            }),
-            Markdown.configure({
-                linkify: true,
-                // The Markdown extension might accidentally include its own link extension
-                // Logic to handle this depends on the version, but ensuring Link is configured separately is key
-            }),
-            TaskList,
-            TaskItem.configure({
-                nested: true,
-            }),
-            Highlight.configure({
-                multicolor: true,
-            }),
-            Link.configure({
-                openOnClick: false, // Handle manually to intercept internal links
-                autolink: true,
-                protocols: ['note', 'id'],
-                validate: href => /^https?:\/\/|^note:\/\/|^id:|^#|^\//.test(href),
-                HTMLAttributes: {
-                    class: 'cursor-pointer text-primary-600 hover:text-primary-700 underline underline-offset-4',
-                },
-            }),
-            ImageWithCaption,
-            Table.extend({
-                addNodeView() {
-                    return ReactNodeViewRenderer(TableNode)
-                },
-            }).configure({
-                resizable: true,
-            }),
-            TableRow,
-            TableHeader,
-            TableCell,
-            Placeholder.configure({
-                placeholder: "Type '/' for commands...",
-            }),
-            SlashCommands,
-            WikiLinkSuggestion.configure({
-                allNotes: allNotes || [],
-            }),
-        ],
-        content: content,
-        onUpdate: ({ editor }) => {
-            if (isInitialRender.current) {
-                isInitialRender.current = false;
-                return;
-            }
-            const markdown = (editor.storage as any).markdown.getMarkdown();
-            onChange(markdown);
-        },
-        onSelectionUpdate: ({ editor }) => {
-            if (!editor.state.selection.empty) {
-                setHoveredLink(null);
-                clearHideTimeout();
-            }
-        },
-        editorProps: {
-            attributes: {
-                class: 'prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl focus:outline-none min-h-[500px]',
-                spellcheck: spellcheckEnabled ? 'true' : 'false',
-            },
-            handleDOMEvents: {
-                click: (_view, event) => {
-                    const target = event.target as HTMLElement;
-                    const anchor = target.closest('a');
-                    if (anchor && onNavigate) {
-                        const href = anchor.getAttribute('href');
-                        console.log('Link clicked:', { href });
-
-                        if (href) {
-                            const isInternal = href.startsWith('note://') || href.startsWith('id:') || href.startsWith('#') || href.endsWith('.md');
-                            if (isInternal) {
-                                event.preventDefault();
-                                event.stopPropagation();
-
-                                if (href.startsWith('#')) {
-                                    onNavigate('', href.substring(1));
-                                } else {
-                                    const cleanHref = href.replace('note://', '').replace('id:', '');
-                                    const [id, anchor] = cleanHref.split('#');
-                                    // Decode specifically for navigation (in case it was encoded for markdown)
-                                    onNavigate(decodeURIComponent(id), anchor);
-                                }
-                                return true;
-                            }
-                        }
-                    }
-                    return false;
-                },
-                keydown: (view, event) => {
-                    if (event.key === '[') {
-                        const { selection } = view.state;
-                        const { from } = selection;
-                        const prevChar = view.state.doc.textBetween(from - 1, from);
-
-                        if (prevChar === '[') {
-                            // User typed the second [, auto-close with ]]
-                            view.dispatch(view.state.tr.insertText(']]', from).setSelection(TextSelection.near(view.state.doc.resolve(from))));
-                            // Note: Suggestion will trigger because matches '[['
-                        }
-                    }
-
-                    if (event.key === 'Backspace') {
-                        const { selection } = view.state;
-                        if (selection.empty) {
-                            const { from } = selection;
-                            const textBefore = view.state.doc.textBetween(from - 2, from);
-                            const textAfter = view.state.doc.textBetween(from, from + 2);
-
-                            if (textBefore === '[[' && textAfter === ']]') {
-                                // Delete both pairs
-                                view.dispatch(view.state.tr.delete(from - 2, from + 2));
-                                return true;
-                            }
-                        }
-                    }
-                    return false;
-                },
-                mousedown: (_, event) => {
-                    const target = event.target as HTMLElement;
-                    const anchor = target.closest('a');
-                    if (anchor) {
-                        const href = anchor.getAttribute('href');
-                        if (href && (href.startsWith('note://') || href.startsWith('id:') || href.startsWith('#'))) {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            return true;
-                        }
-                    }
-                    setHoveredLink(null);
-                    clearHideTimeout();
-                    return false;
-                },
-                mouseover: (view: any, event: any) => {
-                    if (!view.state.selection.empty) return false;
-
-                    const pos = view.posAtCoords({ left: event.clientX, top: event.clientY });
-                    if (!pos) return false;
-
-                    const mark = view.state.doc.marksAt(pos.pos).find((m: any) => m.type.name === 'link');
-
-                    if (mark) {
-                        const start = view.state.doc.resolve(pos.pos).start();
-                        const end = view.state.doc.resolve(pos.pos).end();
-                        const text = view.state.doc.textBetween(start, end);
-                        const rect = view.coordsAtPos(pos.pos);
-
-                        setHoveredLink({
-                            href: mark.attrs.href,
-                            text,
-                            pos: pos.pos,
-                            rect: new DOMRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top)
-                        });
-                        clearHideTimeout();
-                    } else {
-                        startHideTimeout();
-                    }
-                    return false;
-                },
-                mouseleave: () => {
-                    startHideTimeout();
-                    return false;
-                },
-                dragenter: () => {
-                    setIsDragging(true);
-                    return false;
-                },
-                dragover: () => {
-                    setIsDragging(true);
-                    return false;
-                },
-                dragleave: (view: any, event: any) => {
-                    const rect = view.dom.getBoundingClientRect();
-                    if (
-                        event.clientX <= rect.left ||
-                        event.clientX >= rect.right ||
-                        event.clientY <= rect.top ||
-                        event.clientY >= rect.bottom
-                    ) {
-                        setIsDragging(false);
-                    }
-                    return false;
-                },
-                drop: () => {
-                    setIsDragging(false);
-                    return false;
-                },
-            },
-            handleDrop: (view, event, _slice, moved) => {
-                setIsDragging(false);
-                if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
-                    const file = event.dataTransfer.files[0];
-                    if (file.type.startsWith('image/')) {
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            const { schema } = view.state;
-                            const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
-                            if (coordinates && e.target?.result) {
-                                const node = schema.nodes.image.create({ src: e.target.result as string });
-                                const transaction = view.state.tr.insert(coordinates.pos, node);
-                                view.dispatch(transaction);
-                            }
-                        };
-                        reader.readAsDataURL(file);
-                        return true;
-                    }
-                }
-                return false;
-            },
-        },
-    }, [spellcheckEnabled]); // Depend on spellcheckEnabled to re-create/re-configure if needed
-
-    // Handle content updates (e.g. when switching notes)
-    useEffect(() => {
-        if (!editor) return;
-
-        // Only update if content is fundamentally different (e.g. switching notes)
-        // This prevents the "cursor jump" because it only runs when the external content
-        // is no longer what the editor currently has (and it's not from a local change)
-        const currentMarkdown = (editor.storage as any).markdown.getMarkdown();
-        if (content !== currentMarkdown) {
-            editor.commands.setContent(content, { emitUpdate: false });
-        }
-    }, [editor, content]);
-
     const openLinkModal = useCallback((initialUrl?: string, initialText?: string) => {
         if (!editor) return;
         setLinkModalData({
@@ -758,6 +686,13 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
         });
         setIsLinkModalOpen(true);
     }, [editor]);
+
+    // Listen for slash menu link modal trigger
+    useEffect(() => {
+        const handler = () => openLinkModal();
+        window.addEventListener('tiptap:openLinkModal', handler);
+        return () => window.removeEventListener('tiptap:openLinkModal', handler);
+    }, [openLinkModal]);
 
     const openImageModal = useCallback((initialAttrs?: { src?: string, alt?: string }) => {
         if (!editor) return;
@@ -947,7 +882,7 @@ export const MarkdownEditor = ({ content, allNotes, onChange, onNavigate, toolba
             >
                 <div className="max-w-4xl mx-auto py-8 px-8">
                     {header}
-                    <EditorContent editor={editor} />
+                    <EditorContent editor={editor} className="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl" />
                 </div>
             </div>
 

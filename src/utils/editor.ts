@@ -1,9 +1,15 @@
 import type { Editor } from '@tiptap/react';
 
 /**
- * Toggles a mark (like bold, italic, highlight) on the current selection.
- * If no text is selected, it automatically expands the selection to the current word
- * before applying the mark.
+ * toggleSmartMark Utility
+ * Enhances standard Tiptap mark toggling (bold, italic, etc.).
+ * 
+ * Logic:
+ * - Selection is NOT empty: Toggle mark on the current selection.
+ * - Selection IS empty: Intelligently expand selection to the whole word 
+ *   under the cursor before toggling.
+ * 
+ * This provides a more fluid typing experience across different devices.
  */
 export const toggleSmartMark = (editor: Editor, markType: string, options?: any) => {
     if (!editor) return;
@@ -12,14 +18,18 @@ export const toggleSmartMark = (editor: Editor, markType: string, options?: any)
     const { from, empty } = selection;
 
     if (!empty) {
-        // If text is already selected, just toggle the mark as usual
+        // Standard behavior for existing selection
         if (markType === 'bold') editor.chain().focus().toggleBold().run();
         else if (markType === 'italic') editor.chain().focus().toggleItalic().run();
         else if (markType === 'highlight') editor.chain().focus().toggleHighlight(options).run();
         return;
     }
 
-    // If no text is selected, find the word boundaries
+    /**
+     * --- WORD BOUNDARY DETECTION ---
+     * Resolves the current position in the ProseMirror doc and scans backwards/forwards
+     * for word characters (\w).
+     */
     const $pos = doc.resolve(from);
     const text = $pos.parent.textContent;
     const offset = $pos.parentOffset;
@@ -27,17 +37,20 @@ export const toggleSmartMark = (editor: Editor, markType: string, options?: any)
     let start = offset;
     let end = offset;
 
-    // Find start of word
+    // Find start of word (scan left)
     while (start > 0 && /\w/.test(text[start - 1])) {
         start--;
     }
 
-    // Find end of word
+    // Find end of word (scan right)
     while (end < text.length && /\w/.test(text[end])) {
         end++;
     }
 
-    // If we found a word, select it and toggle the mark
+    /**
+     * Stellschraube: Word Expansion Selection
+     * If we found a contiguous block of word characters, we select it.
+     */
     if (start < end) {
         const absoluteStart = from - offset + start;
         const absoluteEnd = from - offset + end;
@@ -47,12 +60,13 @@ export const toggleSmartMark = (editor: Editor, markType: string, options?: any)
             .setTextSelection({ from: absoluteStart, to: absoluteEnd })
             .run();
 
-        // Toggle the mark on the new selection
+        // Apply toggling to the newly selected word
         if (markType === 'bold') editor.chain().focus().toggleBold().run();
         else if (markType === 'italic') editor.chain().focus().toggleItalic().run();
         else if (markType === 'highlight') editor.chain().focus().toggleHighlight(options).run();
     } else {
-        // Fallback: if no word found (e.g. between spaces), just toggle at cursor (standard Tiptap behavior)
+        // Fallback: If cursor is in whitespace or special char, 
+        // fall back to default Tiptap behavior (toggle at cursor for future typing).
         if (markType === 'bold') editor.chain().focus().toggleBold().run();
         else if (markType === 'italic') editor.chain().focus().toggleItalic().run();
         else if (markType === 'highlight') editor.chain().focus().toggleHighlight(options).run();

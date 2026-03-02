@@ -10,7 +10,17 @@ interface WikiLinkMenuProps {
     range: any;
 }
 
+/**
+ * WikiLinkMenu Component
+ * A custom dropdown menu for wiki-style internal linking (`[[note name]]`).
+ * Supports a two-step selection process: 
+ * 1. Select a Note
+ * 2. Select a Heading (Anchor) within that note (optional)
+ */
 export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
+    /**
+     * --- LOCAL STATE ---
+     */
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [step, setStep] = useState<'note' | 'anchor'>('note');
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
@@ -18,6 +28,10 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const lastMousePos = useRef({ x: 0, y: 0 });
 
+    /**
+     * --- MOUSE/KEYBOARD SYNC ---
+     * Prevents the selected index from flickering when both mouse and keyboard are used.
+     */
     const handleMouseMove = (e: React.MouseEvent, index: number) => {
         if (e.clientX !== lastMousePos.current.x || e.clientY !== lastMousePos.current.y) {
             lastMousePos.current = { x: e.clientX, y: e.clientY };
@@ -27,9 +41,14 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
         }
     };
 
+    /**
+     * --- ANCHOR EXTRACTION ---
+     * Adjustments: Slugification Logic
+     * Extracts markdown headings and generates IDs that must match the internal
+     * anchor generation in the MarkdownEditor.
+     */
     const extractAnchors = (content: string) => {
         const headings: { id: string; text: string }[] = [];
-        // Simple regex to find markdown headings
         const lines = content.split('\n');
         lines.forEach(line => {
             const match = line.match(/^(#{1,6})\s+(.+)$/);
@@ -46,15 +65,19 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
         return headings;
     };
 
+    /**
+     * --- SELECTION FLOW ---
+     */
     const selectNote = (note: Note) => {
         const foundAnchors = extractAnchors(note.content || '');
         if (foundAnchors.length > 0) {
+            // Note has headings, proceed to anchor selection step
             setSelectedNote(note);
             setAnchors(foundAnchors);
             setStep('anchor');
             setSelectedIndex(0);
         } else {
-            // No anchors, just insert the note link
+            // No anchors, immediately insert the simple note link
             props.command({
                 id: note.filename.replace('.md', ''),
                 label: note.filename.replace('.md', '')
@@ -64,6 +87,7 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
 
     const selectAnchor = (anchor: { id: string; text: string }) => {
         if (selectedNote) {
+            // Insert link with anchor suffix [[NoteName#HeadingText]]
             props.command({
                 id: selectedNote.filename.replace('.md', ''),
                 anchor: anchor.id,
@@ -74,10 +98,12 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
 
     const currentItems = step === 'note' ? props.items : anchors;
 
+    // Reset cursor when results or step change
     useEffect(() => {
         setSelectedIndex(0);
     }, [props.items, step]);
 
+    // Keep active element in view during keyboard navigation
     useEffect(() => {
         const selectedElement = containerRef.current?.children[selectedIndex + (step === 'note' ? 1 : 1)] as HTMLElement;
         if (selectedElement) {
@@ -85,6 +111,9 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
         }
     }, [selectedIndex, step]);
 
+    /**
+     * --- EXTERNAL API (for Tiptap Suggestion Extension) ---
+     */
     useImperativeHandle(ref, () => ({
         onKeyDown: ({ event }: { event: KeyboardEvent }) => {
             if (event.key === 'ArrowUp') {
@@ -105,6 +134,7 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
             }
             if (event.key === 'Escape') {
                 if (step === 'anchor') {
+                    // Back out to note selection instead of closing the whole menu
                     setStep('note');
                     setSelectedNote(null);
                     return true;
@@ -116,6 +146,7 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
 
     return (
         <div ref={containerRef} className="bg-white dark:bg-gray-800 shadow-2xl rounded-xl border border-gray-200 dark:border-gray-700 p-1.5 min-w-[280px] max-h-[350px] overflow-y-auto z-[1000] custom-scrollbar animate-in fade-in zoom-in duration-150">
+            {/* Header / Context indicator */}
             <div className="flex items-center justify-between px-2 py-1.5 border-b border-gray-100 dark:border-gray-700/50 mb-1">
                 <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest opacity-60">
                     {step === 'note' ? 'Select Note' : `Anchors in ${selectedNote?.filename.replace('.md', '')}`}
@@ -130,12 +161,14 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
                 )}
             </div>
 
+            {/* Empty State */}
             {currentItems.length === 0 && (
                 <div className="px-3 py-6 text-center text-gray-400 text-sm italic">
                     No {step === 'note' ? 'notes' : 'anchors'} found
                 </div>
             )}
 
+            {/* --- LIST RENDERING --- */}
             {step === 'note' ? (
                 (currentItems as Note[]).map((note, index) => (
                     <button

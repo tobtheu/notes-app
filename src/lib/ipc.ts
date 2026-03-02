@@ -3,11 +3,20 @@ import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
-import type { Note, AppMetadata, ElectronAPI } from '../types';
+import type { Note, AppMetadata, TauriAPI } from '../types';
 
 let updateInstance: any = null;
 
-export const tauriAPI: ElectronAPI = {
+/**
+ * tauriAPI Implementation
+ * Implements the TauriAPI interface using Tauri V2 core APIs and plugins.
+ * This bridge allows the frontend to use a unified calling convention 
+ * while the underlying implementation talks to the Rust backend.
+ */
+export const tauriAPI: TauriAPI = {
+    /**
+     * Filesystem Operations
+     */
     selectFolder: async () => {
         const selected = await open({
             directory: true,
@@ -28,28 +37,51 @@ export const tauriAPI: ElectronAPI = {
     renameFolder: (data) => invoke<void>('rename_folder', data).then(() => ({ success: true })).catch((e: any) => ({ success: false, error: e.toString() })),
     deleteFolderRecursive: (folderPath) => invoke<boolean>('delete_folder_recursive', { folderPath }).then(() => true).catch(() => false),
     deleteFolderMoveContents: (data) => invoke<boolean>('delete_folder_move_contents', data).then(() => true).catch(() => false),
+
+    /**
+     * Metadata & Persistence
+     * The .metadata file stores visual properties (icons, colors) for categories.
+     */
     readMetadata: (rootPath) => invoke<AppMetadata>('read_metadata', { rootPath }),
     saveMetadata: (data) => invoke<boolean>('save_metadata', data).then(() => true).catch(() => false),
-    exportPdf: (_html) => Promise.resolve(false), // TODO: Implement PDF export
+
+    exportPdf: (_html) => Promise.resolve(false), // Placeholder: PDF logic is usually handled via system print
+
+    /**
+     * Real-time Watching
+     * Leverages the Rust 'notify' crate through a custom command to detect external changes.
+     */
     startWatch: (folderPath: string) => invoke('start_watch', { folderPath }),
     onFileChanged: (callback) => {
         let unlisten: (() => void) | null = null;
+        let isCancelled = false;
         listen('file-changed', (_event: any) => {
-            callback({ type: 'change', path: '' }); // Simplified event for now
+            // Re-triggering list calls on the frontend upon change
+            callback({ type: 'change', path: '' });
         }).then((fn) => {
-            unlisten = fn;
+            if (isCancelled) {
+                fn();
+            } else {
+                unlisten = fn;
+            }
         });
         return () => {
+            isCancelled = true;
             if (unlisten) unlisten();
         };
     },
+
+    /**
+     * Update Management
+     * Integrates with @tauri-apps/plugin-updater for v2.
+     * Communicates status back to the UI via CustomEvents on the window object.
+     */
     getAppVersion: () => invoke<string>('get_app_version'),
     checkForUpdates: async () => {
         try {
             const update = await check();
             if (update) {
                 updateInstance = update;
-                // Emit event for App.tsx to show UpdateModal
                 window.dispatchEvent(new CustomEvent('tauri-update-status', {
                     detail: { type: 'available', version: update.version }
                 }));
@@ -70,8 +102,6 @@ export const tauriAPI: ElectronAPI = {
         if (!updateInstance) return;
         try {
             await updateInstance.downloadAndInstall((progress: any) => {
-                // If it's a progress event, we need a way to notify the UI
-                // We'll rely on the listener registered via onUpdateStatus
                 if (progress.event === 'Started') {
                     window.dispatchEvent(new CustomEvent('tauri-update-status', {
                         detail: { type: 'downloading', progress: 0 }
@@ -99,16 +129,11 @@ export const tauriAPI: ElectronAPI = {
     onUpdateStatus: (callback) => {
         const handler = (event: any) => callback(event.detail);
         window.addEventListener('tauri-update-status', handler);
-
-        // Also do an initial check to trigger the process if needed? 
-        // No, keep it passive for the listener.
-
-        // Return unsubscribe
         return () => window.removeEventListener('tauri-update-status', handler);
     }
 };
 
-// For backward compatibility and globally making it available (optional, but avoids too many changes)
+// Attach to window globally
 if (typeof window !== 'undefined') {
-    (window as any).electronAPI = tauriAPI;
+    (window as any).tauriAPI = tauriAPI;
 }

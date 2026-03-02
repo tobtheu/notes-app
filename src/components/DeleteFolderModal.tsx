@@ -6,11 +6,17 @@ interface DeleteFolderModalProps {
     onConfirm: (mode: 'recursive' | 'move') => void;
 }
 
+/**
+ * DeleteFolderModal Component
+ * Confirms category deletion with two modes:
+ * 1. Move items to "All Notes" (Keep notes, delete category)
+ * 2. Delete everything (Recursive deletion of category and its notes)
+ */
 export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFolderModalProps) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-                {/* Header */}
+                {/* --- HEADER --- */}
                 <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                     <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">Delete Category</h3>
                     <button onClick={onClose} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors">
@@ -18,13 +24,14 @@ export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFold
                     </button>
                 </div>
 
-                {/* Body */}
+                {/* --- BODY --- */}
                 <div className="p-6">
                     <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
                         How would you like to delete the category <span className="font-semibold text-gray-700 dark:text-gray-100">"{folderName}"</span>?
                     </p>
 
                     <div className="space-y-3">
+                        {/* MODE: KEEP NOTES (Move to root/Inbox) */}
                         <button
                             onClick={() => onConfirm('move')}
                             className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-transparent bg-gray-50 dark:bg-gray-700/50 hover:border-primary-500 transition-all text-left"
@@ -38,6 +45,7 @@ export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFold
                             </div>
                         </button>
 
+                        {/* MODE: DELETE ALL (Recursive) */}
                         <button
                             onClick={() => onConfirm('recursive')}
                             className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-transparent bg-red-50 dark:bg-red-900/10 hover:border-red-500 transition-all text-left"
@@ -53,7 +61,7 @@ export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFold
                     </div>
                 </div>
 
-                {/* Footer */}
+                {/* --- FOOTER --- */}
                 <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900/20 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3">
                     <button
                         onClick={onClose}

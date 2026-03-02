@@ -19,22 +19,27 @@ interface NoteListProps {
     onTogglePin: (note: Note) => void;
     isNotePinned: (note: Note) => boolean;
     getNoteId: (note: Note) => string;
+    selectedCategory: string | null;
 }
-
 const stripMarkdown = (text: string) => {
     if (!text) return '';
     return text
-        .split('\n')[0] // Only first line
-        .replace(/^#+\s+/, '') // Remove headers
-        .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1') // Remove image syntax, keep alt
-        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Remove link syntax, keep text
-        // Only strip #*`_~ if they are likely part of markdown syntax (not just symbols)
+        .split('\n')[0] // Only preview the first line
+        .replace(/^#+\s+/, '') // Remove markdown headers
+        .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1') // Remove image syntax
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Remove link syntax
+        // Strip syntax symbols if they appear at word boundaries
         .replace(/(^|\s)[#*`_~]+|[#*`_~]+(\s|$)/g, '$1$2')
-        .replace(/\[[x ]\]/g, '') // Remove task list brackets
-        .replace(/<[^>]*>/g, '') // Remove HTML tags
+        .replace(/\[[x ]\]/g, '') // Remove task list checkboxes
+        .replace(/<[^>]*>/g, '') // Remove HTML
         .trim();
 };
 
+/**
+ * NoteList Component
+ * Renders the searchable list of notes. Handles sorting (pins first), compact vs detailed views,
+ * and inline note actions like moving to folders or deleting.
+ */
 export function NoteList({
     className,
     notes,
@@ -48,12 +53,21 @@ export function NoteList({
     onTogglePin,
     isNotePinned,
     getNoteId,
+    selectedCategory,
 }: NoteListProps) {
+    /**
+     * --- LOCAL STATE ---
+     */
+
+    // View preference state (persisted in localStorage)
     const [isCompact, setIsCompact] = useState(() => {
         return localStorage.getItem('notelist-compact') === 'true';
     });
+
+    // Tracks which note's folder selection menu is currently open
     const [dropdownOpenId, setDropdownOpenId] = useState<string | null>(null);
 
+    // Toggles between Detailed (with preview) and Compact (titles only) view
     const toggleView = () => {
         const newState = !isCompact;
         setIsCompact(newState);
@@ -62,7 +76,8 @@ export function NoteList({
 
     return (
         <div className={clsx("flex flex-col h-full bg-white dark:bg-gray-900", className)}>
-            {/* Search and Filter */}
+
+            {/* --- HEADER: SEARCH & FILTER --- */}
             <div className="p-4 space-y-3">
                 <div className="relative group">
                     <Search className="absolute left-3 top-2.5 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={18} />
@@ -74,21 +89,30 @@ export function NoteList({
                         onChange={(e) => onSearchChange(e.target.value)}
                     />
                 </div>
+
+                {/* CURRENT CONTEXT INFO */}
                 <div className="flex items-center justify-between px-1">
-                    <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-                        {notes.length} {notes.length === 1 ? 'Note' : 'Notes'}
-                    </span>
-                    <button
-                        onClick={toggleView}
-                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 transition-colors"
-                        title={isCompact ? "Detail View" : "Compact View"}
-                    >
-                        {isCompact ? <LayoutList size={18} /> : <List size={18} />}
-                    </button>
+                    <div className="flex flex-col min-w-0">
+                        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 truncate">
+                            {folders.includes(selectedCategory || '') ? selectedCategory : 'All Notes'}
+                        </h2>
+                        <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                            {notes.length} {notes.length === 1 ? 'Note' : 'Notes'}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                        <button
+                            onClick={toggleView}
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 transition-colors"
+                            title={isCompact ? "Detail View" : "Compact View"}
+                        >
+                            {isCompact ? <LayoutList size={18} /> : <List size={18} />}
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Notes List */}
+            {/* --- NOTES SCROLL AREA --- */}
             <div className="flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar">
                 {notes.length === 0 ? (
                     <div className="p-8 text-center text-gray-400 text-sm">
@@ -105,6 +129,7 @@ export function NoteList({
                             <div key={noteId}>
                                 <div
                                     onClick={() => onSelectNote(note)}
+                                    // Configuration Point: Note item selection styles
                                     className={clsx(
                                         "group relative p-3 rounded-xl cursor-pointer transition-all mb-1 border-2",
                                         isSelected
@@ -121,6 +146,7 @@ export function NoteList({
                                                 {note.filename.replace('.md', '')}
                                             </h3>
                                             <div className="flex items-center shrink-0">
+                                                {/* Pin Toggle */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -139,12 +165,14 @@ export function NoteList({
                                             </div>
                                         </div>
 
+                                        {/* DETAIL VIEW PREVIEW */}
                                         {!isCompact && (
                                             <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-2 leading-relaxed">
                                                 {stripMarkdown(note.content.replace(/^#\s.*?\n/, '').trim()) || 'No additional content'}
                                             </p>
                                         )}
 
+                                        {/* METADATA & ACTIONS FOOTER */}
                                         <div className="flex items-center justify-between text-[10px] font-medium text-gray-400 uppercase tracking-tight relative">
                                             <div className="flex items-center gap-1.5 min-w-0 pr-2">
                                                 <span className="shrink-0">{formatDistanceToNow(new Date(note.updatedAt), { addSuffix: true }).replace('less than a minute', '< 1 min').replace('about ', '')}</span>
@@ -155,6 +183,7 @@ export function NoteList({
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-1">
+                                                {/* Move Note Dropdown Toggle */}
                                                 <div className="relative">
                                                     <button
                                                         onClick={(e) => {
@@ -172,6 +201,7 @@ export function NoteList({
                                                         <FolderTree size={12} />
                                                     </button>
                                                 </div>
+                                                {/* Delete Button */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -185,7 +215,7 @@ export function NoteList({
                                             </div>
                                         </div>
 
-                                        {/* Folder Selection Accordion (Inline) */}
+                                        {/* INLINE FOLDER SELECTION MENU */}
                                         {dropdownOpenId === noteId && (
                                             <div
                                                 className="mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm py-1 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200"
@@ -230,6 +260,7 @@ export function NoteList({
                                         )}
                                     </div>
                                 </div>
+                                {/* Divider - Optimized for visual consistency when items are selected */}
                                 {index < notes.length - 1 && (
                                     <div className={clsx(
                                         "border-b mx-2 my-1 transition-colors",

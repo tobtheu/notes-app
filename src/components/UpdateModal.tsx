@@ -13,12 +13,18 @@ interface UpdateModalProps {
     };
 }
 
+/**
+ * UpdateModal Component
+ * A high-visibility modal that alerts users to new software versions.
+ * Integrates with the Tauri updater status to show download progress.
+ */
 export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, status }: UpdateModalProps) {
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
+                        {/* --- BRANDING ICON --- */}
                         <div className="bg-primary-100 dark:bg-primary-900/40 p-2 rounded-xl">
                             <svg className="w-6 h-6 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -36,6 +42,7 @@ export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, st
                     </p>
 
                     <div className="space-y-3">
+                        {/* --- IDLE/AVAILABLE STATE --- */}
                         {status.type === 'available' && (
                             <button
                                 onClick={onUpdate}
@@ -45,6 +52,7 @@ export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, st
                             </button>
                         )}
 
+                        {/* --- DOWNLOADING STATE --- */}
                         {status.type === 'downloading' && (
                             <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-700">
                                 <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-wider">
@@ -60,6 +68,7 @@ export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, st
                             </div>
                         )}
 
+                        {/* --- READY TO INSTALL --- */}
                         {status.type === 'downloaded' && (
                             <button
                                 onClick={onInstall}
@@ -72,6 +81,7 @@ export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, st
                             </button>
                         )}
 
+                        {/* --- ERROR HANDLING --- */}
                         {status.type === 'error' && (
                             <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-xs">
                                 <p className="font-bold mb-1">Update failed</p>
@@ -79,6 +89,7 @@ export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, st
                             </div>
                         )}
 
+                        {/* --- SECONDARY ACTIONS --- */}
                         <div className="grid grid-cols-2 gap-3">
                             <button
                                 onClick={onSkip}

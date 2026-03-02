@@ -4,12 +4,17 @@ import type { NodeViewProps } from '@tiptap/react';
 import { Copy, Check, ChevronDown } from 'lucide-react';
 import clsx from 'clsx';
 
+/**
+ * CodeBlockComponent
+ * Custom NodeView for Tiptap code blocks.
+ * Provides syntax highlighting language selection and a copy-to-clipboard feature.
+ */
 export const CodeBlockComponent: React.FC<NodeViewProps> = (props) => {
     const { node, updateAttributes, extension } = props;
     const { language: defaultLanguage } = node.attrs;
     const [copied, setCopied] = useState(false);
 
-    // Get available languages from lowlight
+    // Get available languages from the lowlight extension configuration
     // @ts-ignore
     const languages = extension.options.lowlight.listLanguages();
 
@@ -18,6 +23,7 @@ export const CodeBlockComponent: React.FC<NodeViewProps> = (props) => {
         const text = node.textContent || '';
         navigator.clipboard.writeText(text);
         setCopied(true);
+        // Reset copy state after 2 seconds
         setTimeout(() => setCopied(false), 2000);
     };
 
@@ -27,7 +33,7 @@ export const CodeBlockComponent: React.FC<NodeViewProps> = (props) => {
                 className="absolute right-4 top-4 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                 contentEditable={false}
             >
-                {/* Language Selector */}
+                {/* --- LANGUAGE SELECTOR --- */}
                 <div className="relative">
                     <select
                         contentEditable={false}
@@ -45,7 +51,7 @@ export const CodeBlockComponent: React.FC<NodeViewProps> = (props) => {
                     <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>
 
-                {/* Copy Button */}
+                {/* --- COPY BUTTON --- */}
                 <button
                     onClick={handleCopy}
                     className={clsx(
@@ -61,6 +67,7 @@ export const CodeBlockComponent: React.FC<NodeViewProps> = (props) => {
             </div>
 
             <pre className="rounded-xl overflow-hidden shadow-lg border border-gray-200 dark:border-gray-800">
+                {/* The actual code content rendered by Tiptap */}
                 {/* @ts-ignore */}
                 <NodeViewContent as="code" className={clsx(defaultLanguage && `language-${defaultLanguage}`)} />
             </pre>

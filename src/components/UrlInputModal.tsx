@@ -15,7 +15,19 @@ interface UrlInputModalProps {
     onBrowseFiles?: () => void;
 }
 
+/**
+ * UrlInputModal
+ * A versatile modal used for inserting both hyperlink and image references.
+ * Features:
+ * - External URL input
+ * - Internal note linking with anchor (headline) support
+ * - Searchable list of all notes
+ * - File browser integration for local images
+ */
 export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, initialUrl, initialText, initialCaption, allNotes = [], onClose, onSave, onBrowseFiles }) => {
+    /**
+     * --- STATE MANAGEMENT ---
+     */
     const [url, setUrl] = useState(initialUrl || '');
     const [text, setText] = useState(initialText || '');
     const [caption, setCaption] = useState(initialCaption || '');
@@ -25,12 +37,14 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
     const [selectedHeadline, setSelectedHeadline] = useState<string>('');
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // Synchronize local state with props when modal opens
     useEffect(() => {
         if (isOpen) {
             setUrl(initialUrl || '');
             setText(initialText || '');
             setCaption(initialCaption || '');
-            // Focus input on open if not image (since image might use browse)
+
+            // Auto-focus logic for better UX
             if (type !== 'image') {
                 setTimeout(() => {
                     inputRef.current?.focus();
@@ -39,6 +53,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
         }
     }, [isOpen, initialUrl, initialText, initialCaption, type]);
 
+    // Detective logic: check if the initial URL is an internal note link
     useEffect(() => {
         if (isOpen && initialUrl?.startsWith('note://')) {
             setLinkType('internal');
@@ -59,6 +74,9 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
         }
     }, [isOpen, initialUrl, allNotes]);
 
+    /**
+     * --- COMPUTED DATA ---
+     */
     const filteredNotes = useMemo(() => {
         if (!searchNoteTerm) return allNotes;
         return allNotes.filter(n =>
@@ -67,6 +85,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
         );
     }, [allNotes, searchNoteTerm]);
 
+    // Extracts all Markdown headings from the selected note for anchor linking
     const headlines = useMemo(() => {
         if (!selectedNote) return [];
         const matches = selectedNote.content.matchAll(/^#+\s+(.+)$/gm);
@@ -75,15 +94,27 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
 
     if (!isOpen) return null;
 
+    /**
+     * --- EVENT HANDLERS ---
+     */
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         let finalUrl = url;
+
         if (type === 'link' && linkType === 'internal' && selectedNote) {
             const notePath = selectedNote.folder ? `${selectedNote.folder}/${selectedNote.filename}` : selectedNote.filename;
-            // Encode the path to ensure spaces and special characters don't break the markdown link
+            // Encode the path to ensure spaces and special characters don't break the markdown syntax
             const encodedPath = notePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
-            finalUrl = `note://${encodedPath}${selectedHeadline ? `#${selectedHeadline.toLowerCase().replace(/[^a-z0-9äöüß ]/gi, '').trim().replace(/\s+/g, '-')}` : ''}`;
+
+            // Configuration Point: Anchor normalization logic
+            // Matches the logic in MarkdownEditor's Heading extension
+            const anchorId = selectedHeadline
+                ? `#${selectedHeadline.toLowerCase().replace(/[^a-z0-9äöüß ]/gi, '').trim().replace(/\s+/g, '-')}`
+                : '';
+
+            finalUrl = `note://${encodedPath}${anchorId}`;
         }
+
         onSave(finalUrl, text, caption);
         onClose();
     };
@@ -91,6 +122,8 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-4 animate-in zoom-in-95 duration-200">
+
+                {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-100">
                         {type === 'link' ? 'Insert Link' : 'Insert Image'}
@@ -103,6 +136,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                     </button>
                 </div>
 
+                {/* Local File Browser (Images Only) */}
                 {type === 'image' && onBrowseFiles && (
                     <div className="mb-6">
                         <button
@@ -135,6 +169,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                 <form onSubmit={handleSubmit}>
                     {type === 'link' && (
                         <>
+                            {/* Display Text Input */}
                             <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Text
@@ -148,6 +183,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                                 />
                             </div>
 
+                            {/* Internal vs External Toggle */}
                             <div className="flex bg-gray-100 dark:bg-gray-900 p-1 rounded-lg mb-4">
                                 <button
                                     type="button"
@@ -177,6 +213,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                                 </button>
                             </div>
 
+                            {/* Conditional URL / Note Picker */}
                             {linkType === 'external' ? (
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -195,6 +232,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                                 <div className="mb-4 flex flex-col gap-3">
                                     {!selectedNote ? (
                                         <div className="flex flex-col gap-2">
+                                            {/* Search box for notes */}
                                             <div className="relative">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                                                 <input
@@ -228,6 +266,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                                         </div>
                                     ) : (
                                         <div className="flex flex-col gap-3">
+                                            {/* Selected Note Indicator */}
                                             <div className="flex items-center justify-between p-2 bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-800 rounded-md">
                                                 <div className="flex items-center gap-2 overflow-hidden">
                                                     <FileText className="text-primary-600" size={16} />
@@ -244,6 +283,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                                                 </button>
                                             </div>
 
+                                            {/* Headline/Anchor Picker */}
                                             {headlines.length > 0 && (
                                                 <div className="flex flex-col gap-1.5">
                                                     <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">
@@ -289,6 +329,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                         </>
                     )}
 
+                    {/* Image URL Input */}
                     {type === 'image' && (
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -305,6 +346,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                         </div>
                     )}
 
+                    {/* Image Caption Input */}
                     {type === 'image' && (
                         <div className="mb-6">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -320,6 +362,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                         </div>
                     )}
 
+                    {/* Footer Actions */}
                     <div className="flex justify-end gap-2">
                         <button
                             type="button"

@@ -1,23 +1,42 @@
+/**
+ * Note Interface
+ * Represents a single markdown file in the filesystem.
+ */
 export interface Note {
     filename: string;
-    folder: string; // Relative path from root
+    folder: string; // Relative path from the root storage directory
     content: string;
     updatedAt: string;
 }
 
+/**
+ * FolderMetadata Interface
+ * Configurable visual properties for a folder/category.
+ */
 export interface FolderMetadata {
     icon?: string;
     color?: string;
 }
 
+/**
+ * AppMetadata Interface
+ * The central configuration object persisted as '.metadata' in the root folder.
+ * Synchronizes layout and visuals across devices.
+ */
 export interface AppMetadata {
-    folders: Record<string, FolderMetadata>;
+    folders: Record<string, FolderMetadata>; // Key is the folder path
     pinnedNotes: string[];
     folderOrder?: string[];
-    settings?: any; // Contains both synced and local-only settings
+    settings?: any; // Contains both synced settings (like accent color) and local-only settings
 }
 
-export interface ElectronAPI {
+/**
+ * TauriAPI Interface
+ * A bridge naming convention. In this Tauri V2 project, 
+ * this interface defines all IPC calls to the Rust backend.
+ * Access via `window.tauriAPI`.
+ */
+export interface TauriAPI {
     selectFolder: () => Promise<string | null>;
     listNotes: (folderPath: string) => Promise<Note[]>;
     listFolders: (folderPath: string) => Promise<string[]>;
@@ -47,6 +66,6 @@ export interface ElectronAPI {
 
 declare global {
     interface Window {
-        electronAPI: ElectronAPI;
+        tauriAPI: TauriAPI;
     }
 }

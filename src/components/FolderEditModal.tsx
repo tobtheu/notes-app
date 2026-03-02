@@ -51,38 +51,68 @@ const COLORS = [
     { id: 'gray', bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200', darkBg: 'dark:bg-gray-800', darkText: 'dark:text-gray-400' },
 ];
 
+/**
+ * FolderEditModal
+ * A modal for customizing folder metadata (name, icon, and color).
+ * This component handles "optimistic" saving on every change (icon click, color selection).
+ */
 export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave }: FolderEditModalProps) {
     const [name, setName] = useState(folderName);
     const [selectedIcon, setSelectedIcon] = useState(metadata.icon || 'Folder');
     const [selectedColor, setSelectedColor] = useState(metadata.color || 'gray');
 
+    // Sync state when modal source changes or modal opens
     useEffect(() => {
         if (isOpen) {
             setName(folderName);
             setSelectedIcon(metadata.icon || 'Folder');
             setSelectedColor(metadata.color || 'gray');
         }
-    }, [isOpen, folderName, metadata]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, folderName]);
+
+    /**
+     * Configuration Point: Auto-Save Logic
+     * Icons and Colors save immediately on click. 
+     * The name saves on "Blur" (when focus leaves the input) or "Enter".
+     */
+    const handleIconSelect = (iconId: string) => {
+        setSelectedIcon(iconId);
+        onSave(name, { icon: iconId, color: selectedColor });
+    };
+
+    const handleColorSelect = (colorId: string) => {
+        setSelectedColor(colorId);
+        onSave(name, { icon: selectedIcon, color: colorId });
+    };
+
+    const handleNameBlur = () => {
+        if (name.trim() && name.trim() !== folderName) {
+            onSave(name.trim(), { icon: selectedIcon, color: selectedColor });
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleNameBlur();
+            (e.target as HTMLInputElement).blur();
+        }
+    };
 
     if (!isOpen) return null;
 
     const selectedColorData = COLORS.find(c => c.id === selectedColor) || COLORS[9];
     const SelectedIconComponent = (ICONS.find(i => i.id === selectedIcon) || ICONS[0]).icon;
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (name.trim()) {
-            onSave(name.trim(), {
-                icon: selectedIcon,
-                color: selectedColor
-            });
-            onClose();
-        }
-    };
-
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+            {/* 
+                Stellschraube: Modal Width and Styling
+                Tailwind classes like 'max-w-md' and 'rounded-2xl' define the visual footprint.
+            */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+
+                {/* Header with Preview */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800">
                     <div className="flex items-center gap-3">
                         <div className={clsx("p-2 rounded-lg transition-colors duration-300", selectedColorData.bg, selectedColorData.darkBg)}>
@@ -95,7 +125,7 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <div className="p-6 space-y-6">
                     {/* Name Input */}
                     <div className="space-y-3">
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-400">
@@ -105,13 +135,15 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
+                            onBlur={handleNameBlur}
+                            onKeyDown={handleKeyDown}
                             className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-xl outline-none transition-all dark:text-gray-100"
                             placeholder="Category name..."
                             autoFocus
                         />
                     </div>
 
-                    {/* Color Picker */}
+                    {/* Color Picker Section */}
                     <div className="space-y-3">
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-400">
                             <Palette size={16} /> Accent Color
@@ -121,7 +153,7 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                                 <button
                                     key={c.id}
                                     type="button"
-                                    onClick={() => setSelectedColor(c.id)}
+                                    onClick={() => handleColorSelect(c.id)}
                                     className={clsx(
                                         "w-full aspect-square rounded-full transition-all border-4 flex items-center justify-center",
                                         c.bg, c.darkBg,
@@ -135,7 +167,8 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                         </div>
                     </div>
 
-                    {/* Icon Picker */}
+                    {/* Icon Picker Section */}
+                    {/* Stellschraube: Grid Columns and Scroll Area Height */}
                     <div className="space-y-3">
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-400">
                             <Folder size={16} /> Icon
@@ -145,7 +178,7 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                                 <button
                                     key={id}
                                     type="button"
-                                    onClick={() => setSelectedIcon(id)}
+                                    onClick={() => handleIconSelect(id)}
                                     className={clsx(
                                         "p-3 rounded-xl flex items-center justify-center transition-all border-2",
                                         selectedIcon === id
@@ -162,22 +195,17 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                         </div>
                     </div>
 
-                    <div className="flex gap-3 pt-4">
+                    {/* Footer Button - Just used to close since saving is automatic */}
+                    <div className="pt-4">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-colors"
+                            className="w-full px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold transition-all shadow-lg shadow-primary-500/20 active:scale-95 text-center"
                         >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="flex-3 px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold transition-all shadow-lg shadow-primary-500/20 active:scale-95"
-                        >
-                            Save Changes
+                            Done
                         </button>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     );

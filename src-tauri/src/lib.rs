@@ -33,6 +33,12 @@ fn get_files_recursively(dir: &Path) -> Vec<PathBuf> {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
+                if let Some(name) = path.file_name() {
+                    let name_str = name.to_string_lossy();
+                    if name_str.starts_with('.') || name_str == "node_modules" || name_str == "target" || name_str == "dist" || name_str == "src-tauri" {
+                        continue;
+                    }
+                }
                 files.extend(get_files_recursively(&path));
             } else {
                 files.push(path);
@@ -238,8 +244,27 @@ async fn start_watch(app: tauri::AppHandle, folder_path: String, state: tauri::S
     let app_handle = app.clone();
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         match res {
-            Ok(_event) => {
-                app_handle.emit("file-changed", ()).ok();
+            Ok(event) => {
+                let mut notify = false;
+                for path in &event.paths {
+                    let path_str = path.to_string_lossy().to_lowercase();
+                    // Ignore build directories, git, and our own config files
+                    if path_str.contains(".git") || 
+                       path_str.contains("node_modules") || 
+                       path_str.contains("target") || 
+                       path_str.contains("dist") || 
+                       path_str.contains("src-tauri") ||
+                       path_str.contains(".notizapp-metadata") ||
+                       path_str.contains("notizapp-config") {
+                        continue;
+                    }
+                    notify = true;
+                    break;
+                }
+                
+                if notify {
+                    app_handle.emit("file-changed", ()).ok();
+                }
             },
             Err(e) => println!("watch error: {:?}", e),
         }

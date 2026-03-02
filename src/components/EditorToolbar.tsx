@@ -38,8 +38,22 @@ interface EditorToolbarProps {
     onImageClick?: () => void;
 }
 
+/**
+ * EditorToolbar Component
+ * A floating formatting bar for the Tiptap editor.
+ * Features:
+ * - Basic formatting (Bold, Italic, Highlight)
+ * - Headings and Lists
+ * - Advanced items (Blockquote, Code, Table)
+ * - Custom Modal integration for Links and Images
+ * - Responsive "Compact" vs "Full" modes
+ */
 export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'full', onLinkClick, onImageClick }) => {
-    // Add a local state to force re-renders when the editor state changes (selection, formatting, etc.)
+    /**
+     * --- FORCED UPDATES ---
+     * Tiptap's internal state (selection, isActive) doesn't always trigger React re-renders.
+     * We subscribe to 'transaction' to ensure the toolbar buttons reflect the current formatting.
+     */
     const [, setUpdateCount] = React.useState(0);
 
     React.useEffect(() => {
@@ -62,9 +76,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
 
     return (
         <div className={clsx(
-            "flex items-center gap-1 p-1 bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 rounded-lg animate-in fade-in zoom-in duration-200 w-fit",
+            "flex items-center gap-1 p-1 bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 rounded-lg animate-in fade-in zoom-in duration-200 w-full md:w-fit max-w-[calc(100vw-2rem)] overflow-x-auto no-scrollbar shrink-0",
             isCompact ? "bg-opacity-90 backdrop-blur-sm" : ""
         )}>
+            {/* --- BASIC FORMATTING --- */}
             <ToolbarButton
                 icon={Bold}
                 label="Bold"
@@ -88,6 +103,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                 <>
                     <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
 
+                    {/* --- HEADINGS --- */}
                     <ToolbarButton
                         icon={Heading1}
                         label="Heading 1"
@@ -109,6 +125,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
 
                     <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
 
+                    {/* --- LISTS --- */}
                     <ToolbarButton
                         icon={List}
                         label="Bullet List"
@@ -124,6 +141,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
 
                     <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
 
+                    {/* --- ADVANCED BLOCKS --- */}
                     <ToolbarButton
                         icon={Quote}
                         label="Quote"
@@ -132,9 +150,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                     />
                     <ToolbarButton
                         icon={Code}
-                        label="Inline Code"
-                        action={() => editor.chain().focus().toggleCode().run()}
-                        isActive={editor.isActive('code')}
+                        label="Code Block"
+                        action={() => editor.chain().focus().toggleCodeBlock().run()}
+                        isActive={editor.isActive('codeBlock')}
                     />
 
                     <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
@@ -150,15 +168,16 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
 
             <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
 
+            {/* --- MEDIA & LINKS --- */}
             <ToolbarButton
                 icon={LinkIcon}
                 label="Link"
                 action={() => {
-                    // Check if handler is provided, otherwise fallback or do nothing
+                    // Prefer the custom UrlInputModal via onLinkClick
                     if (onLinkClick) {
                         onLinkClick();
                     } else {
-                        // Fallback or legacy behavior (though getting rid of prompt is the goal)
+                        // Fallback to native prompt (used if parent doesn't provide modal)
                         const previousUrl = editor.getAttributes('link').href;
                         const url = window.prompt('URL', previousUrl);
                         if (url === null) return;
@@ -175,9 +194,11 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                 icon={ImageIcon}
                 label="Image"
                 action={() => {
+                    // Prefer the custom UrlInputModal via onImageClick
                     if (onImageClick) {
                         onImageClick();
                     } else {
+                        // Fallback to native prompt
                         const url = window.prompt('Image URL');
                         if (url) {
                             editor.chain().focus().setImage({ src: url }).run();

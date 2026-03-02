@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import {
     Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
     Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart,
@@ -26,11 +26,19 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+/**
+ * ICON_MAP
+ * Configuration Point: Add or remove Lucide icons here to make them available for folder selection.
+ */
 const ICON_MAP: Record<string, any> = {
     Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
     Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart, Settings, Trash2
 };
 
+/**
+ * COLOR_MAP
+ * Configuration Point: Define theme colors for folders. Use Tailwind CSS classes.
+ */
 const COLOR_MAP: Record<string, any> = {
     red: { bg: 'bg-red-100', text: 'text-red-600', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-400' },
     orange: { bg: 'bg-orange-100', text: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400' },
@@ -76,14 +84,29 @@ interface FolderItemProps {
     style?: React.CSSProperties;
 }
 
+interface SortableFolderItemProps {
+    id: string;
+    folder: string;
+    metadata: AppMetadata;
+    selectedCategory: string | null;
+    isCollapsed: boolean;
+    onSelectCategory: (name: string | null) => void;
+    onEditCategory: (name: string) => void;
+    onDeleteCategory: (name: string) => void;
+}
+
 const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
 
+/**
+ * FolderItem Component
+ * Individual folder row inside the sidebar. Handles selection, hover actions (edit/delete), and DnD visual states.
+ */
 const FolderItem = ({
     folder, metadata, selectedCategory, isCollapsed, onSelectCategory,
     onEditCategory, onDeleteCategory, isDragging, isOverlay,
     setNodeRef, attributes, listeners, style
 }: FolderItemProps) => {
-    // Case-insensitive + Unicode-normalized lookup for folder metadata
+    // Normalization ensures "Folder" and "folder" match correctly
     const folderKey = Object.keys(metadata.folders).find(k => normalizeStr(k) === normalizeStr(folder)) || folder;
     const folderMeta = metadata.folders[folderKey] || {};
     const IconComponent = ICON_MAP[folderMeta.icon || 'Folder'] || Folder;
@@ -96,7 +119,8 @@ const FolderItem = ({
             style={style}
             className={clsx(
                 "group relative flex items-center transition-all rounded-lg cursor-pointer mb-0.5 outline-none",
-                isCollapsed ? "justify-center py-3" : "px-1 py-2.5 gap-2 text-sm font-medium",
+                // Configuration Point: Sidebar item padding and height
+                isCollapsed ? "justify-center py-2.5" : "px-1 py-2.5 gap-2 text-sm font-medium",
                 isSelected
                     ? "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100"
                     : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700",
@@ -104,12 +128,13 @@ const FolderItem = ({
                 isOverlay && "shadow-lg scale-105 opacity-90 cursor-grabbing bg-white dark:bg-gray-800"
             )}
             title={isCollapsed ? folder : undefined}
-            onClick={() => onSelectCategory && !isCollapsed && onSelectCategory(folder)}
+            onClick={() => onSelectCategory && onSelectCategory(folder)}
         >
             <div
-                className={clsx("flex items-center gap-2 shrink-0 flex-1 min-w-0 pr-1", isCollapsed ? "justify-center pr-0" : "")}
+                className={clsx("flex items-center gap-2 shrink-0 min-w-0", isCollapsed ? "justify-center" : "flex-1 pr-1")}
             >
                 {!isCollapsed && (
+                    // Drag Handle - Visible only on hover
                     <div
                         {...attributes}
                         {...listeners}
@@ -118,6 +143,7 @@ const FolderItem = ({
                         <GripVertical size={14} />
                     </div>
                 )}
+                {/* Folder Icon Container */}
                 <div className={clsx(
                     "p-1 rounded-md transition-colors shrink-0",
                     isSelected ? colorStyles.bg + " " + colorStyles.darkBg : "bg-transparent"
@@ -127,8 +153,11 @@ const FolderItem = ({
                         className={clsx(colorStyles.text, colorStyles.darkText)}
                     />
                 </div>
+                {/* Folder Label */}
                 {!isCollapsed && <span className="truncate flex-1 py-0.5">{folder}</span>}
             </div>
+
+            {/* Inline Action Buttons (Edit/Delete) - Absolute positioned to right */}
             {!isCollapsed && onEditCategory && onDeleteCategory && (
                 <div className="absolute right-1.5 px-1 py-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-md shadow-sm border border-gray-100/50 dark:border-gray-700/50 z-20">
                     <button
@@ -157,17 +186,10 @@ const FolderItem = ({
     );
 };
 
-interface SortableFolderItemProps {
-    id: string;
-    folder: string;
-    metadata: AppMetadata;
-    selectedCategory: string | null;
-    isCollapsed: boolean;
-    onSelectCategory: (name: string | null) => void;
-    onEditCategory: (name: string) => void;
-    onDeleteCategory: (name: string) => void;
-}
-
+/**
+ * SortableFolderItem
+ * Wrapper for FolderItem to inject DnD-kit sortable functionality.
+ */
 const SortableFolderItem = (props: SortableFolderItemProps) => {
     const {
         attributes,
@@ -195,6 +217,10 @@ const SortableFolderItem = (props: SortableFolderItemProps) => {
     );
 };
 
+/**
+ * Sidebar Component
+ * Primary navigation column. Contains the search/creation header and the scrollable folder list.
+ */
 export function Sidebar({
     className,
     folders = [],
@@ -215,6 +241,8 @@ export function Sidebar({
     const [activeId, setActiveId] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // Configuration Point: DnD Sensors
+    // distance: 5 ensures a click is not mistaken for a drag
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
@@ -235,12 +263,9 @@ export function Sidebar({
         }
     };
 
-    useEffect(() => {
-        if (isCreatingFolder && inputRef.current) {
-            inputRef.current.focus();
-        }
-    }, [isCreatingFolder]);
-
+    /**
+     * DnD Event Handlers
+     */
     const handleDragStart = (event: any) => {
         setActiveId(event.active.id);
     };
@@ -262,16 +287,13 @@ export function Sidebar({
     return (
         <div
             className={clsx(
-                "flex flex-col h-full bg-gray-50 dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 transition-all duration-300",
+                "flex flex-col h-full bg-gray-50 dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 transition-all duration-300 shrink-0 overflow-x-hidden",
+                // Configuration Point: Sidebar Widths
                 isCollapsed ? "w-16" : "w-64",
                 className
             )}
-            onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-            }}
         >
-            {/* Header */}
+            {/* --- SIDEBAR TOP SECTION --- */}
             <div className={clsx("p-4 flex items-center shrink-0", isCollapsed ? "justify-center" : "justify-between")}>
                 {!isCollapsed && (
                     <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
@@ -281,16 +303,17 @@ export function Sidebar({
                         <span className="font-bold text-gray-800 dark:text-gray-100">NotizApp</span>
                     </div>
                 )}
+                {/* Collapse Toggle - Hidden on small screens (layout is auto-managed there) */}
                 <button
                     onClick={onToggleCollapse}
-                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors hidden lg:block"
                     title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                 >
                     {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
                 </button>
             </div>
 
-            {/* Main Navigation (Fixed Header) */}
+            {/* --- ACTIONS HEADER --- */}
             <div className="px-2 pt-4 pb-2">
                 <div className={clsx("mb-6 px-1 lg:px-2", isCollapsed ? "flex flex-col items-center" : "block")}>
                     <button
@@ -306,7 +329,6 @@ export function Sidebar({
                     </button>
                 </div>
 
-                {/* Categories / Folders Label */}
                 {!isCollapsed && (
                     <div className="px-3 mb-2 flex items-center justify-between group">
                         <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
@@ -323,7 +345,7 @@ export function Sidebar({
                 )}
             </div>
 
-            {/* Folder List (Scrollable) */}
+            {/* --- SCROLLABLE NAVIGATION CONTENT --- */}
             <div className="flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar overflow-x-hidden">
                 <DndContext
                     sensors={sensors}
@@ -333,6 +355,7 @@ export function Sidebar({
                     onDragCancel={() => setActiveId(null)}
                 >
                     <div className="space-y-0.5 mb-4 px-1">
+                        {/* Static "All Notes" folder */}
                         <button
                             onClick={() => onSelectCategory(null)}
                             className={clsx(
@@ -346,6 +369,7 @@ export function Sidebar({
                             {!isCollapsed && <span>All Notes</span>}
                         </button>
 
+                        {/* Sortable user folders */}
                         <SortableContext
                             items={folders}
                             strategy={verticalListSortingStrategy}
@@ -365,6 +389,7 @@ export function Sidebar({
                             ))}
                         </SortableContext>
 
+                        {/* Rendering the active item while dragging */}
                         <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.4' } } }) }}>
                             {activeId ? (
                                 <FolderItem
@@ -377,6 +402,7 @@ export function Sidebar({
                             ) : null}
                         </DragOverlay>
 
+                        {/* Inline creation input */}
                         {!isCollapsed && isCreatingFolder && (
                             <form onSubmit={handleCreateFolder} className="px-3 py-2">
                                 <input
@@ -384,6 +410,7 @@ export function Sidebar({
                                     type="text"
                                     className="w-full bg-white dark:bg-gray-800 border border-primary-500 outline-none rounded px-2 py-1 text-sm dark:text-gray-100"
                                     placeholder="New category..."
+                                    autoFocus
                                     value={newFolderName}
                                     onChange={(e) => setNewFolderName(e.target.value)}
                                     onBlur={() => {
@@ -396,7 +423,7 @@ export function Sidebar({
                 </DndContext>
             </div>
 
-            {/* Footer / Settings */}
+            {/* --- FOOTER / SETTINGS --- */}
             <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex flex-col items-center">
                 <button
                     onClick={onOpenSettings}

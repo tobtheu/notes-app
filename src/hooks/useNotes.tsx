@@ -3,55 +3,80 @@ import type { Note, AppMetadata, FolderMetadata } from '../types';
 
 const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
 
+/**
+ * useNotes Hook
+ * The core business logic of the application. Manages:
+ * - File system operations (reading/writing/renaming/deleting notes)
+ * - Metadata synchronization (pins, folder order, icons, colors)
+ * - Real-time file watching and polling fallbacks
+ * - Note filtering and sorting
+ */
 export function useNotes() {
-    const [baseFolder, setBaseFolder] = useState<string | null>(null);
-    const [notes, setNotes] = useState<Note[]>([]);
-    const [folders, setFolders] = useState<string[]>([]);
-    const [metadata, setMetadata] = useState<AppMetadata>({ folders: {}, pinnedNotes: [] });
-    const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); // This is now the relative path: "folder/filename.md" or "filename.md" (lowercased)
+    /**
+     * --- STATE MANAGEMENT ---
+     */
+    const [baseFolder, setBaseFolder] = useState<string | null>(null); // The root directory of the notes
+    const [notes, setNotes] = useState<Note[]>([]); // Current list of all notes found on disk
+    const [folders, setFolders] = useState<string[]>([]); // List of subdirectories (categories)
+    const [metadata, setMetadata] = useState<AppMetadata>({ folders: {}, pinnedNotes: [] }); // UI settings (order, pins)
+    const [isLoading, setIsLoading] = useState(false);
+
+    // tracks the currently active note by its unique ID
+    const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const isRepairing = useRef(false); // Guard against recursive calls during metadata repair
 
+    /**
+     * Unique Identifier Generation
+     * Consistent IDs are critical for tracking notes across renames and moves.
+     * Logic: Lowercased "folder/filename.md" normalized to NFC.
+     */
     const getNoteId = (note: Note) => {
         const folder = note.folder ? note.folder.replace(/\\/g, '/') : '';
         const path = folder ? `${folder}/${note.filename}` : note.filename;
-        return normalizeStr(path); // Consistent unique ID (normalized)
+        return normalizeStr(path);
     };
 
-    // Load folder from local storage or ask user
+    /**
+     * --- INITIALIZATION ---
+     */
     useEffect(() => {
         const savedFolder = localStorage.getItem('notes-folder');
-        if (savedFolder) {
-            setBaseFolder(savedFolder);
-        }
+        if (savedFolder) setBaseFolder(savedFolder);
     }, []);
 
+    /**
+     * --- DATA LOADING & SYNC ---
+     */
 
     const loadNotes = useCallback(async () => {
-        if (!baseFolder) return;
+        if (!baseFolder || isRepairing.current) return;
+        setIsLoading(true);
         try {
-            const loadedNotes = await window.electronAPI.listNotes(baseFolder);
+            const [loadedNotes, loadedFolders, meta] = await Promise.all([
+                window.tauriAPI.listNotes(baseFolder),
+                window.tauriAPI.listFolders(baseFolder),
+                window.tauriAPI.readMetadata(baseFolder)
+            ]);
 
-            // Deduplicate by normalized ID (sanity check)
+            // Deduplicate notes by their normalized ID to handle OS casing variations
             const uniqueMap = new Map();
             loadedNotes.forEach(note => {
                 const id = getNoteId(note);
-                if (!uniqueMap.has(id)) {
-                    uniqueMap.set(id, note);
-                }
+                if (!uniqueMap.has(id)) uniqueMap.set(id, note);
             });
             const uniqueNotes = Array.from(uniqueMap.values());
 
+            // Default Sort: Updated date (descending), then filename
             setNotes(uniqueNotes.sort((a, b) => {
                 const timeDiff = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
                 if (timeDiff !== 0) return timeDiff;
                 return normalizeStr(a.filename).localeCompare(normalizeStr(b.filename));
             }));
 
-            const loadedFolders = await window.electronAPI.listFolders(baseFolder);
-            const meta = await window.electronAPI.readMetadata(baseFolder);
-
-            // Normalize pinned notes in metadata to lowercase/NFC for consistency
+            // Ensure pins in metadata are normalized for robust matching
             if (meta.pinnedNotes) {
                 meta.pinnedNotes = meta.pinnedNotes.map(p => normalizeStr(p));
             } else {
@@ -59,14 +84,11 @@ export function useNotes() {
             }
             setMetadata(meta);
 
-            // Sort folders based on metadata order (case-insensitive + normalized)
+            // FOLDER REPAIR: Ensure folders seen on disk exist in the metadata order
             let order = meta.folderOrder || [];
             let needsMetadataSave = false;
-
-            // Normalize order to handle casing and Unicode robustly
             const orderNormalized = order.map(f => normalizeStr(f));
 
-            // Guarantee that any folder existing on disk is in the order array (case-insensitive check)
             loadedFolders.forEach(folder => {
                 const normalizedFolder = normalizeStr(folder);
                 if (!orderNormalized.includes(normalizedFolder)) {
@@ -76,16 +98,21 @@ export function useNotes() {
                 }
             });
 
-            // If we found missing folders, update the metadata immediately
             if (needsMetadataSave) {
+                isRepairing.current = true;
                 meta.folderOrder = order;
-                setMetadata(meta);
-                lastSaveTime.current = Date.now(); // Prevent save loop
-                window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: meta }).catch(e => {
-                    console.error("Failed to automatically repair folder order in metadata", e);
-                });
+                setMetadata({ ...meta }); // Trigger state update
+                lastSaveTime.current = Date.now(); // Update immediately before the async call
+                try {
+                    await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: meta });
+                } catch (e) {
+                    console.error("Failed to save repaired metadata", e);
+                } finally {
+                    isRepairing.current = false;
+                }
             }
 
+            // apply the metadata order to the folder list
             const sortedFolders = [...loadedFolders].sort((a, b) => {
                 const indexA = orderNormalized.indexOf(normalizeStr(a));
                 const indexB = orderNormalized.indexOf(normalizeStr(b));
@@ -97,34 +124,44 @@ export function useNotes() {
             setFolders(sortedFolders);
         } catch (error) {
             console.error("Failed to load notes or folders", error);
+        } finally {
+            setIsLoading(false);
         }
     }, [baseFolder]);
 
-    useEffect(() => {
-        loadNotes();
-    }, [loadNotes]);
+    /**
+     * --- FILE SYSTEM WATCHING ---
+     */
 
     const lastSaveTime = useRef<number>(0);
 
-    // Setup Watcher
     useEffect(() => {
         if (!baseFolder) return;
-        window.electronAPI.startWatch(baseFolder);
-        const cleanup = window.electronAPI.onFileChanged(() => {
-            // Ignore events if we just saved (prevent "save-reload-loop")
-            const now = Date.now();
-            // Reduced guard time to 200ms for better responsiveness
-            if (now - lastSaveTime.current < 200) return;
 
-            loadNotes();
+        // Initial load
+        loadNotes();
+
+        window.tauriAPI.startWatch(baseFolder);
+
+        // Listener for external changes (e.g. OneDrive/Git sync)
+        let debounceTimer: any = null;
+        const cleanup = window.tauriAPI.onFileChanged(() => {
+            const now = Date.now();
+            if (now - lastSaveTime.current < 500) return; // Increased guard
+
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                loadNotes();
+                debounceTimer = null;
+            }, 300); // Debounce to batch multiple rapid changes
         });
 
-        // Polling fallback every 30 seconds for cloud sync reliability
+
+        // Configuration Point: Polling Interval (ms)
+        // Fallback for cases where OS events fail or cloud drives sync silently
         const pollInterval = setInterval(() => {
             const now = Date.now();
-            if (now - lastSaveTime.current > 5000) { // Only poll if not recently saved
-                loadNotes();
-            }
+            if (now - lastSaveTime.current > 5000) loadNotes();
         }, 30000);
 
         return () => {
@@ -133,9 +170,13 @@ export function useNotes() {
         };
     }, [baseFolder, loadNotes]);
 
+    /**
+     * --- CORE ACTIONS: NOTES ---
+     */
+
     const selectFolder = async () => {
         try {
-            const folder = await window.electronAPI.selectFolder();
+            const folder = await window.tauriAPI.selectFolder();
             if (folder) {
                 setBaseFolder(folder);
                 localStorage.setItem('notes-folder', folder);
@@ -145,9 +186,14 @@ export function useNotes() {
         }
     };
 
+    /**
+     * updateNoteLocally
+     * Performs an "Optimistic Update" on the UI state without waiting for the disk write.
+     * Crucial for smooth typing experiences.
+     */
     const updateNoteLocally = (filename: string, content: string, folder: string = "", updateTimestamp: boolean = false) => {
         const id = folder ? `${folder}/${filename}`.toLowerCase() : filename.toLowerCase();
-        setNotes(prev => prev.map(n =>
+        setNotes(prev => prev.map((n: Note) =>
             getNoteId(n) === id
                 ? {
                     ...n,
@@ -158,10 +204,18 @@ export function useNotes() {
         ));
     };
 
+    /**
+     * saveNote
+     * Handles: Content saving, Auto-renaming based on the first line (Title),
+     * and ID synchronization (updating pins if renamed).
+     */
     const saveNote = async (filename: string, content: string, folder: string | null = null) => {
         if (!baseFolder) return;
 
-        // Extract title from content to see if we should rename
+        // PREEMPTIVE GUARD: Block the file watcher immediately before the async work starts
+        lastSaveTime.current = Date.now();
+
+        // Configuration Point: Filename Generation Logic
         const lines = content.split('\n');
         const firstLine = lines[0].replace(/^#\s*/, '').trim();
         const safeTitle = firstLine.replace(/[^a-z0-9äöüß ]/gi, '').trim().substring(0, 50);
@@ -172,18 +226,16 @@ export function useNotes() {
         }
 
         const folderPath = folder ? `${baseFolder}/${folder}`.replace(/\/+/g, '/') : baseFolder;
-
-        // Find current note by id
-        const currentNote = selectedNoteId ? notes.find(n => getNoteId(n) === selectedNoteId) : null;
+        const currentNote = selectedNoteId ? notes.find((n: Note) => getNoteId(n) === selectedNoteId) : null;
         const isRenaming = currentNote && currentNote.filename !== targetFilename;
 
         if (isRenaming) {
-            // Check if another note with targetFilename already exists in the same folder
-            const collision = notes.find(n => n.filename === targetFilename && n.folder === (folder || ""));
+            // Check for collisions to avoid accidentally overwriting existing files
+            const collision = notes.find((n: Note) => n.filename === targetFilename && n.folder === (folder || ""));
             if (collision && getNoteId(collision) !== selectedNoteId) {
                 targetFilename = currentNote!.filename;
             } else {
-                const renameResult = await window.electronAPI.renameNote({
+                const renameResult = await window.tauriAPI.renameNote({
                     folderPath,
                     oldFilename: currentNote!.filename,
                     newFilename: targetFilename
@@ -191,63 +243,62 @@ export function useNotes() {
 
                 if (renameResult.success) {
                     const oldPath = selectedNoteId!;
-                    const newPathRaw = folder ? `${folder}/${targetFilename}` : targetFilename;
-                    const newPath = newPathRaw.toLowerCase();
+                    const newPath = (folder ? `${folder}/${targetFilename}` : targetFilename).toLowerCase();
 
+                    // Migrate pins if the note was renamed
                     if (metadata.pinnedNotes?.includes(oldPath)) {
                         const newMeta = { ...metadata };
-                        newMeta.pinnedNotes = (newMeta.pinnedNotes || []).map(p =>
+                        newMeta.pinnedNotes = (newMeta.pinnedNotes || []).map((p: string) =>
                             p.toLowerCase() === oldPath ? newPath : p.toLowerCase()
                         );
                         setMetadata(newMeta);
-                        await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
+                        await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
                     }
 
-                    // Optimistic update of the notes local state to prevent unmounting
-                    setNotes(prev => prev.map(n =>
+                    // Optimistic update to keep the Note object in memory
+                    setNotes(prev => prev.map((n: Note) =>
                         getNoteId(n) === oldPath
                             ? { ...n, filename: targetFilename, folder: folder || "" }
                             : n
                     ));
                     setSelectedNoteId(newPath);
                 } else {
-                    console.error("Rename failed:", renameResult.error);
                     targetFilename = currentNote!.filename;
                 }
             }
         }
 
-        const result = await window.electronAPI.saveNote({
+        const result = await window.tauriAPI.saveNote({
             folderPath,
             filename: targetFilename,
             content
         });
 
         if (result) {
-            lastSaveTime.current = Date.now();
             await loadNotes();
         }
     };
 
+    /**
+     * moveNote
+     * Relocates a file between root and category folders.
+     */
     const moveNote = async (noteId: string, targetFolder: string | null) => {
         if (!baseFolder) return;
-
         const note = notes.find(n => getNoteId(n) === noteId);
-        if (!note) return;
-
-        // Note is already in the target folder
-        if (note.folder === (targetFolder || "")) return;
+        if (!note || note.folder === (targetFolder || "")) return;
 
         const oldFilename = note.folder ? `${note.folder}/${note.filename}` : note.filename;
         const newFilename = targetFolder ? `${targetFolder}/${note.filename}` : note.filename;
 
-        // Check collision in target folder
         if (notes.some(n => n.filename === note.filename && n.folder === (targetFolder || ""))) {
-            console.error("A note with this name already exists in the target folder.");
+            console.error("Collision error");
             return;
         }
 
-        const renameResult = await window.electronAPI.renameNote({
+        // PREEMPTIVE GUARD
+        lastSaveTime.current = Date.now();
+        const renameResult = await window.tauriAPI.renameNote({
             folderPath: baseFolder,
             oldFilename,
             newFilename
@@ -255,39 +306,22 @@ export function useNotes() {
 
         if (renameResult.success) {
             const newPath = newFilename.toLowerCase();
-
-            // Handle pinned notes update
             if (metadata.pinnedNotes?.includes(noteId)) {
                 const newMeta = { ...metadata };
-                newMeta.pinnedNotes = (newMeta.pinnedNotes || []).map(p =>
-                    p.toLowerCase() === noteId ? newPath : p.toLowerCase()
-                );
+                newMeta.pinnedNotes = (newMeta.pinnedNotes || []).map(p => p.toLowerCase() === noteId ? newPath : p.toLowerCase());
                 setMetadata(newMeta);
-                lastSaveTime.current = Date.now();
-                await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
+                await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
             }
 
-            // Optimistic update
-            setNotes(prev => prev.map(n =>
-                getNoteId(n) === noteId
-                    ? { ...n, folder: targetFolder || "" }
-                    : n
-            ));
-
-            if (selectedNoteId === noteId) {
-                setSelectedNoteId(newPath);
-            }
-
-            lastSaveTime.current = Date.now();
+            setNotes(prev => prev.map(n => getNoteId(n) === noteId ? { ...n, folder: targetFolder || "" } : n));
+            if (selectedNoteId === noteId) setSelectedNoteId(newPath);
             await loadNotes();
-        } else {
-            console.error("Failed to move note:", renameResult.error);
         }
     };
 
     const createNote = async () => {
         if (!baseFolder) return;
-
+        lastSaveTime.current = Date.now();
         const folderRelative = selectedCategory || "";
         const folderAbsolute = folderRelative ? `${baseFolder}/${folderRelative}` : baseFolder;
 
@@ -298,161 +332,109 @@ export function useNotes() {
             counter++;
         }
 
-        const initialContent = '# ';
-        await window.electronAPI.saveNote({ folderPath: folderAbsolute, filename, content: initialContent });
+        await window.tauriAPI.saveNote({ folderPath: folderAbsolute, filename, content: '# ' });
         await loadNotes();
-        const newPathRaw = folderRelative ? `${folderRelative}/${filename}` : filename;
-        setSelectedNoteId(newPathRaw.toLowerCase());
+        setSelectedNoteId(`${folderRelative ? folderRelative + '/' : ''}${filename}`.toLowerCase());
     };
 
     const deleteNote = async (id: string) => {
         if (!baseFolder) return;
+        lastSaveTime.current = Date.now();
         const normalizedId = id.toLowerCase();
         const note = notes.find(n => getNoteId(n) === normalizedId);
         if (!note) return;
 
         const folderPath = note.folder ? `${baseFolder}/${note.folder}` : baseFolder;
-        await window.electronAPI.deleteNote({ folderPath, filename: note.filename });
-        if (selectedNoteId === normalizedId) {
-            setSelectedNoteId(null);
-        }
+        await window.tauriAPI.deleteNote({ folderPath, filename: note.filename });
+        if (selectedNoteId === normalizedId) setSelectedNoteId(null);
         await loadNotes();
     };
 
+    /**
+     * --- CORE ACTIONS: FOLDERS ---
+     */
+
     const deleteFolder = async (folderRelative: string, mode: 'recursive' | 'move') => {
         if (!baseFolder) return;
+        lastSaveTime.current = Date.now();
         const folderAbsolute = `${baseFolder}/${folderRelative}`;
 
         if (mode === 'recursive') {
-            await window.electronAPI.deleteFolderRecursive(folderAbsolute);
+            await window.tauriAPI.deleteFolderRecursive(folderAbsolute);
         } else {
-            await window.electronAPI.deleteFolderMoveContents({
-                folderPath: folderAbsolute,
-                rootPath: baseFolder
-            });
+            await window.tauriAPI.deleteFolderMoveContents({ folderPath: folderAbsolute, rootPath: baseFolder });
         }
 
-        // Clean up metadata
         const newMeta = { ...metadata };
-        // Find existing key with potential case/Unicode difference
         const normalizedTarget = normalizeStr(folderRelative);
         const existingKey = Object.keys(newMeta.folders).find(k => normalizeStr(k) === normalizedTarget);
-        if (existingKey) {
-            delete newMeta.folders[existingKey];
-        } else {
-            delete newMeta.folders[folderRelative];
-        }
-
-        if (newMeta.folderOrder) {
-            newMeta.folderOrder = newMeta.folderOrder.filter(f => normalizeStr(f) !== normalizedTarget);
-        }
-
-        // Remove pins for notes in this folder
+        if (existingKey) delete newMeta.folders[existingKey];
+        if (newMeta.folderOrder) newMeta.folderOrder = newMeta.folderOrder.filter(f => normalizeStr(f) !== normalizedTarget);
         if (newMeta.pinnedNotes) {
             const prefix = `${normalizedTarget}/`;
             newMeta.pinnedNotes = newMeta.pinnedNotes.filter(p => !normalizeStr(p).startsWith(prefix));
         }
 
         lastSaveTime.current = Date.now();
-        await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
-
-        if (selectedCategory === folderRelative) {
-            setSelectedCategory(null);
-        }
+        await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
+        if (selectedCategory === folderRelative) setSelectedCategory(null);
         await loadNotes();
     };
 
     const createFolder = async (folderName: string) => {
         if (!baseFolder) return;
-        // Always create at root
-        const target = `${baseFolder}/${folderName}`;
-        await window.electronAPI.createFolder(target);
-
-        // Update order metadata to include the new folder at the end
+        lastSaveTime.current = Date.now();
+        await window.tauriAPI.createFolder(`${baseFolder}/${folderName}`);
         const newMeta = { ...metadata };
         const normalizedNew = normalizeStr(folderName);
         if (newMeta.folderOrder) {
-            if (!newMeta.folderOrder.some(f => normalizeStr(f) === normalizedNew)) {
-                newMeta.folderOrder = [...newMeta.folderOrder, folderName];
-            }
+            if (!newMeta.folderOrder.some(f => normalizeStr(f) === normalizedNew)) newMeta.folderOrder = [...newMeta.folderOrder, folderName];
         } else {
             newMeta.folderOrder = [...folders, folderName];
         }
         lastSaveTime.current = Date.now();
-        await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
-
+        await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
         await loadNotes();
     };
 
     const reorderFolders = async (newOrder: string[]) => {
         if (!baseFolder) return;
-
-        // Robust merge: Preserve hidden/non-disk folders in metadata
         const currentOrder = metadata.folderOrder || folders;
         const newOrderNormalized = newOrder.map(f => normalizeStr(f));
-
-        // Start with the new order from UI
         let mergedOrder = [...newOrder];
-
-        // Then append anything that was in the old order but NOT touched by the UI reorder
-        currentOrder.forEach(f => {
-            if (!newOrderNormalized.includes(normalizeStr(f))) {
-                mergedOrder.push(f);
-            }
-        });
-
+        currentOrder.forEach(f => { if (!newOrderNormalized.includes(normalizeStr(f))) mergedOrder.push(f); });
         const newMeta = { ...metadata, folderOrder: mergedOrder };
         setMetadata(newMeta);
-        setFolders(newOrder); // Optimistic update (UI only shows what matters now)
-
+        setFolders(newOrder); // Optimistic UI update
         lastSaveTime.current = Date.now();
-        await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
+        await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
     };
 
     const renameFolder = async (oldName: string, newName: string) => {
         if (!baseFolder) return;
-        const result = await window.electronAPI.renameFolder({ rootPath: baseFolder, oldName, newName });
+        lastSaveTime.current = Date.now();
+        const result = await window.tauriAPI.renameFolder({ rootPath: baseFolder, oldName, newName });
         if (result.success) {
-            // Update metadata mapping
             const newMeta = { ...metadata };
-
-            // Update folder meta
             const normalizedOld = normalizeStr(oldName);
             const normalizedNew = normalizeStr(newName);
-
-            // Update folder keys in metadata.folders
             const existingMetaKey = Object.keys(newMeta.folders).find(k => normalizeStr(k) === normalizedOld);
             if (existingMetaKey) {
                 newMeta.folders[newName] = newMeta.folders[existingMetaKey];
-                if (existingMetaKey !== newName) {
-                    delete newMeta.folders[existingMetaKey];
-                }
+                if (existingMetaKey !== newName) delete newMeta.folders[existingMetaKey];
             }
-
-            // Update pinned notes paths if folder changed
             if (newMeta.pinnedNotes) {
                 const oldPrefix = `${normalizedOld}/`;
                 const newPrefix = `${normalizedNew}/`;
                 newMeta.pinnedNotes = newMeta.pinnedNotes.map(p => {
                     const normalizedP = normalizeStr(p);
-                    if (normalizedP.startsWith(oldPrefix)) {
-                        return normalizedP.replace(oldPrefix, newPrefix);
-                    }
-                    return p;
+                    return normalizedP.startsWith(oldPrefix) ? normalizedP.replace(oldPrefix, newPrefix) : p;
                 });
             }
-
-            // Update folderOrder if it exists
-            if (newMeta.folderOrder) {
-                newMeta.folderOrder = newMeta.folderOrder.map(f => normalizeStr(f) === normalizedOld ? newName : f);
-            }
-
+            if (newMeta.folderOrder) newMeta.folderOrder = newMeta.folderOrder.map(f => normalizeStr(f) === normalizedOld ? newName : f);
             lastSaveTime.current = Date.now();
-            await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
-
-            if (selectedCategory === oldName) {
-                setSelectedCategory(newName);
-            }
+            await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
+            if (selectedCategory === oldName) setSelectedCategory(newName);
             await loadNotes();
         }
         return result;
@@ -463,33 +445,22 @@ export function useNotes() {
         const notePath = getNoteId(note);
         const newMeta = { ...metadata };
         const pinned = (newMeta.pinnedNotes || []).map(p => normalizeStr(p));
-
-        if (pinned.includes(notePath)) {
-            newMeta.pinnedNotes = pinned.filter(p => p !== notePath);
-        } else {
-            newMeta.pinnedNotes = [...pinned, notePath];
-        }
-
+        newMeta.pinnedNotes = pinned.includes(notePath) ? pinned.filter(p => p !== notePath) : [...pinned, notePath];
         setMetadata(newMeta);
         lastSaveTime.current = Date.now();
-        await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
+        await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
     };
 
     const updateFolderMetadata = async (folderName: string, meta: FolderMetadata) => {
         if (!baseFolder) return;
         const newMetadata = { ...metadata };
-        // Find existing key case-insensitively + normalized
         const normalizedTarget = normalizeStr(folderName);
         const existingKey = Object.keys(newMetadata.folders).find(k => normalizeStr(k) === normalizedTarget);
         const keyToUse = existingKey || folderName;
-
-        newMetadata.folders[keyToUse] = {
-            ...newMetadata.folders[keyToUse],
-            ...meta
-        };
+        newMetadata.folders[keyToUse] = { ...newMetadata.folders[keyToUse], ...meta };
         setMetadata(newMetadata);
         lastSaveTime.current = Date.now();
-        await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMetadata });
+        await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMetadata });
     };
 
     const saveSettings = async (settings: any) => {
@@ -497,46 +468,43 @@ export function useNotes() {
         const newMetadata = { ...metadata, settings: { ...metadata.settings, ...settings } };
         setMetadata(newMetadata);
         lastSaveTime.current = Date.now();
-        await window.electronAPI.saveMetadata({ rootPath: baseFolder, metadata: newMetadata });
+        await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMetadata });
     };
 
-    // Helper to check if a note is pinned
-    const isNotePinned = (note: Note) => {
-        const notePath = getNoteId(note);
-        return metadata.pinnedNotes?.includes(notePath) || false;
-    };
+    const isNotePinned = (note: Note) => (metadata.pinnedNotes?.includes(getNoteId(note)) || false);
 
-    // Derived state
+    /**
+     * --- DERIVED STATE: FILTERING & SORTING ---
+     */
+
     const selectedNote = notes.find(n => getNoteId(n) === selectedNoteId) || null;
 
     const filteredNotes = notes
         .filter(note => {
-            // Filter by search term
             const searchLower = searchTerm.toLowerCase();
             const contentMatch = note.content.toLowerCase().includes(searchLower);
             const titleMatch = note.filename.toLowerCase().includes(searchLower);
             if (!contentMatch && !titleMatch) return false;
-
-            // Filter by category (Flat structure: exact match only)
-            if (selectedCategory) {
-                return normalizeStr(note.folder) === normalizeStr(selectedCategory);
-            }
-
+            if (selectedCategory && normalizeStr(note.folder) !== normalizeStr(selectedCategory)) return false;
             return true;
         })
         .sort((a, b) => {
+            // Priority 1: Pinned notes at top
             const aPinned = isNotePinned(a);
             const bPinned = isNotePinned(b);
-
             if (aPinned && !bPinned) return -1;
             if (!aPinned && bPinned) return 1;
 
+            // Priority 2: Modified date
             const timeDiff = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
             if (timeDiff !== 0) return timeDiff;
             return a.filename.localeCompare(b.filename);
         });
 
-    // Auto-deselect if note is filtered out
+    /**
+     * Auto-deselect: If the active note disappears from the filtered list (e.g. category switch),
+     * we clear the selection to avoid editing a hidden note.
+     */
     useEffect(() => {
         if (selectedNoteId && !filteredNotes.some(n => getNoteId(n) === selectedNoteId)) {
             setSelectedNoteId(null);
@@ -570,6 +538,7 @@ export function useNotes() {
         togglePinNote,
         isNotePinned,
         reloadNotes: loadNotes,
-        getNoteId
+        getNoteId,
+        isLoading
     };
 }

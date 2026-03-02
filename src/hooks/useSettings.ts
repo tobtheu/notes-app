@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 
+/**
+ * useSettings Hook
+ * Manages application settings with local storage persistence and cloud metadata synchronization.
+ * Distinction:
+ * - Sync-able: markdownEnabled, accentColor, toolbarVisible, spellcheckEnabled
+ * - Device-specific (No sync): fontFamily, fontSize
+ */
 export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: any) => void) {
+    /** --- 1. SETTINGS STATE (Initialized from LocalStorage) --- **/
     const [markdownEnabled, setMarkdownEnabled] = useState<boolean>(() => {
         const saved = localStorage.getItem('markdown-enabled');
         return saved === null ? true : saved === 'true';
@@ -30,22 +38,25 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         return saved === null ? true : saved === 'true';
     });
 
+    // Guard to prevent saving to cloud before metadata has been initially loaded
     const hasLoadedMetadata = useRef(false);
 
-    // Update from metadata if available (cloud sync)
+    /** --- 2. CLOUD SYNC: LOADING --- **/
+    // Triggered when metadata settings are fetched from the backend/Tauri side
     useEffect(() => {
         if (metadataSettings) {
             if (metadataSettings.markdownEnabled !== undefined) setMarkdownEnabled(metadataSettings.markdownEnabled);
             if (metadataSettings.accentColor !== undefined) setAccentColor(metadataSettings.accentColor);
-            // fontFamily and fontSize are device-specific and NOT loaded from cloud metadata
+            // Note: fontFamily and fontSize are intentionally OMITTED from cloud sync
             if (metadataSettings.toolbarVisible !== undefined) setToolbarVisible(metadataSettings.toolbarVisible);
             if (metadataSettings.spellcheckEnabled !== undefined) setSpellcheckEnabled(metadataSettings.spellcheckEnabled);
             hasLoadedMetadata.current = true;
         }
     }, [metadataSettings]);
 
-    // Save to local storage and trigger metadata save
+    /** --- 3. PERSISTENCE: LOCAL & CLOUD --- **/
     useEffect(() => {
+        // Always persist to local storage
         localStorage.setItem('markdown-enabled', String(markdownEnabled));
         localStorage.setItem('accent-color', accentColor);
         localStorage.setItem('font-family', fontFamily);
@@ -53,12 +64,11 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         localStorage.setItem('toolbar-visible', String(toolbarVisible));
         localStorage.setItem('spellcheck-enabled', String(spellcheckEnabled));
 
-        // Sync with cloud metadata if callback provided AND we have already loaded metadata once
+        // Sync with cloud metadata if callback provided AND we have already finished the initial load
         if (onSaveSettings && hasLoadedMetadata.current) {
             onSaveSettings({
                 markdownEnabled,
                 accentColor,
-                // fontFamily and fontSize are device-specific and NOT synced to cloud metadata
                 toolbarVisible,
                 spellcheckEnabled,
             });

@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 updater.key
 updater.key.pub
+  
+docs/ 
