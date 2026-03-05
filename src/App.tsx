@@ -94,6 +94,12 @@ function App() {
 
   const { theme, setTheme } = useTheme();
 
+  // Apply font size to <html> so all rem-based Tailwind classes scale with it
+  useEffect(() => {
+    const px = fontSize === 'small' ? '14px' : fontSize === 'large' ? '18px' : '16px';
+    document.documentElement.style.fontSize = px;
+  }, [fontSize]);
+
   useEffect(() => {
     const checkForUpdates = async () => {
       try {
@@ -173,7 +179,7 @@ function App() {
     <div
       className="h-full flex bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 overflow-hidden"
       style={{
-        fontFamily: fontFamily === 'inter' ? "'Inter', sans-serif" : fontFamily === 'roboto' ? "'Roboto', sans-serif" : "ui-sans-serif, system-ui, sans-serif"
+        fontFamily: fontFamily === 'inter' ? "'Inter', sans-serif" : fontFamily === 'roboto' ? "'Roboto', sans-serif" : "ui-sans-serif, system-ui, sans-serif",
       }}
     >
       {/* SIDEBAR — always visible except in editor view on mobile */}
