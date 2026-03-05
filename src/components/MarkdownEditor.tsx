@@ -618,7 +618,7 @@ export const MarkdownEditor = ({
      * --- SIDE EFFECTS ---
      */
 
-    // Content synchronization: handles note switching.
+    // Content synchronization: handles note switching and backend updates.
     useEffect(() => {
         if (!editor || content == null) return;
         if (content !== editorMarkdownRef.current && !editor.isDestroyed) {
@@ -888,7 +888,7 @@ export const MarkdownEditor = ({
 
             {/* Footer Toolbar - stays fixed at bottom of MarkdownEditor */}
             {toolbarVisible && (
-                <div className="shrink-0 py-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex justify-center w-full">
+                <div className="shrink-0 pt-2 editor-toolbar-padding bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex justify-center w-full">
                     <EditorToolbar
                         editor={editor}
                         onLinkClick={() => openLinkModal()}

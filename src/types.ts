@@ -30,6 +30,11 @@ export interface AppMetadata {
     settings?: any; // Contains both synced settings (like accent color) and local-only settings
 }
 
+export interface ConflictPair {
+    original: string;    // Relative path of the local (winning) file
+    conflictCopy: string; // Relative path of the newly created conflict copy
+}
+
 /**
  * TauriAPI Interface
  * A bridge naming convention. In this Tauri V2 project, 
@@ -38,14 +43,15 @@ export interface AppMetadata {
  */
 export interface TauriAPI {
     selectFolder: () => Promise<string | null>;
+    getDocumentDir: () => Promise<string>;
     listNotes: (folderPath: string) => Promise<Note[]>;
     listFolders: (folderPath: string) => Promise<string[]>;
-    saveNote: (data: { folderPath: string; filename: string; content: string }) => Promise<boolean>;
-    deleteNote: (data: { folderPath: string; filename: string }) => Promise<boolean>;
-    renameNote: (data: { folderPath: string; oldFilename: string; newFilename: string }) => Promise<{ success: boolean; error?: string }>;
-    createFolder: (folderPath: string) => Promise<boolean>;
+    saveNote: (data: { rootPath: string; folderPath: string; filename: string; content: string }) => Promise<boolean>;
+    deleteNote: (data: { rootPath: string; folderPath: string; filename: string }) => Promise<boolean>;
+    renameNote: (data: { rootPath: string; oldFilename: string; newFilename: string }) => Promise<{ success: boolean; error?: string }>;
+    createFolder: (rootPath: string, folderPath: string) => Promise<boolean>;
     renameFolder: (data: { rootPath: string; oldName: string; newName: string }) => Promise<{ success: boolean; error?: string }>;
-    deleteFolderRecursive: (folderPath: string) => Promise<boolean>;
+    deleteFolderRecursive: (rootPath: string, folderPath: string) => Promise<boolean>;
     deleteFolderMoveContents: (data: { folderPath: string; rootPath: string }) => Promise<boolean>;
     readMetadata: (rootPath: string) => Promise<AppMetadata>;
     saveMetadata: (data: { rootPath: string; metadata: AppMetadata }) => Promise<boolean>;
@@ -62,10 +68,22 @@ export interface TauriAPI {
         error?: string;
         version?: string;
     }) => void) => () => void;
+    connectGithub: (token: string, folderPath: string) => Promise<{ success: boolean; username?: string; error?: string }>;
+    syncNow: (folderPath: string) => Promise<{ hadChanges: boolean; hadConflicts: boolean; conflictPairs: ConflictPair[]; pushSucceeded: boolean }>;
+    startGithubOAuth: () => Promise<{ deviceCode: string; userCode: string; verificationUri: string; interval: number; expiresIn: number }>;
+    completeGithubOAuth: (deviceCode: string, interval: number, folderPath: string) => Promise<string>;
+    getGithubToken: () => Promise<{ token: string, username: string } | null>;
+    saveGithubToken: (token: string, username: string) => Promise<boolean>;
+    disconnectGithub: () => Promise<boolean>;
 }
 
 declare global {
     interface Window {
         tauriAPI: TauriAPI;
+        __TAURI_INTERNALS__?: {
+            metadata?: {
+                platform?: string;
+            };
+        };
     }
 }

@@ -6,6 +6,19 @@ use std::sync::{Arc, Mutex};
 use notify::{Watcher, RecursiveMode};
 use tauri::Emitter;
 
+mod git;
+mod github;
+mod store;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncResultPayload {
+    pub had_changes: bool,
+    pub had_conflicts: bool,
+    pub conflict_pairs: Vec<git::ConflictPair>,
+    pub push_succeeded: bool,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
@@ -100,27 +113,61 @@ async fn list_folders(folder_path: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-async fn save_note(folder_path: String, filename: String, content: String) -> Result<(), String> {
-    let path = Path::new(&folder_path).join(filename);
-    if let Some(parent) = path.parent() {
+async fn save_note(app: tauri::AppHandle, root_path: String, folder_path: String, filename: String, content: String) -> Result<(), String> {
+    let root = Path::new(&root_path);
+    let target_dir = Path::new(&folder_path);
+    let file_path = target_dir.join(&filename);
+    
+    if let Some(parent) = file_path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    fs::write(path, content).map_err(|e| e.to_string())?;
+    
+    fs::write(&file_path, content).map_err(|e| e.to_string())?;
+
+    // Auto-commit changes
+    if let Ok(_) = git::ensure_repo(root) {
+        let msg = format!("Auto-save: {}", filename);
+        if let Err(e) = git::commit_changes(root, &msg) {
+            println!("Failed to commit changes: {}", e);
+        } else {
+            spawn_sync(app, root_path);
+        }
+    }
+
     Ok(())
 }
 
 #[tauri::command]
-async fn delete_note(folder_path: String, filename: String) -> Result<(), String> {
-    let path = Path::new(&folder_path).join(filename);
+async fn delete_note(app: tauri::AppHandle, root_path: String, folder_path: String, filename: String) -> Result<(), String> {
+    let root = Path::new(&root_path);
+    let target_dir = Path::new(&folder_path);
+    let path = target_dir.join(&filename);
     fs::remove_file(path).map_err(|e| e.to_string())?;
+
+    if let Ok(_) = git::ensure_repo(root) {
+        let msg = format!("Delete: {}", filename);
+        if let Ok(_) = git::commit_changes(root, &msg) {
+            spawn_sync(app, root_path);
+        }
+    }
+
     Ok(())
 }
 
 #[tauri::command]
-async fn rename_note(folder_path: String, old_filename: String, new_filename: String) -> Result<(), String> {
-    let old_path = Path::new(&folder_path).join(old_filename);
-    let new_path = Path::new(&folder_path).join(new_filename);
+async fn rename_note(app: tauri::AppHandle, root_path: String, old_filename: String, new_filename: String) -> Result<(), String> {
+    let root = Path::new(&root_path);
+    let old_path = root.join(&old_filename);
+    let new_path = root.join(&new_filename);
     fs::rename(old_path, new_path).map_err(|e| e.to_string())?;
+
+    if let Ok(_) = git::ensure_repo(root) {
+        let msg = format!("Rename: {} -> {}", old_filename, new_filename);
+        if let Ok(_) = git::commit_changes(root, &msg) {
+            spawn_sync(app, root_path);
+        }
+    }
+
     Ok(())
 }
 
@@ -180,27 +227,56 @@ async fn save_metadata(root_path: String, metadata: AppMetadata) -> Result<(), S
 }
 
 #[tauri::command]
-async fn rename_folder(root_path: String, old_name: String, new_name: String) -> Result<(), String> {
-    let old_path = Path::new(&root_path).join(old_name);
-    let new_path = Path::new(&root_path).join(new_name);
+async fn rename_folder(app: tauri::AppHandle, root_path: String, old_name: String, new_name: String) -> Result<(), String> {
+    let root = Path::new(&root_path);
+    let old_path = root.join(&old_name);
+    let new_path = root.join(&new_name);
     fs::rename(old_path, new_path).map_err(|e| e.to_string())?;
+
+    if let Ok(_) = git::ensure_repo(root) {
+        let msg = format!("Rename folder: {} -> {}", old_name, new_name);
+        if let Ok(_) = git::commit_changes(root, &msg) {
+            spawn_sync(app, root_path);
+        }
+    }
+
     Ok(())
 }
 
 #[tauri::command]
-async fn create_folder(folder_path: String) -> Result<(), String> {
-    fs::create_dir_all(folder_path).map_err(|e| e.to_string())?;
+async fn create_folder(app: tauri::AppHandle, root_path: String, folder_path: String) -> Result<(), String> {
+    let root = Path::new(&root_path);
+    fs::create_dir_all(&folder_path).map_err(|e| e.to_string())?;
+    
+    if let Ok(_) = git::ensure_repo(root) {
+        let folder_name = Path::new(&folder_path).file_name().unwrap_or_default().to_string_lossy();
+        let msg = format!("Created folder: {}", folder_name);
+        if let Ok(_) = git::commit_changes(root, &msg) {
+            spawn_sync(app, root_path);
+        }
+    }
+
     Ok(())
 }
 
 #[tauri::command]
-async fn delete_folder_recursive(folder_path: String) -> Result<(), String> {
-    fs::remove_dir_all(folder_path).map_err(|e| e.to_string())?;
+async fn delete_folder_recursive(app: tauri::AppHandle, root_path: String, folder_path: String) -> Result<(), String> {
+    let root = Path::new(&root_path);
+    fs::remove_dir_all(&folder_path).map_err(|e| e.to_string())?;
+
+    if let Ok(_) = git::ensure_repo(root) {
+        let folder_name = Path::new(&folder_path).file_name().unwrap_or_default().to_string_lossy();
+        let msg = format!("Deleted folder (recursive): {}", folder_name);
+        if let Ok(_) = git::commit_changes(root, &msg) {
+            spawn_sync(app, root_path);
+        }
+    }
+
     Ok(())
 }
 
 #[tauri::command]
-async fn delete_folder_move_contents(folder_path: String, root_path: String) -> Result<(), String> {
+async fn delete_folder_move_contents(app: tauri::AppHandle, folder_path: String, root_path: String) -> Result<(), String> {
     let folder = Path::new(&folder_path);
     let root = Path::new(&root_path);
     
@@ -222,6 +298,15 @@ async fn delete_folder_move_contents(folder_path: String, root_path: String) -> 
         }
     }
     fs::remove_dir_all(folder).map_err(|e| e.to_string())?;
+
+    if let Ok(_) = git::ensure_repo(root) {
+        let folder_name = folder.file_name().unwrap_or_default().to_string_lossy();
+        let msg = format!("Deleted folder (moved contents): {}", folder_name);
+        if let Ok(_) = git::commit_changes(root, &msg) {
+            spawn_sync(app, root_path);
+        }
+    }
+
     Ok(())
 }
 
@@ -230,56 +315,197 @@ async fn get_app_version(app: tauri::AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
+#[tauri::command]
+async fn get_document_dir(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    app.path().document_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn connect_github(token: String, folder_path: String) -> Result<String, String> {
+    // 1. Verify token
+    let username = github::verify_token(&token).await?;
+    
+    // 2. Ensure remote repository exists (and get its URL)
+    let repo_url = github::ensure_remote_repo(&token, &username).await?;
+
+    // 3. Make sure local folder is a git repo
+    let root = Path::new(&folder_path);
+    if let Err(e) = git::ensure_repo(root) {
+        return Err(format!("Could not initialize local repo: {}", e));
+    }
+
+    // 4. Inject credentials into URL for pushes
+    // clone_url format: https://github.com/User/Repo.git
+    let auth_url = repo_url.replace("https://", &format!("https://{}:{}@", username, token));
+
+    // 5. Link local repo to remote
+    git::add_remote(root, &auth_url).map_err(|e| format!("Could not add remote: {}", e))?;
+
+    // Return the authenticated username for the UI
+    Ok(username)
+}
+
+/// Step 1 of OAuth Device Flow: initiate the flow and open the browser.
+/// Returns the user_code and verification_uri for display in the UI.
+#[tauri::command]
+async fn start_github_oauth() -> Result<serde_json::Value, String> {
+    let flow = github::start_device_flow().await?;
+    
+    // Open the verification URL in the system browser
+    #[cfg(not(mobile))]
+    {
+        let url = flow.verification_uri.clone();
+        std::thread::spawn(move || {
+            let _ = std::process::Command::new("open").arg(&url).spawn();
+        });
+    }
+
+    Ok(serde_json::json!({
+        "deviceCode": flow.device_code,
+        "userCode": flow.user_code,
+        "verificationUri": flow.verification_uri,
+        "interval": flow.interval,
+        "expiresIn": flow.expires_in,
+    }))
+}
+
+/// Step 2 of OAuth Device Flow: poll until the user approves in the browser.
+/// On success: stores credentials and sets up the remote repo, then returns username.
+#[tauri::command]
+async fn complete_github_oauth(app: tauri::AppHandle, device_code: String, interval: u64, folder_path: String) -> Result<String, String> {
+    // Poll for the token (blocks until approval or timeout)
+    let token = github::poll_device_flow(&device_code, interval).await?;
+
+    // Get the username
+    let username = github::verify_token(&token).await?;
+
+    // Persist credentials in the store (same as existing PAT flow)
+    store::save_github_credentials(&app, &token, &username);
+
+    // Ensure the remote repo exists and link local repo
+    let repo_url = github::ensure_remote_repo(&token, &username).await?;
+    let root = Path::new(&folder_path);
+    if let Err(e) = git::ensure_repo(root) {
+        return Err(format!("Could not initialize local repo: {}", e));
+    }
+    let auth_url = repo_url.replace("https://", &format!("https://{}:{}@", username, token));
+    git::add_remote(root, &auth_url).map_err(|e| format!("Could not add remote: {}", e))?;
+
+    Ok(username)
+}
+
 struct WatcherState(Arc<Mutex<Option<notify::RecommendedWatcher>>>);
 
 #[tauri::command]
 async fn start_watch(app: tauri::AppHandle, folder_path: String, state: tauri::State<'_, WatcherState>) -> Result<(), String> {
-    let mut watcher_guard = state.0.lock().map_err(|e| e.to_string())?;
-    
-    // Stop old watcher if exists
-    if let Some(mut old_watcher) = watcher_guard.take() {
-        old_watcher.unwatch(Path::new(&folder_path)).ok();
+    #[cfg(mobile)]
+    {
+        println!("Skipping start_watch on mobile");
+        return Ok(());
     }
 
-    let app_handle = app.clone();
-    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-        match res {
-            Ok(event) => {
-                let mut notify = false;
-                for path in &event.paths {
-                    let path_str = path.to_string_lossy().to_lowercase();
-                    // Ignore build directories, git, and our own config files
-                    if path_str.contains(".git") || 
-                       path_str.contains("node_modules") || 
-                       path_str.contains("target") || 
-                       path_str.contains("dist") || 
-                       path_str.contains("src-tauri") ||
-                       path_str.contains(".notizapp-metadata") ||
-                       path_str.contains("notizapp-config") {
-                        continue;
-                    }
-                    notify = true;
-                    break;
-                }
-                
-                if notify {
-                    app_handle.emit("file-changed", ()).ok();
-                }
-            },
-            Err(e) => println!("watch error: {:?}", e),
+    #[cfg(not(mobile))]
+    {
+        let mut watcher_guard = state.0.lock().map_err(|e| e.to_string())?;
+        
+        // Stop old watcher if exists
+        if let Some(mut old_watcher) = watcher_guard.take() {
+            old_watcher.unwatch(Path::new(&folder_path)).ok();
         }
-    }).map_err(|e| e.to_string())?;
 
-    watcher.watch(Path::new(&folder_path), RecursiveMode::Recursive).map_err(|e| e.to_string())?;
-    
-    *watcher_guard = Some(watcher);
-    Ok(())
+        let app_handle = app.clone();
+        let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+            match res {
+                Ok(event) => {
+                    let mut notify = false;
+                    for path in &event.paths {
+                        let path_str = path.to_string_lossy().to_lowercase();
+                        // Ignore build directories, git, and our own config files
+                        if path_str.contains(".git") || 
+                           path_str.contains("node_modules") || 
+                           path_str.contains("target") || 
+                           path_str.contains("dist") || 
+                           path_str.contains("src-tauri") ||
+                           path_str.contains(".notizapp-metadata") ||
+                           path_str.contains("notizapp-config") {
+                            continue;
+                        }
+                        notify = true;
+                        break;
+                    }
+                    
+                    if notify {
+                        app_handle.emit("file-changed", ()).ok();
+                    }
+                },
+                Err(e) => println!("watch error: {:?}", e),
+            }
+        }).map_err(|e| e.to_string())?;
+
+        watcher.watch(Path::new(&folder_path), RecursiveMode::Recursive).map_err(|e| e.to_string())?;
+        
+        *watcher_guard = Some(watcher);
+        Ok(())
+    }
+}
+
+#[tauri::command]
+async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResultPayload, String> {
+    if let Some(creds) = store::get_github_credentials(&app) {
+        let root = Path::new(&folder_path);
+
+        // Pull changes first
+        let pull_result = git::pull_changes(root, &creds.token, &creds.username)
+            .map_err(|e| format!("Pull failed: {}", e))?;
+
+        // Push local changes (best effort — don't fail if push fails)
+        let push_succeeded = git::push_changes(root, &creds.token, &creds.username)
+            .unwrap_or(false);
+
+        let payload = SyncResultPayload {
+            had_changes: pull_result.had_changes,
+            had_conflicts: pull_result.had_conflicts,
+            conflict_pairs: pull_result.conflict_pairs,
+            push_succeeded,
+        };
+
+        // Notify frontend of sync completion
+        app.emit("sync-complete", &payload).ok();
+
+        Ok(payload)
+    } else {
+        Err("Not connected to GitHub".into())
+    }
+}
+
+fn spawn_sync(app: tauri::AppHandle, folder_path: String) {
+    tauri::async_runtime::spawn(async move {
+        if let Some(creds) = store::get_github_credentials(&app) {
+            let root = std::path::PathBuf::from(&folder_path);
+            match git::push_changes(&root, &creds.token, &creds.username) {
+                Ok(_) => println!("Auto-push succeeded"),
+                Err(e) => println!("Auto-sync failed: {}", e),
+            }
+        }
+    });
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Install default crypto provider for rustls (required for iOS)
+    #[cfg(target_os = "ios")]
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     tauri::Builder::default()
+        .plugin(tauri_plugin_log::Builder::default()
+            .level(log::LevelFilter::Info)
+            .build()
+        )
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -297,17 +523,16 @@ pub fn run() {
             delete_folder_recursive,
             delete_folder_move_contents,
             get_app_version,
+            get_document_dir,
+            connect_github,
+            start_github_oauth,
+            complete_github_oauth,
+            sync_now,
             start_watch
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            log::info!("App is setting up...");
             Ok(())
         })
         .run(tauri::generate_context!())

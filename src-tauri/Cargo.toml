@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.3.5"
+version = "0.4.0"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -22,7 +22,7 @@ serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.10.0", features = [] }
-tauri-plugin-log = "2"
+tauri-plugin-log = "2.0.0"
 tauri-plugin-fs = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-shell = "2"
@@ -30,3 +30,8 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 notify = "8.0.0"
 chrono = "0.4"
+rustls = { version = "0.23", features = ["ring"] }
+git2 = "0.19"
+reqwest = { version = "0.12", features = ["json"] }
+tauri-plugin-store = "2"
+tokio = { version = "1", features = ["time"] }

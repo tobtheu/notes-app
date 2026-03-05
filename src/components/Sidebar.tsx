@@ -5,7 +5,8 @@ import {
     Plus, Settings, Trash2, PanelLeftClose, PanelLeftOpen, Pencil, GripVertical
 } from 'lucide-react';
 import clsx from 'clsx';
-import type { AppMetadata } from '../types';
+import { SyncStatusBadge } from './SyncStatusBadge';
+import type { AppMetadata, ConflictPair } from '../types';
 import {
     DndContext,
     closestCenter,
@@ -66,6 +67,10 @@ interface SidebarProps {
     onReorderFolders?: (newOrder: string[]) => void;
     onToggleCollapse: () => void;
     onOpenSettings?: () => void;
+    syncStatus?: 'idle' | 'syncing' | 'synced' | 'offline' | 'error' | 'conflict';
+    lastSyncedAt?: Date | null;
+    conflictFiles?: ConflictPair[];
+    onSync?: () => void;
 }
 
 interface FolderItemProps {
@@ -106,6 +111,21 @@ const FolderItem = ({
     onEditCategory, onDeleteCategory, isDragging, isOverlay,
     setNodeRef, attributes, listeners, style
 }: FolderItemProps) => {
+    const longPressTimer = useRef<any>(null);
+
+    const handleTouchStart = () => {
+        longPressTimer.current = setTimeout(() => {
+            if (onEditCategory) onEditCategory(folder);
+        }, 500);
+    };
+
+    const handleTouchEnd = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+    };
+
     // Normalization ensures "Folder" and "folder" match correctly
     const folderKey = Object.keys(metadata.folders).find(k => normalizeStr(k) === normalizeStr(folder)) || folder;
     const folderMeta = metadata.folders[folderKey] || {};
@@ -129,6 +149,9 @@ const FolderItem = ({
             )}
             title={isCollapsed ? folder : undefined}
             onClick={() => onSelectCategory && onSelectCategory(folder)}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onTouchMove={handleTouchEnd}
         >
             <div
                 className={clsx("flex items-center gap-2 shrink-0 min-w-0", isCollapsed ? "justify-center" : "flex-1 pr-1")}
@@ -159,7 +182,7 @@ const FolderItem = ({
 
             {/* Inline Action Buttons (Edit/Delete) - Absolute positioned to right */}
             {!isCollapsed && onEditCategory && onDeleteCategory && (
-                <div className="absolute right-1.5 px-1 py-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-md shadow-sm border border-gray-100/50 dark:border-gray-700/50 z-20">
+                <div className="absolute right-1.5 px-1 py-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-md shadow-sm border border-gray-100/50 dark:border-gray-700/50 z-20 lg:flex hidden">
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -232,9 +255,13 @@ export function Sidebar({
     onDeleteCategory,
     onEditCategory,
     onSelectCategory,
-    onReorderFolders,
+    onReorderFolders = undefined,
     onToggleCollapse,
-    onOpenSettings
+    onOpenSettings,
+    syncStatus = 'idle',
+    lastSyncedAt = null,
+    conflictFiles = [],
+    onSync,
 }: SidebarProps) {
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
@@ -294,7 +321,7 @@ export function Sidebar({
             )}
         >
             {/* --- SIDEBAR TOP SECTION --- */}
-            <div className={clsx("p-4 flex items-center shrink-0", isCollapsed ? "justify-center" : "justify-between")}>
+            <div className={clsx("p-4 pb-2 flex items-center shrink-0", isCollapsed ? "justify-center" : "justify-between")}>
                 {!isCollapsed && (
                     <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
                         <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center shadow-sm shrink-0">
@@ -306,12 +333,24 @@ export function Sidebar({
                 {/* Collapse Toggle - Hidden on small screens (layout is auto-managed there) */}
                 <button
                     onClick={onToggleCollapse}
-                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors hidden lg:block"
+                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                     title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                 >
                     {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
                 </button>
             </div>
+
+            {/* --- SYNC STATUS --- */}
+            {!isCollapsed && (
+                <div className="px-3 pb-1">
+                    <SyncStatusBadge
+                        syncStatus={syncStatus}
+                        lastSyncedAt={lastSyncedAt}
+                        conflictFiles={conflictFiles}
+                        onSync={onSync}
+                    />
+                </div>
+            )}
 
             {/* --- ACTIONS HEADER --- */}
             <div className="px-2 pt-4 pb-2">
@@ -336,7 +375,7 @@ export function Sidebar({
                         </span>
                         <button
                             onClick={() => setIsCreatingFolder(true)}
-                            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-400 transition-opacity hidden lg:block lg:opacity-0 lg:group-hover:opacity-100"
                             title="New Folder"
                         >
                             <Plus size={14} />
@@ -403,28 +442,38 @@ export function Sidebar({
                         </DragOverlay>
 
                         {/* Inline creation input */}
-                        {!isCollapsed && isCreatingFolder && (
-                            <form onSubmit={handleCreateFolder} className="px-3 py-2">
-                                <input
-                                    ref={inputRef}
-                                    type="text"
-                                    className="w-full bg-white dark:bg-gray-800 border border-primary-500 outline-none rounded px-2 py-1 text-sm dark:text-gray-100"
-                                    placeholder="New category..."
-                                    autoFocus
-                                    value={newFolderName}
-                                    onChange={(e) => setNewFolderName(e.target.value)}
-                                    onBlur={() => {
-                                        if (!newFolderName.trim()) setIsCreatingFolder(false);
-                                    }}
-                                />
-                            </form>
+                        {!isCollapsed && (
+                            isCreatingFolder ? (
+                                <form onSubmit={handleCreateFolder} className="px-1 py-1">
+                                    <input
+                                        ref={inputRef}
+                                        type="text"
+                                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-base dark:text-gray-100 outline-none focus:ring-2 focus:ring-primary-500/20 transition-all"
+                                        placeholder="New category..."
+                                        autoFocus
+                                        value={newFolderName}
+                                        onChange={(e) => setNewFolderName(e.target.value)}
+                                        onBlur={() => {
+                                            if (!newFolderName.trim()) setIsCreatingFolder(false);
+                                        }}
+                                    />
+                                </form>
+                            ) : (
+                                <button
+                                    onClick={() => setIsCreatingFolder(true)}
+                                    className="w-full flex items-center px-3 py-2.5 gap-3 text-sm font-medium text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800/50 rounded-lg transition-all border border-dashed border-gray-200 dark:border-gray-700/50 mt-1 mb-2 group lg:hidden"
+                                >
+                                    <Plus size={18} className="text-gray-300 group-hover:text-primary-500 transition-colors" />
+                                    <span>Add Category...</span>
+                                </button>
+                            )
                         )}
                     </div>
                 </DndContext>
             </div>
 
             {/* --- FOOTER / SETTINGS --- */}
-            <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex flex-col items-center">
+            <div className="p-2 border-t border-gray-100 dark:border-gray-800 flex flex-col items-center shrink-0">
                 <button
                     onClick={onOpenSettings}
                     className={clsx(

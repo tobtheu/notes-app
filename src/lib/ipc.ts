@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { load } from '@tauri-apps/plugin-store';
 import type { Note, AppMetadata, TauriAPI } from '../types';
 
 let updateInstance: any = null;
@@ -18,24 +19,32 @@ export const tauriAPI: TauriAPI = {
      * Filesystem Operations
      */
     selectFolder: async () => {
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        if (isMobile) {
+            console.log('tauriAPI: Mobile detected, returning documentDir');
+            return invoke<string>('get_document_dir');
+        }
+
         const selected = await open({
             directory: true,
             multiple: false,
         });
         return selected as string | null;
     },
+    getDocumentDir: () => invoke<string>('get_document_dir'),
     listNotes: (folderPath: string) => invoke<Note[]>('list_notes', { folderPath }),
     listFolders: (folderPath: string) => invoke<string[]>('list_folders', { folderPath }),
     saveNote: (data) => invoke<boolean>('save_note', data).then(() => true).catch(() => false),
     deleteNote: (data) => invoke<boolean>('delete_note', data).then(() => true).catch(() => false),
     renameNote: (data) => invoke<void>('rename_note', {
-        folderPath: data.folderPath,
+        rootPath: data.rootPath,
         oldFilename: data.oldFilename,
         newFilename: data.newFilename
     }).then(() => ({ success: true })).catch((e) => ({ success: false, error: e.toString() })),
-    createFolder: (folderPath) => invoke<boolean>('create_folder', { folderPath }).then(() => true).catch(() => false),
+    createFolder: (rootPath, folderPath) => invoke<boolean>('create_folder', { rootPath, folderPath }).then(() => true).catch(() => false),
     renameFolder: (data) => invoke<void>('rename_folder', data).then(() => ({ success: true })).catch((e: any) => ({ success: false, error: e.toString() })),
-    deleteFolderRecursive: (folderPath) => invoke<boolean>('delete_folder_recursive', { folderPath }).then(() => true).catch(() => false),
+    deleteFolderRecursive: (rootPath, folderPath) => invoke<boolean>('delete_folder_recursive', { rootPath, folderPath }).then(() => true).catch(() => false),
     deleteFolderMoveContents: (data) => invoke<boolean>('delete_folder_move_contents', data).then(() => true).catch(() => false),
 
     /**
@@ -130,6 +139,50 @@ export const tauriAPI: TauriAPI = {
         const handler = (event: any) => callback(event.detail);
         window.addEventListener('tauri-update-status', handler);
         return () => window.removeEventListener('tauri-update-status', handler);
+    },
+
+    /**
+     * GitHub Synchronization Setup (via Store and Rust Command)
+     */
+    connectGithub: (token, folderPath) => invoke<string>('connect_github', { token, folderPath })
+        .then((username) => ({ success: true, username }))
+        .catch((e: any) => ({ success: false, error: e.toString() })),
+    startGithubOAuth: () => invoke<{
+        deviceCode: string;
+        userCode: string;
+        verificationUri: string;
+        interval: number;
+        expiresIn: number;
+    }>('start_github_oauth'),
+    completeGithubOAuth: (deviceCode, interval, folderPath) =>
+        invoke<string>('complete_github_oauth', { deviceCode, interval, folderPath }),
+    syncNow: (folderPath) => invoke<{
+        hadChanges: boolean;
+        hadConflicts: boolean;
+        conflictPairs: { original: string; conflictCopy: string }[];
+        pushSucceeded: boolean;
+    }>('sync_now', { folderPath }),
+    getGithubToken: async () => {
+        try {
+            const store = await load('settings.json');
+            return await store.get<{ token: string, username: string }>('github-sync') || null;
+        } catch { return null; }
+    },
+    saveGithubToken: async (token, username) => {
+        try {
+            const store = await load('settings.json');
+            await store.set('github-sync', { token, username });
+            await store.save();
+            return true;
+        } catch { return false; }
+    },
+    disconnectGithub: async () => {
+        try {
+            const store = await load('settings.json');
+            await store.delete('github-sync');
+            await store.save();
+            return true;
+        } catch { return false; }
     }
 };
 

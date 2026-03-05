@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Note } from '../types';
 import { MarkdownEditor } from './MarkdownEditor';
 import clsx from 'clsx';
-import { MoreVertical, FileDown, Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-react';
+import { MoreVertical, FileDown, Eye, EyeOff, ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 
 interface EditorProps {
     note: Note;
@@ -15,6 +15,9 @@ interface EditorProps {
     setToolbarVisible: (visible: boolean) => void;
     spellcheckEnabled: boolean;
     onBack?: () => void;
+    className?: string;
+    onSync?: () => Promise<void>;
+    isSyncing?: boolean;
 }
 
 /**
@@ -36,14 +39,15 @@ export function Editor({
     spellcheckEnabled,
     toolbarVisible,
     setToolbarVisible,
-    onBack
+    onBack,
+    className,
+    onSync,
+    isSyncing
 }: EditorProps) {
     /**
      * --- LOCAL STATE & REFS ---
      */
     const [content, setContent] = useState(note.content);
-    const [isScrolling, setIsScrolling] = useState(false);
-    const scrollTimeoutRef = useRef<any>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const titleRef = useRef<HTMLTextAreaElement>(null);
 
@@ -62,10 +66,11 @@ export function Editor({
      * --- SIDE EFFECTS: STATE SYNC ---
      */
 
-    // Sync internal state only when a DIFFERENT note is loaded
+    // Sync internal state when a DIFFERENT note is loaded OR when the backend updates the same note
     useEffect(() => {
         const currentNoteId = `${note.folder}/${note.filename}`;
         if (currentNoteId !== lastNoteId.current) {
+            // Note switched
             setContent(note.content);
             lastSavedContent.current = note.content;
             lastNoteId.current = currentNoteId;
@@ -75,6 +80,12 @@ export function Editor({
             if (isNewNote) {
                 setTimeout(() => titleRef.current?.focus(), 50);
             }
+        } else if (note.content !== lastSavedContent.current) {
+            // BACKEND/SYNC UPDATE: The file on disk changed independently of our typing (e.g. Git Pull).
+            // Only update if the incoming content is genuinely different from what we last saved.
+            // We do NOT include `content` in the dependency array to avoid infinite loops.
+            setContent(note.content);
+            lastSavedContent.current = note.content;
         }
     }, [note.folder, note.filename, note.content]);
 
@@ -142,6 +153,9 @@ export function Editor({
             if (isSignificantChange) {
                 // updateTimestamp: false avoids re-sorting the list while the user is still typing.
                 onUpdateLocally(note.filename, content, note.folder, false);
+                // Mark this content as "known" so the sync guard doesn't treat
+                // the parent's reflected update as an external change.
+                lastSavedContent.current = content;
             }
         }
     }, [content, note.filename, note.folder, onUpdateLocally, note.content]);
@@ -166,12 +180,6 @@ export function Editor({
      * --- UI HELPERS ---
      */
 
-    const handleScroll = useCallback(() => {
-        setIsScrolling(true);
-        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = setTimeout(() => setIsScrolling(false), 1000);
-    }, []);
-
     // Close action menu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -189,10 +197,10 @@ export function Editor({
     };
 
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-gray-900 overflow-hidden relative">
+        <div className={clsx("h-full overflow-hidden flex flex-col bg-white dark:bg-gray-900 border-l border-gray-100 dark:border-gray-800", className)}>
 
             {/* --- FLOATING HEADER ACTIONS --- */}
-            <div className="fixed top-4 right-8 z-50 flex gap-2" ref={menuRef}>
+            <div className="fixed top-0 right-8 z-50 flex gap-2" ref={menuRef}>
                 {onBack && (
                     <button
                         onClick={onBack}
@@ -243,6 +251,19 @@ export function Editor({
                                 </div>
                                 <span className="font-medium">{toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}</span>
                             </button>
+
+                            {onSync && (
+                                <button
+                                    onClick={() => { onSync(); setIsMenuOpen(false); }}
+                                    disabled={isSyncing}
+                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group disabled:opacity-50"
+                                >
+                                    <div className="w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 transition-colors group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                                        <RefreshCw size={16} className={clsx(isSyncing && "animate-spin text-primary-500")} />
+                                    </div>
+                                    <span className="font-medium">{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -281,33 +302,25 @@ export function Editor({
                     }
                 />
             ) : (
-                /* PLAIN TEXT MODE */
-                <div
-                    className={clsx(
-                        "flex-1 overflow-y-auto custom-scrollbar px-8 pt-16 flex flex-col cursor-text",
-                        isScrolling && "is-scrolling"
-                    )}
-                    onScroll={handleScroll}
-                >
-                    <div className="max-w-4xl w-full mx-auto flex-1 flex flex-col">
-                        <textarea
-                            ref={titleRef}
-                            className="w-full p-0 text-4xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700 shrink-0"
-                            placeholder="Note Title"
-                            value={title}
-                            onChange={(e) => handleTitleChange(e.target.value)}
-                            spellCheck={spellcheckEnabled}
-                            rows={1}
-                        />
-                        <textarea
-                            ref={textareaRef}
-                            className="w-full p-0 text-lg bg-transparent border-none outline-none resize-none text-gray-800 dark:text-gray-300 leading-relaxed flex-1"
-                            placeholder="Start typing your note here..."
-                            value={body}
-                            onChange={(e) => handleBodyChange(e.target.value)}
-                            spellCheck={spellcheckEnabled}
-                        />
-                    </div>
+                /* PLAIN TEXT MODE - Standard Fallback */
+                <div className="flex-1 flex flex-col p-8 max-w-4xl mx-auto w-full">
+                    <textarea
+                        ref={titleRef}
+                        className="w-full p-0 text-4xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700"
+                        placeholder="Note Title"
+                        value={title}
+                        onChange={(e) => handleTitleChange(e.target.value)}
+                        spellCheck={spellcheckEnabled}
+                        rows={1}
+                    />
+                    <textarea
+                        ref={textareaRef}
+                        className="w-full p-0 text-lg bg-transparent border-none outline-none resize-none text-gray-800 dark:text-gray-300 leading-relaxed flex-1"
+                        placeholder="Start typing your note here..."
+                        value={body}
+                        onChange={(e) => handleBodyChange(e.target.value)}
+                        spellCheck={spellcheckEnabled}
+                    />
                 </div>
             )}
         </div>

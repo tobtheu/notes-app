@@ -27,6 +27,7 @@ export function useNotes() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const isRepairing = useRef(false); // Guard against recursive calls during metadata repair
+    const lastSaveTime = useRef<number>(0);
 
     /**
      * Unique Identifier Generation
@@ -43,22 +44,38 @@ export function useNotes() {
      * --- INITIALIZATION ---
      */
     useEffect(() => {
-        const savedFolder = localStorage.getItem('notes-folder');
-        if (savedFolder) setBaseFolder(savedFolder);
+        const initFolder = async () => {
+            const savedFolder = localStorage.getItem('notes-folder');
+            if (savedFolder && !savedFolder.startsWith('null')) {
+                setBaseFolder(savedFolder);
+            } else {
+                setBaseFolder(null);
+            }
+        };
+        initFolder();
     }, []);
 
     /**
      * --- DATA LOADING & SYNC ---
      */
+    type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline' | 'error' | 'conflict';
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncStatus, setSyncStatus] = useState<SyncStatus>(
+        navigator.onLine ? 'idle' : 'offline'
+    );
+    const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+    const [conflictPairs, setConflictPairs] = useState<{ original: string; conflictCopy: string }[]>([]);
 
     const loadNotes = useCallback(async () => {
         if (!baseFolder || isRepairing.current) return;
         setIsLoading(true);
         try {
+            console.log('Loading notes from:', baseFolder);
+
             const [loadedNotes, loadedFolders, meta] = await Promise.all([
-                window.tauriAPI.listNotes(baseFolder),
-                window.tauriAPI.listFolders(baseFolder),
-                window.tauriAPI.readMetadata(baseFolder)
+                window.tauriAPI.listNotes(baseFolder).catch(e => { console.error('listNotes failed:', e); return []; }),
+                window.tauriAPI.listFolders(baseFolder).catch(e => { console.error('listFolders failed:', e); return []; }),
+                window.tauriAPI.readMetadata(baseFolder).catch(e => { console.error('readMetadata failed:', e); return { folders: {}, pinnedNotes: [], folderOrder: [], settings: {} }; })
             ]);
 
             // Deduplicate notes by their normalized ID to handle OS casing variations
@@ -129,17 +146,80 @@ export function useNotes() {
         }
     }, [baseFolder]);
 
+    const triggerSync = useCallback(async () => {
+        if (!baseFolder || !navigator.onLine) return;
+        setIsSyncing(true);
+        setSyncStatus('syncing');
+        try {
+            const result = await window.tauriAPI.syncNow(baseFolder);
+            if (result.hadConflicts) {
+                setSyncStatus('conflict');
+                setConflictPairs(result.conflictPairs);
+            } else {
+                setSyncStatus('synced');
+                setLastSyncedAt(new Date());
+                setConflictPairs([]);
+            }
+            // Reload notes if we pulled any remote changes
+            if (result.hadChanges) {
+                await loadNotes();
+            }
+        } catch (e) {
+            console.error("Sync failed:", e);
+            setSyncStatus('error');
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [baseFolder, loadNotes]);
+
+    // Online/Offline detection — auto-sync when connection returns
+    useEffect(() => {
+        const handleOnline = () => {
+            setSyncStatus('idle');
+            triggerSync();
+        };
+        const handleOffline = () => {
+            setSyncStatus('offline');
+        };
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        // Set initial state
+        if (!navigator.onLine) setSyncStatus('offline');
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, [triggerSync]);
+
+    // 60-second background auto-pull (only when online and idle)
+    useEffect(() => {
+        if (!baseFolder) return;
+
+        const intervalId = setInterval(() => {
+            if (!navigator.onLine) return;
+            const timeSinceLastSave = Date.now() - lastSaveTime.current;
+            // Only pull if user hasn't typed in the last 5 seconds to avoid interruptions
+            if (timeSinceLastSave > 5000 && !isSyncing) {
+                console.log("Auto-pulling from GitHub in the background...");
+                triggerSync();
+            }
+        }, 60000); // 60 seconds
+
+        return () => clearInterval(intervalId);
+    }, [baseFolder, isSyncing, triggerSync]);
+
     /**
      * --- FILE SYSTEM WATCHING ---
      */
-
-    const lastSaveTime = useRef<number>(0);
 
     useEffect(() => {
         if (!baseFolder) return;
 
         // Initial load
         loadNotes();
+
+        // Perform initial remote sync exactly once upon mounting the folder
+        window.tauriAPI.syncNow(baseFolder).catch(e => console.error("Initial Auto-sync failed:", e));
 
         window.tauriAPI.startWatch(baseFolder);
 
@@ -236,7 +316,7 @@ export function useNotes() {
                 targetFilename = currentNote!.filename;
             } else {
                 const renameResult = await window.tauriAPI.renameNote({
-                    folderPath,
+                    rootPath: baseFolder,
                     oldFilename: currentNote!.filename,
                     newFilename: targetFilename
                 });
@@ -269,6 +349,7 @@ export function useNotes() {
         }
 
         const result = await window.tauriAPI.saveNote({
+            rootPath: baseFolder,
             folderPath,
             filename: targetFilename,
             content
@@ -299,7 +380,7 @@ export function useNotes() {
         // PREEMPTIVE GUARD
         lastSaveTime.current = Date.now();
         const renameResult = await window.tauriAPI.renameNote({
-            folderPath: baseFolder,
+            rootPath: baseFolder,
             oldFilename,
             newFilename
         });
@@ -332,7 +413,7 @@ export function useNotes() {
             counter++;
         }
 
-        await window.tauriAPI.saveNote({ folderPath: folderAbsolute, filename, content: '# ' });
+        await window.tauriAPI.saveNote({ rootPath: baseFolder, folderPath: folderAbsolute, filename, content: '# ' });
         await loadNotes();
         setSelectedNoteId(`${folderRelative ? folderRelative + '/' : ''}${filename}`.toLowerCase());
     };
@@ -345,7 +426,7 @@ export function useNotes() {
         if (!note) return;
 
         const folderPath = note.folder ? `${baseFolder}/${note.folder}` : baseFolder;
-        await window.tauriAPI.deleteNote({ folderPath, filename: note.filename });
+        await window.tauriAPI.deleteNote({ rootPath: baseFolder, folderPath, filename: note.filename });
         if (selectedNoteId === normalizedId) setSelectedNoteId(null);
         await loadNotes();
     };
@@ -360,7 +441,7 @@ export function useNotes() {
         const folderAbsolute = `${baseFolder}/${folderRelative}`;
 
         if (mode === 'recursive') {
-            await window.tauriAPI.deleteFolderRecursive(folderAbsolute);
+            await window.tauriAPI.deleteFolderRecursive(baseFolder, folderAbsolute);
         } else {
             await window.tauriAPI.deleteFolderMoveContents({ folderPath: folderAbsolute, rootPath: baseFolder });
         }
@@ -384,7 +465,7 @@ export function useNotes() {
     const createFolder = async (folderName: string) => {
         if (!baseFolder) return;
         lastSaveTime.current = Date.now();
-        await window.tauriAPI.createFolder(`${baseFolder}/${folderName}`);
+        await window.tauriAPI.createFolder(baseFolder, `${baseFolder}/${folderName}`);
         const newMeta = { ...metadata };
         const normalizedNew = normalizeStr(folderName);
         if (newMeta.folderOrder) {
@@ -538,6 +619,11 @@ export function useNotes() {
         togglePinNote,
         isNotePinned,
         reloadNotes: loadNotes,
+        triggerSync,
+        isSyncing,
+        syncStatus,
+        lastSyncedAt,
+        conflictPairs,
         getNoteId,
         isLoading
     };

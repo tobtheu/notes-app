@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Download, Rocket } from 'lucide-react';
+import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, Github, LogOut, Download, Rocket } from 'lucide-react';
 import clsx from 'clsx';
 
 interface SettingsModalProps {
@@ -56,6 +56,17 @@ export function SettingsModal({
     }>({ type: 'idle' });
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+    // GitHub Sync State
+    const [syncUsername, setSyncUsername] = useState<string | null>(null);
+    const [syncStatus, setSyncStatus] = useState<'idle' | 'waiting-code' | 'polling' | 'error'>('idle');
+    const [syncError, setSyncError] = useState<string | null>(null);
+    const [deviceFlow, setDeviceFlow] = useState<{
+        deviceCode: string;
+        userCode: string;
+        verificationUri: string;
+        interval: number;
+    } | null>(null);
+
     // Auto-scroll to update status box when it appears
     useEffect(() => {
         if (updateStatus.type !== 'idle' && scrollContainerRef.current) {
@@ -77,6 +88,11 @@ export function SettingsModal({
         // Fetch current app version from the backend
         window.tauriAPI.getAppVersion().then(setVersion);
 
+        // Fetch connected GitHub account
+        window.tauriAPI.getGithubToken().then(data => {
+            if (data) setSyncUsername(data.username);
+        });
+
         // Subscribe to real-time update events from the Tauri updater
         const unsubscribe = window.tauriAPI.onUpdateStatus((status) => {
             setUpdateStatus(status);
@@ -84,6 +100,33 @@ export function SettingsModal({
 
         return () => unsubscribe();
     }, [isOpen]);
+
+    const handleConnectGithub = async () => {
+        if (!currentPath) return;
+        setSyncStatus('waiting-code');
+        setSyncError(null);
+        try {
+            const flow = await window.tauriAPI.startGithubOAuth();
+            setDeviceFlow(flow);
+            setSyncStatus('polling');
+            // Poll in the background — complete_github_oauth blocks until approved
+            const username = await window.tauriAPI.completeGithubOAuth(flow.deviceCode, flow.interval, currentPath);
+            setSyncUsername(username);
+            setDeviceFlow(null);
+            setSyncStatus('idle');
+        } catch (e: any) {
+            setSyncError(e?.toString() || 'Login failed');
+            setDeviceFlow(null);
+            setSyncStatus('error');
+        }
+    };
+
+    const handleDisconnectGithub = async () => {
+        await window.tauriAPI.disconnectGithub();
+        setSyncUsername(null);
+        setSyncStatus('idle');
+        setSyncError(null);
+    };
 
     const handleCheckForUpdates = () => {
         setUpdateStatus({ type: 'checking' });
@@ -116,6 +159,94 @@ export function SettingsModal({
                     ref={scrollContainerRef}
                     className="overflow-y-auto max-h-[70vh] pr-2 -mr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700"
                 >
+                    {/* --- SYNC SECTION --- */}
+                    <div className="mb-8">
+                        <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Cloud Sync</h3>
+                        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                            {syncUsername ? (
+                                <div className="flex flex-col gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                                            <Cloud className="text-blue-600 dark:text-blue-400" size={20} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">Connected to GitHub</p>
+                                            <p className="text-xs text-gray-500 truncate">@{syncUsername}</p>
+                                        </div>
+                                        <CheckCircle2 className="text-green-500 shrink-0" size={18} />
+                                    </div>
+                                    <button
+                                        onClick={handleDisconnectGithub}
+                                        className="flex items-center justify-center gap-2 mt-1 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                    >
+                                        <LogOut size={14} />
+                                        Disconnect
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-3">
+                                    <div className="flex items-start gap-3 mb-2">
+                                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center mt-0.5 shrink-0">
+                                            <Github className="text-gray-600 dark:text-gray-400" size={16} />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">GitHub Sync</p>
+                                            <p className="text-xs text-gray-500">
+                                                Verbinde dein GitHub-Konto, um deine Notizen automatisch zu synchronisieren.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Device Flow: show code when waiting */}
+                                    {deviceFlow && (syncStatus === 'polling' || syncStatus === 'waiting-code') && (
+                                        <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center border border-gray-200 dark:border-gray-700">
+                                            <p className="text-xs text-gray-500 mb-2">Gib diesen Code auf GitHub ein:</p>
+                                            <p className="text-2xl font-mono font-bold tracking-widest text-gray-900 dark:text-white mb-3 select-all">
+                                                {deviceFlow.userCode}
+                                            </p>
+                                            <p className="text-xs text-gray-400">
+                                                Browser wurde geöffnet →{' '}
+                                                <a
+                                                    href={deviceFlow.verificationUri}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="text-blue-500 hover:underline"
+                                                >
+                                                    {deviceFlow.verificationUri}
+                                                </a>
+                                            </p>
+                                            <div className="mt-3 flex items-center justify-center gap-2 text-xs text-gray-400">
+                                                <RefreshCw size={12} className="animate-spin" />
+                                                Warte auf Bestätigung…
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {syncStatus === 'error' && syncError && (
+                                        <p className="text-xs text-red-500 text-center break-words">{syncError}</p>
+                                    )}
+
+                                    {!deviceFlow && (
+                                        <button
+                                            onClick={handleConnectGithub}
+                                            disabled={syncStatus === 'polling' || syncStatus === 'waiting-code' || !currentPath}
+                                            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
+                                        >
+                                            <Github size={15} />
+                                            Mit GitHub verbinden
+                                        </button>
+                                    )}
+
+                                    {!currentPath && (
+                                        <p className="text-xs text-red-500 text-center mt-1">
+                                            Bitte zuerst einen Ordner auswählen.
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* --- STORAGE SECTION --- */}
                     <div className="mb-8">
                         <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Storage</h3>

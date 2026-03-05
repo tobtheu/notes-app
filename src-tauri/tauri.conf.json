@@ -1,22 +1,23 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "NotizApp",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "identifier": "com.tobtheu.notizapp",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:5173",
+    "devUrl": "http://192.168.2.77:5173",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "NotizApp",
-        "width": 1200,
-        "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "width": 1200,
+        "height": 800
       }
     ],
     "security": {

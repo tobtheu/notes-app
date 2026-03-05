@@ -1,248 +1,157 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNotes } from './hooks/useNotes';
+import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
 import { SettingsModal } from './components/SettingsModal';
 import { DeleteFolderModal } from './components/DeleteFolderModal';
-import { useTheme } from './hooks/useTheme';
-import { useSettings } from './hooks/useSettings';
-import { FolderEditModal } from './components/FolderEditModal';
-import { Folder, Loader2 } from 'lucide-react';
 import { UpdateModal } from './components/UpdateModal';
+import { ConflictModal } from './components/ConflictModal';
+import { useNotes } from './hooks/useNotes';
+import { useSettings } from './hooks/useSettings';
+import { useTheme } from './hooks/useTheme';
+import type { Note } from './types';
+import { Loader2, Book } from 'lucide-react';
 import clsx from 'clsx';
-import type { Note, FolderMetadata } from './types';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 
-const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
-
-/**
- * App.tsx - Main Application Component
- * Manages core layout, responsive views, and integration of logic hooks.
- */
 function App() {
-  /**
-   * --- STATE & CONFIGURATION ---
-   */
-
-  // Sidebar Collapse state
-  // Configuration Point: Default behavior collapses sidebar when window width < 1024px
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    return window.innerWidth < 1024;
-  });
-
-  // Automated sidebar behavior on window resize
-  useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      // Configuration Point: Breakpoints for automatic layout shifts
-      if (width < 1024 && !isSidebarCollapsed) {
-        setIsSidebarCollapsed(true);
-      } else if (width >= 1024 && isSidebarCollapsed) {
-        setIsSidebarCollapsed(false);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [isSidebarCollapsed]);
-
-  // Modal & Popup States
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
-  const [categoryToEdit, setCategoryToEdit] = useState<string | null>(null);
-  // Navigation & Update System
-  const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
-  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState<{
-    type: 'idle' | 'available' | 'downloading' | 'downloaded' | 'error';
-    progress?: number;
-    error?: string;
-    version?: string;
-  }>({ type: 'idle' });
-
-  // Mobile View Management
-  // 'sidebar/notelist' (default): Shows combined view (collapsed sidebar + note list)
-  // 'editor': Shows only the editor in full screen on mobile
-  const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('sidebar');
-
-  /**
-   * --- HOOKS (Logic & Data Layer) ---
-   */
-
-  const { theme, setTheme } = useTheme();
-
-  // Central hook for file system operations, note management and metadata
   const {
-    currentFolder,
-    notes,
     allNotes,
     folders,
     metadata,
-    selectedNote,
-    setSelectedNote,
+    notes,
+    currentFolder,
     selectedCategory,
-    setSelectedCategory,
-    searchTerm,
-    setSearchTerm,
+    isLoading,
     selectFolder,
-    saveNote,
-    updateNoteLocally,
     createNote,
+    saveNote,
     deleteNote,
     createFolder,
-    renameFolder,
-    updateFolderMetadata,
-    saveSettings,
     deleteFolder,
+    renameFolder: _renameFolder,
     reorderFolders,
+    selectedNote,
+    setSelectedNote,
+    setSelectedCategory,
+    updateNoteLocally,
     moveNote,
     togglePinNote,
     isNotePinned,
     getNoteId,
-    isLoading,
+    searchTerm,
+    setSearchTerm,
+    triggerSync,
+    isSyncing,
+    syncStatus,
+    lastSyncedAt,
+    conflictPairs,
   } = useNotes();
 
-  // User preference management (Colors, Markdown, Typography)
   const {
-    markdownEnabled, setMarkdownEnabled,
-    accentColor, setAccentColor,
-    fontFamily, setFontFamily,
-    fontSize, setFontSize,
-    toolbarVisible, setToolbarVisible,
-    spellcheckEnabled, setSpellcheckEnabled
-  } = useSettings(metadata.settings, saveSettings);
+    markdownEnabled,
+    setMarkdownEnabled,
+    accentColor,
+    setAccentColor,
+    fontFamily,
+    setFontFamily,
+    fontSize,
+    setFontSize,
+    spellcheckEnabled,
+    setSpellcheckEnabled,
+    toolbarVisible,
+    setToolbarVisible
+  } = useSettings(metadata.settings, (_settings) => {
+    // metadata.settings is updated via useNotes.saveSettings contextually if needed
+  });
 
-  /**
-   * --- SIDE EFFECTS ---
-   */
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => window.innerWidth < 768);
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
 
-  // Global application of appearance settings
-  // Configuration Point: Design tokens are applied to document root
+  // Auto-open ConflictModal when a sync conflict is detected
   useEffect(() => {
-    document.documentElement.setAttribute('data-accent', accentColor);
-  }, [accentColor]);
-
-  useEffect(() => {
-    // Configuration Point: Font size mappings for accessibility
-    document.documentElement.style.fontSize = fontSize === 'small' ? '14px' : fontSize === 'large' ? '18px' : '16px';
-  }, [fontSize]);
-
-  // Ref maintenance for navigation reference consistency
-  const allNotesRef = useRef(allNotes);
-  useEffect(() => {
-    allNotesRef.current = allNotes;
-  }, [allNotes]);
-
-  /**
-   * --- HANDLERS ---
-   */
-
-  // Logic for navigating between notes (e.g., via Wiki-links [[Note Name]])
-  const handleNavigate = useCallback((id: string, anchor?: string) => {
-    if (id) {
-      const note = allNotesRef.current.find((n: Note) => getNoteId(n) === id.toLowerCase());
-      if (note) {
-        setSelectedNote(getNoteId(note));
-        if (anchor) setPendingAnchor(anchor);
-      }
-    } else if (anchor) {
-      const element = document.getElementById(anchor);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
-      }
+    if (syncStatus === 'conflict' && conflictPairs.length > 0) {
+      setIsConflictModalOpen(true);
     }
-  }, [getNoteId, setSelectedNote]);
+  }, [syncStatus, conflictPairs]);
 
-  // Handles deep-linking/scrolling to anchors after a note content has loaded
-  useEffect(() => {
-    if (pendingAnchor && selectedNote) {
-      const timer = setTimeout(() => {
-        const element = document.getElementById(pendingAnchor);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
-          setPendingAnchor(null);
-        }
-      }, 500); // Configuration Point: Scroll delay to ensure DOM is ready
-      return () => clearTimeout(timer);
-    }
-  }, [selectedNote, pendingAnchor]);
+  // Update logic
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<{
+    type: 'idle' | 'available' | 'downloading' | 'error' | 'downloaded';
+    progress?: number;
+    error?: string;
+  }>({ type: 'idle' });
 
-  // Auto-Update integration via Tauri API
+
+
+  // Mobile View Management
+  const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('notelist');
+
+  const { theme, setTheme } = useTheme();
+
   useEffect(() => {
-    const removeListener = window.tauriAPI.onUpdateStatus((status: any) => {
-      setUpdateStatus(status);
-      if (status.type === 'available') {
-        const skippedVersion = localStorage.getItem('skipped-update-version');
-        if (skippedVersion !== status.version) {
-          setUpdateVersion(status.version);
+    const checkForUpdates = async () => {
+      try {
+        const update = await check();
+        if (update) {
+          setUpdateVersion(update.version);
+          setUpdateStatus({ type: 'available' });
           setIsUpdateModalOpen(true);
         }
+      } catch (error) {
+        console.error('Failed to check for updates:', error);
       }
-    });
-
-    window.tauriAPI.checkForUpdates();
-    return () => { if (typeof removeListener === 'function') removeListener(); };
+    };
+    checkForUpdates();
   }, []);
 
-  const handleUpdate = () => {
-    window.tauriAPI.downloadUpdate();
+  const handleUpdate = async () => {
+    try {
+      setUpdateStatus({ type: 'downloading' });
+      const update = await check();
+      if (update) {
+        await update.downloadAndInstall();
+        setUpdateStatus({ type: 'downloaded' });
+      }
+    } catch (error) {
+      console.error('Update failed:', error);
+      setUpdateStatus({ type: 'error', error: String(error) });
+    }
   };
 
-  const handleInstallUpdate = () => {
-    window.tauriAPI.quitAndInstall();
+  const handleInstallUpdate = async () => {
+    await relaunch();
   };
 
   const handleSkipUpdate = () => {
-    if (updateVersion) {
-      localStorage.setItem('skipped-update-version', updateVersion);
-    }
     setIsUpdateModalOpen(false);
-  };
-
-  const handleDeleteCategory = (mode: 'recursive' | 'move') => {
-    if (categoryToDelete) {
-      deleteFolder(categoryToDelete, mode);
-      setCategoryToDelete(null);
-    }
-  };
-
-  const handleEditCategory = async (newName: string, meta: FolderMetadata) => {
-    if (!categoryToEdit) return;
-
-    let targetName = categoryToEdit;
-
-    if (newName !== categoryToEdit) {
-      const result = await renameFolder(categoryToEdit, newName);
-      if (result?.success) {
-        targetName = newName;
-        setCategoryToEdit(prev => prev ? newName : null);
-      } else {
-        return;
-      }
-    }
-
-    await updateFolderMetadata(targetName, meta);
   };
 
   const handleSelectCategory = (category: string | null) => {
     setSelectedCategory(category);
-    setActiveView('notelist'); // Switch view for mobile responsiveness
+    setActiveView('notelist');
   };
 
-  const handleSelectNote = (noteId: string) => {
-    setSelectedNote(noteId);
-    setActiveView('editor'); // Switch to editor focus for mobile responsiveness
+  const handleSelectNote = (note: Note) => {
+    setSelectedNote(getNoteId(note));
+    setActiveView('editor');
   };
 
-  /**
-   * --- RENDER LAYER ---
-   */
+  const handleDeleteCategory = async () => {
+    if (categoryToDelete) {
+      await deleteFolder(categoryToDelete, 'recursive');
+      setCategoryToDelete(null);
+    }
+  };
 
   if (!currentFolder) {
-    // Welcome Screen when no workspace folder is selected
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 p-6 text-center">
+      <div className="flex flex-col items-center justify-center fixed inset-0 bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 p-6 text-center">
         <div className="w-20 h-20 bg-primary-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-primary-500/20">
           <span className="text-4xl text-white">📝</span>
         </div>
@@ -262,15 +171,12 @@ function App() {
 
   return (
     <div
-      className="flex h-screen w-full bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 overflow-hidden"
-      style={{ fontFamily: fontFamily === 'inter' ? "'Inter', sans-serif" : fontFamily === 'roboto' ? "'Roboto', sans-serif" : "ui-sans-serif, system-ui, sans-serif" }}
+      className="h-full flex bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 overflow-hidden"
+      style={{
+        fontFamily: fontFamily === 'inter' ? "'Inter', sans-serif" : fontFamily === 'roboto' ? "'Roboto', sans-serif" : "ui-sans-serif, system-ui, sans-serif"
+      }}
     >
-      {/* 
-          COLUMN 1: SIDEBAR (NAVIGATION)
-          Responsiveness:
-          - Desktop (md:flex): Always present.
-          - Mobile: Visible in combined mode, hidden when editor is focused.
-      */}
+      {/* SIDEBAR — always visible except in editor view on mobile */}
       <Sidebar
         className={clsx(
           "md:flex",
@@ -283,100 +189,93 @@ function App() {
         onCreateNote={createNote}
         onCreateFolder={createFolder}
         onDeleteCategory={setCategoryToDelete}
-        onEditCategory={setCategoryToEdit}
+        onEditCategory={() => { }}
         onSelectCategory={handleSelectCategory}
         onReorderFolders={reorderFolders}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        syncStatus={syncStatus}
+        lastSyncedAt={lastSyncedAt}
+        conflictFiles={conflictPairs}
+        onSync={triggerSync}
       />
 
-      {/* 
-          COLUMN 2: NOTE LIST
-          Responsiveness: Sibling to Sidebar
-          Configuration Point: Fixed desktop width 'md:w-80' (320px)
-      */}
+      {/* NOTELIST — visible when not in sidebar-only or editor view */}
       <NoteList
         className={clsx(
-          "flex-shrink-0 border-r border-gray-100 dark:border-gray-800 md:flex md:w-80",
-          activeView === 'editor' ? "hidden md:flex" : "flex-1 md:flex-initial"
+          "md:flex md:w-80 shrink-0 border-r border-gray-100 dark:border-gray-800",
+          activeView === 'editor' ? "hidden md:flex" :
+            activeView === 'sidebar' ? "hidden md:flex" : "flex"
         )}
         notes={notes}
-        folders={folders}
         selectedNote={selectedNote}
-        selectedCategory={selectedCategory}
-        onSelectNote={(note) => handleSelectNote(getNoteId(note))}
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSelectNote={handleSelectNote}
         onDeleteNote={deleteNote}
         onMoveNote={moveNote}
         onTogglePin={togglePinNote}
         isNotePinned={isNotePinned}
         getNoteId={getNoteId}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        folders={folders}
+        selectedCategory={selectedCategory}
+        onBack={() => setActiveView('sidebar')}
       />
 
-      {/* 
-          COLUMN 3: EDITOR (CONTENT)
-          Responsiveness:
-          - Desktop: Occupies remaining space.
-          - Mobile: Full screen when focused.
-      */}
-      <div className={clsx(
-        "flex-1 flex flex-col h-full overflow-hidden md:flex",
-        activeView === 'editor' ? "flex w-full" : "hidden"
-      )}>
-        {selectedNote ? (
-          <Editor
-            note={selectedNote}
-            allNotes={allNotes}
-            onSave={saveNote}
-            onUpdateLocally={updateNoteLocally}
-            onNavigate={handleNavigate}
-            markdownEnabled={markdownEnabled}
-            spellcheckEnabled={spellcheckEnabled}
-            toolbarVisible={toolbarVisible}
-            setToolbarVisible={setToolbarVisible}
-            onBack={() => setActiveView('notelist')}
-          />
-        ) : (
-          // Default state when no note is active
-          <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-400 p-8 text-center animate-in fade-in duration-500">
-            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-              <Folder size={32} />
+      {/* EDITOR — takes full width on mobile, hides sidebar + notelist */}
+      {selectedNote ? (
+        <Editor
+          className={clsx(
+            "flex-1",
+            activeView === 'editor' ? "flex" : "hidden md:flex"
+          )}
+          note={selectedNote}
+          allNotes={allNotes}
+          onSave={(filename, content, folder) => saveNote(filename, content, folder)}
+          onUpdateLocally={updateNoteLocally}
+          onBack={() => setActiveView('notelist')}
+          markdownEnabled={markdownEnabled}
+          toolbarVisible={toolbarVisible}
+          setToolbarVisible={setToolbarVisible}
+          spellcheckEnabled={spellcheckEnabled}
+          onNavigate={(id, _anchor) => setSelectedNote(id)}
+          onSync={triggerSync}
+          isSyncing={isSyncing}
+        />
+      ) : (
+        <div className={clsx(
+          "flex-1 items-center justify-center text-gray-400 bg-white dark:bg-gray-900",
+          activeView === 'editor' ? "flex" : "hidden md:flex"
+        )}>
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
+              <Book className="text-gray-300 dark:text-gray-600" size={32} />
             </div>
-            <h2 className="text-xl font-medium text-gray-600 dark:text-gray-300 mb-1">No Note Selected</h2>
-            <p className="text-sm">Select a note from the list or create a new one to start writing.</p>
+            <p className="text-sm font-medium">Select a note to start editing</p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/** MODALS & OVERLAYS **/}
-
-      <FolderEditModal
-        isOpen={!!categoryToEdit}
-        onClose={() => setCategoryToEdit(null)}
-        folderName={categoryToEdit || ""}
-        metadata={categoryToEdit ? (metadata.folders[Object.keys(metadata.folders).find(k => normalizeStr(k) === normalizeStr(categoryToEdit)) || categoryToEdit] || {}) : {}}
-        onSave={handleEditCategory}
-      />
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        currentPath={currentFolder}
-        onChangePath={selectFolder}
-        theme={theme}
-        setTheme={setTheme}
-        markdownEnabled={markdownEnabled}
-        onToggleMarkdown={setMarkdownEnabled}
-        accentColor={accentColor}
-        setAccentColor={setAccentColor}
-        fontFamily={fontFamily}
-        setFontFamily={setFontFamily}
-        fontSize={fontSize}
-        setFontSize={setFontSize}
-        spellcheckEnabled={spellcheckEnabled}
-        onToggleSpellcheck={setSpellcheckEnabled}
-      />
+      {isSettingsOpen && (
+        <SettingsModal
+          isOpen={true}
+          onClose={() => setIsSettingsOpen(false)}
+          currentPath={currentFolder}
+          onChangePath={selectFolder}
+          theme={theme}
+          setTheme={setTheme}
+          markdownEnabled={markdownEnabled}
+          onToggleMarkdown={setMarkdownEnabled}
+          accentColor={accentColor}
+          setAccentColor={setAccentColor}
+          fontFamily={fontFamily}
+          setFontFamily={setFontFamily}
+          fontSize={fontSize}
+          setFontSize={setFontSize}
+          spellcheckEnabled={spellcheckEnabled}
+          onToggleSpellcheck={setSpellcheckEnabled}
+        />
+      )}
 
       {categoryToDelete && (
         <DeleteFolderModal
@@ -396,11 +295,24 @@ function App() {
           status={updateStatus}
         />
       )}
+
+      {/* CONFLICT MODAL — auto-opens when sync detects a merge conflict */}
+      {isConflictModalOpen && conflictPairs.length > 0 && currentFolder && (
+        <ConflictModal
+          conflictPairs={conflictPairs}
+          baseFolder={currentFolder}
+          onClose={() => setIsConflictModalOpen(false)}
+          onReload={() => triggerSync()}
+        />
+      )}
+
       {isLoading && (
-        <div className="fixed bottom-6 right-6 z-50 bg-white dark:bg-gray-800 rounded-full shadow-lg p-3 border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in duration-300">
+        <div className="fixed bottom-6 right-6 z-50 bg-white dark:bg-gray-900 rounded-full shadow-lg p-3 border border-gray-100 dark:border-gray-700">
           <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
         </div>
       )}
+
+
     </div>
   );
 }

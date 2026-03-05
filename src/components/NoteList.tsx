@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-    Search, List, LayoutList, Trash2, Pin, FolderTree
+    Search, List, LayoutList, Trash2, Pin, FolderTree, ArrowLeft
 } from 'lucide-react';
 import clsx from 'clsx';
 import type { Note } from '../types';
@@ -20,6 +20,7 @@ interface NoteListProps {
     isNotePinned: (note: Note) => boolean;
     getNoteId: (note: Note) => string;
     selectedCategory: string | null;
+    onBack?: () => void;
 }
 const stripMarkdown = (text: string) => {
     if (!text) return '';
@@ -54,6 +55,7 @@ export function NoteList({
     isNotePinned,
     getNoteId,
     selectedCategory,
+    onBack,
 }: NoteListProps) {
     /**
      * --- LOCAL STATE ---
@@ -78,16 +80,28 @@ export function NoteList({
         <div className={clsx("flex flex-col h-full bg-white dark:bg-gray-900", className)}>
 
             {/* --- HEADER: SEARCH & FILTER --- */}
-            <div className="p-4 space-y-3">
-                <div className="relative group">
-                    <Search className="absolute left-3 top-2.5 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Search notes..."
-                        className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500/20 rounded-xl outline-none transition-all dark:text-gray-100"
-                        value={searchTerm}
-                        onChange={(e) => onSearchChange(e.target.value)}
-                    />
+            <div
+                className="p-4 space-y-3"
+            >
+                <div className="flex items-center gap-3">
+                    {onBack && (
+                        <button
+                            onClick={onBack}
+                            className="md:hidden p-2 -ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                        >
+                            <ArrowLeft size={20} />
+                        </button>
+                    )}
+                    <div className="relative group flex-1">
+                        <Search className="absolute left-3 top-2.5 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Search notes..."
+                            className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500/20 rounded-xl outline-none transition-all dark:text-gray-100 text-base"
+                            value={searchTerm}
+                            onChange={(e) => onSearchChange(e.target.value)}
+                        />
+                    </div>
                 </div>
 
                 {/* CURRENT CONTEXT INFO */}
