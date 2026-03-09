@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
+use log::LevelFilter;
 use std::fs;
 use std::path::{Path, PathBuf};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Local};
 use std::sync::{Arc, Mutex};
 use notify::{Watcher, RecursiveMode};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 mod git;
 mod github;
@@ -64,19 +65,18 @@ fn get_files_recursively(dir: &Path) -> Vec<PathBuf> {
 #[tauri::command]
 async fn list_notes(folder_path: String) -> Result<Vec<Note>, String> {
     let root = Path::new(&folder_path);
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
     let files = get_files_recursively(root);
     
     let mut notes = Vec::new();
     for file in files {
         if file.extension().map_or(false, |ext| ext == "md") {
-            let content = fs::read_to_string(&file).unwrap_or_default();
-            let metadata = fs::metadata(&file).map_err(|e| e.to_string())?;
-            let updated_at: String = metadata.modified()
-                .map(|m| {
-                    let dt: DateTime<Utc> = m.into();
-                    dt.to_rfc3339()
-                })
-                .unwrap_or_else(|_| Utc::now().to_rfc3339());
+            let raw_content = fs::read_to_string(&file).unwrap_or_default();
+            
+            // Parse frontmatter for `updated` timestamp
+            let (content, updated_at) = parse_frontmatter(&raw_content, &file);
 
             let relative_path = file.strip_prefix(root).map_err(|e| e.to_string())?;
             let folder = relative_path.parent()
@@ -94,10 +94,72 @@ async fn list_notes(folder_path: String) -> Result<Vec<Note>, String> {
     Ok(notes)
 }
 
+/// Parses YAML frontmatter from a markdown file to extract the `updated` timestamp.
+/// Returns (content_without_frontmatter, updated_at_rfc3339).
+/// Falls back to filesystem modified time if no frontmatter is present.
+fn parse_frontmatter(raw: &str, file_path: &Path) -> (String, String) {
+    if raw.starts_with("---\n") || raw.starts_with("---\r\n") {
+        let after_open = if raw.starts_with("---\r\n") { 5 } else { 4 };
+        // Find the closing --- that must be preceded by a newline
+        if let Some(close_index_rel) = raw[after_open..].find("\n---") {
+            let close_index = after_open + close_index_rel;
+            let frontmatter = &raw[after_open..close_index];
+            
+            // The content starts after "\n---" (4 chars) followed by optional newline
+            let mut content_start = close_index + 4;
+            
+            // Extract content safely
+            let content = if content_start < raw.len() {
+                let remainder = &raw[content_start..];
+                if remainder.starts_with('\n') {
+                    &remainder[1..]
+                } else if remainder.starts_with("\r\n") {
+                    &remainder[2..]
+                } else {
+                    remainder
+                }
+            } else {
+                ""
+            };
+
+            let mut updated_at: Option<String> = None;
+            for line in frontmatter.lines() {
+                let trimmed = line.trim();
+                if trimmed.starts_with("updated:") {
+                    let value = trimmed.trim_start_matches("updated:").trim().trim_matches('"').trim_matches('\'');
+                    if let Ok(dt) = DateTime::parse_from_rfc3339(value) {
+                        updated_at = Some(dt.with_timezone(&Utc).to_rfc3339());
+                    } else {
+                        updated_at = Some(value.to_string());
+                    }
+                }
+            }
+            
+            return (content.to_string(), updated_at.unwrap_or_else(|| get_fs_timestamp(file_path)));
+        }
+    }
+    (raw.to_string(), get_fs_timestamp(file_path))
+}
+
+/// Gets the filesystem modification time as RFC 3339.
+fn get_fs_timestamp(file_path: &Path) -> String {
+    fs::metadata(file_path)
+        .and_then(|m| m.modified())
+        .map(|m| {
+            let dt: DateTime<Utc> = m.into();
+            dt.to_rfc3339()
+        })
+        .unwrap_or_else(|_| Utc::now().to_rfc3339())
+}
+
 #[tauri::command]
 async fn list_folders(folder_path: String) -> Result<Vec<String>, String> {
     let mut folders = Vec::new();
-    let entries = fs::read_dir(folder_path).map_err(|e| e.to_string())?;
+    let root = Path::new(&folder_path);
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+    let entries = fs::read_dir(root).map_err(|e| e.to_string())?;
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -122,19 +184,41 @@ async fn save_note(app: tauri::AppHandle, root_path: String, folder_path: String
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     
-    fs::write(&file_path, content).map_err(|e| e.to_string())?;
+    // Inject/update frontmatter with current timestamp (ISO 8601 with timezone)
+    let now = chrono::Local::now().to_rfc3339();
+    let final_content = inject_frontmatter(&content, &now);
+    
+    fs::write(&file_path, final_content).map_err(|e| e.to_string())?;
+    Ok(())
+}
 
-    // Auto-commit changes
-    if let Ok(_) = git::ensure_repo(root) {
-        let msg = format!("Auto-save: {}", filename);
-        if let Err(e) = git::commit_changes(root, &msg) {
-            println!("Failed to commit changes: {}", e);
-        } else {
-            spawn_sync(app, root_path);
+/// Injects or updates the `updated` field in YAML frontmatter.
+fn inject_frontmatter(content: &str, timestamp: &str) -> String {
+    if content.starts_with("---\n") || content.starts_with("---\r\n") {
+        let after_open = if content.starts_with("---\r\n") { 5 } else { 4 };
+        if let Some(close_pos) = content[after_open..].find("\n---") {
+            let frontmatter = &content[after_open..after_open + close_pos];
+            let rest = &content[after_open + close_pos + 4..]; // after "\n---"
+            
+            // Replace existing `updated:` line or add it
+            let mut lines: Vec<String> = frontmatter.lines().map(|l| l.to_string()).collect();
+            let mut found = false;
+            for line in &mut lines {
+                if line.trim().starts_with("updated:") {
+                    *line = format!("updated: {}", timestamp);
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                lines.push(format!("updated: {}", timestamp));
+            }
+            
+            return format!("---\n{}\n---{}", lines.join("\n"), rest);
         }
     }
-
-    Ok(())
+    // No existing frontmatter — add one
+    format!("---\nupdated: {}\n---\n{}", timestamp, content)
 }
 
 #[tauri::command]
@@ -142,7 +226,9 @@ async fn delete_note(app: tauri::AppHandle, root_path: String, folder_path: Stri
     let root = Path::new(&root_path);
     let target_dir = Path::new(&folder_path);
     let path = target_dir.join(&filename);
-    fs::remove_file(path).map_err(|e| e.to_string())?;
+    if path.exists() {
+        fs::remove_file(path).map_err(|e| e.to_string())?;
+    }
 
     if let Ok(_) = git::ensure_repo(root) {
         let msg = format!("Delete: {}", filename);
@@ -178,12 +264,9 @@ async fn read_metadata(root_path: String) -> Result<AppMetadata, String> {
 
     let mut needs_migration = !config_path.exists() && legacy_path.exists();
 
-    // Migration robustness: If config exists but is effectively empty (no folders, no settings),
-    // and we have a legacy file, we should still attempt to migrate.
     if config_path.exists() && legacy_path.exists() {
         if let Ok(content) = fs::read_to_string(&config_path) {
             if let Ok(metadata) = serde_json::from_str::<serde_json::Value>(&content) {
-                // If the new config has no folder groupings yet, it's safe to migrate from legacy.
                 let folders = metadata.get("folders");
                 let folders_empty = folders.map_or(true, |f| f.is_object() && f.as_object().unwrap().is_empty());
                 if folders_empty {
@@ -201,7 +284,7 @@ async fn read_metadata(root_path: String) -> Result<AppMetadata, String> {
 
     if config_path.exists() {
         let content = fs::read_to_string(&config_path).map_err(|e| e.to_string())?;
-        let metadata: AppMetadata = serde_json::from_str(&content).unwrap_or_else(|_| AppMetadata { 
+        let metadata = serde_json::from_str::<AppMetadata>(&content).unwrap_or_else(|_| AppMetadata { 
             folders: serde_json::json!({}), 
             pinned_notes: Vec::new(),
             folder_order: None,
@@ -286,7 +369,6 @@ async fn delete_folder_move_contents(app: tauri::AppHandle, folder_path: String,
             let basename = file.file_name().unwrap();
             let mut target_path = root.join(basename);
             
-            // Handle collisions
             let mut counter = 1;
             while target_path.exists() {
                 let name = file.file_stem().unwrap().to_string_lossy();
@@ -317,49 +399,41 @@ async fn get_app_version(app: tauri::AppHandle) -> String {
 
 #[tauri::command]
 async fn get_document_dir(app: tauri::AppHandle) -> Result<String, String> {
-    use tauri::Manager;
     app.path().document_dir()
         .map(|p| p.to_string_lossy().to_string())
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
+async fn clear_github_credentials(app: tauri::AppHandle) {
+    store::clear_github_credentials(&app);
+}
+
+#[tauri::command]
 async fn connect_github(token: String, folder_path: String) -> Result<String, String> {
-    // 1. Verify token
     let username = github::verify_token(&token).await?;
-    
-    // 2. Ensure remote repository exists (and get its URL)
     let repo_url = github::ensure_remote_repo(&token, &username).await?;
-
-    // 3. Make sure local folder is a git repo
     let root = Path::new(&folder_path);
-    if let Err(e) = git::ensure_repo(root) {
-        return Err(format!("Could not initialize local repo: {}", e));
-    }
-
-    // 4. Inject credentials into URL for pushes
-    // clone_url format: https://github.com/User/Repo.git
+    git::ensure_repo(root).map_err(|e| format!("Git init failed: {}", e))?;
     let auth_url = repo_url.replace("https://", &format!("https://{}:{}@", username, token));
-
-    // 5. Link local repo to remote
-    git::add_remote(root, &auth_url).map_err(|e| format!("Could not add remote: {}", e))?;
-
-    // Return the authenticated username for the UI
+    git::add_remote(root, &auth_url).map_err(|e| format!("Remote add failed: {}", e))?;
     Ok(username)
 }
 
-/// Step 1 of OAuth Device Flow: initiate the flow and open the browser.
-/// Returns the user_code and verification_uri for display in the UI.
 #[tauri::command]
 async fn start_github_oauth() -> Result<serde_json::Value, String> {
     let flow = github::start_device_flow().await?;
     
-    // Open the verification URL in the system browser
+    let url = flow.verification_uri.clone();
     #[cfg(not(mobile))]
     {
-        let url = flow.verification_uri.clone();
         std::thread::spawn(move || {
+            #[cfg(target_os = "windows")]
+            let _ = std::process::Command::new("cmd").args(&["/C", "start", &url]).spawn();
+            #[cfg(target_os = "macos")]
             let _ = std::process::Command::new("open").arg(&url).spawn();
+            #[cfg(target_os = "linux")]
+            let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
         });
     }
 
@@ -372,28 +446,16 @@ async fn start_github_oauth() -> Result<serde_json::Value, String> {
     }))
 }
 
-/// Step 2 of OAuth Device Flow: poll until the user approves in the browser.
-/// On success: stores credentials and sets up the remote repo, then returns username.
 #[tauri::command]
 async fn complete_github_oauth(app: tauri::AppHandle, device_code: String, interval: u64, folder_path: String) -> Result<String, String> {
-    // Poll for the token (blocks until approval or timeout)
     let token = github::poll_device_flow(&device_code, interval).await?;
-
-    // Get the username
     let username = github::verify_token(&token).await?;
-
-    // Persist credentials in the store (same as existing PAT flow)
     store::save_github_credentials(&app, &token, &username);
-
-    // Ensure the remote repo exists and link local repo
     let repo_url = github::ensure_remote_repo(&token, &username).await?;
     let root = Path::new(&folder_path);
-    if let Err(e) = git::ensure_repo(root) {
-        return Err(format!("Could not initialize local repo: {}", e));
-    }
+    git::ensure_repo(root).map_err(|e| format!("Git init failed: {}", e))?;
     let auth_url = repo_url.replace("https://", &format!("https://{}:{}@", username, token));
-    git::add_remote(root, &auth_url).map_err(|e| format!("Could not add remote: {}", e))?;
-
+    git::add_remote(root, &auth_url).map_err(|e| format!("Remote add failed: {}", e))?;
     Ok(username)
 }
 
@@ -401,69 +463,71 @@ struct WatcherState(Arc<Mutex<Option<notify::RecommendedWatcher>>>);
 
 #[tauri::command]
 async fn start_watch(app: tauri::AppHandle, folder_path: String, state: tauri::State<'_, WatcherState>) -> Result<(), String> {
-    #[cfg(mobile)]
-    {
-        println!("Skipping start_watch on mobile");
-        return Ok(());
-    }
-
     #[cfg(not(mobile))]
     {
         let mut watcher_guard = state.0.lock().map_err(|e| e.to_string())?;
-        
-        // Stop old watcher if exists
         if let Some(mut old_watcher) = watcher_guard.take() {
             old_watcher.unwatch(Path::new(&folder_path)).ok();
         }
 
         let app_handle = app.clone();
         let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-            match res {
-                Ok(event) => {
-                    let mut notify = false;
-                    for path in &event.paths {
-                        let path_str = path.to_string_lossy().to_lowercase();
-                        // Ignore build directories, git, and our own config files
-                        if path_str.contains(".git") || 
-                           path_str.contains("node_modules") || 
-                           path_str.contains("target") || 
-                           path_str.contains("dist") || 
-                           path_str.contains("src-tauri") ||
-                           path_str.contains(".notizapp-metadata") ||
-                           path_str.contains("notizapp-config") {
-                            continue;
-                        }
-                        notify = true;
-                        break;
+            if let Ok(event) = res {
+                let mut notify = false;
+                for path in event.paths {
+                    let path_str = path.to_string_lossy().to_lowercase();
+                    if path_str.contains(".git") || path_str.contains("node_modules") || path_str.contains("target") || 
+                       path_str.contains("dist") || path_str.contains("src-tauri") || path_str.contains("config.json") {
+                        continue;
                     }
-                    
-                    if notify {
-                        app_handle.emit("file-changed", ()).ok();
-                    }
-                },
-                Err(e) => println!("watch error: {:?}", e),
+                    notify = true;
+                    break;
+                }
+                if notify {
+                    app_handle.emit("file-changed", ()).ok();
+                }
             }
         }).map_err(|e| e.to_string())?;
 
         watcher.watch(Path::new(&folder_path), RecursiveMode::Recursive).map_err(|e| e.to_string())?;
-        
         *watcher_guard = Some(watcher);
-        Ok(())
     }
+    Ok(())
 }
 
 #[tauri::command]
 async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResultPayload, String> {
-    if let Some(creds) = store::get_github_credentials(&app) {
-        let root = Path::new(&folder_path);
+    let root = Path::new(&folder_path);
+    
+    // Ensure the folder exists
+    if !root.exists() {
+        fs::create_dir_all(root).map_err(|e| format!("Could not create folder: {}", e))?;
+    }
 
-        // Pull changes first
+    // Ensure repo exists
+    let repo = git::ensure_repo(root).map_err(|e| format!("Repo init failed: {}", e))?;
+
+    if let Some(creds) = store::get_github_credentials(&app) {
+        // Automatically add remote if missing
+        if repo.find_remote("origin").is_err() {
+            let repo_url = github::ensure_remote_repo(&creds.token, &creds.username).await
+                .map_err(|e| format!("Remote lookup failed: {}", e))?;
+            
+            let auth_url = repo_url.replace("https://", &format!("https://{}:{}@", creds.username, creds.token));
+            git::add_remote(root, &auth_url).map_err(|e| format!("Remote link failed: {}", e))?;
+        }
+
+        // CRITICAL: Commit local changes BEFORE pulling to prevent data loss.
+        // Without this, pull would overwrite uncommitted local edits.
+        let _ = git::commit_changes(root, "Auto-save");
+
         let pull_result = git::pull_changes(root, &creds.token, &creds.username)
             .map_err(|e| format!("Pull failed: {}", e))?;
+        
+        // Commit any merge results before pushing
+        let _ = git::commit_changes(root, "Merge remote changes");
 
-        // Push local changes (best effort — don't fail if push fails)
-        let push_succeeded = git::push_changes(root, &creds.token, &creds.username)
-            .unwrap_or(false);
+        let push_succeeded = git::push_changes(root, &creds.token, &creds.username).unwrap_or(false);
 
         let payload = SyncResultPayload {
             had_changes: pull_result.had_changes,
@@ -471,10 +535,7 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
             conflict_pairs: pull_result.conflict_pairs,
             push_succeeded,
         };
-
-        // Notify frontend of sync completion
         app.emit("sync-complete", &payload).ok();
-
         Ok(payload)
     } else {
         Err("Not connected to GitHub".into())
@@ -484,26 +545,21 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
 fn spawn_sync(app: tauri::AppHandle, folder_path: String) {
     tauri::async_runtime::spawn(async move {
         if let Some(creds) = store::get_github_credentials(&app) {
-            let root = std::path::PathBuf::from(&folder_path);
-            match git::push_changes(&root, &creds.token, &creds.username) {
-                Ok(_) => println!("Auto-push succeeded"),
-                Err(e) => println!("Auto-sync failed: {}", e),
-            }
+            let root = PathBuf::from(&folder_path);
+            let _ = git::push_changes(&root, &creds.token, &creds.username);
         }
     });
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Install default crypto provider for rustls (required for iOS)
     #[cfg(target_os = "ios")]
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::default()
             .level(log::LevelFilter::Info)
-            .build()
-        )
+            .build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -511,28 +567,16 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
-            list_notes,
-            list_folders,
-            save_note,
-            delete_note,
-            rename_note,
-            read_metadata,
-            save_metadata,
-            rename_folder,
-            create_folder,
-            delete_folder_recursive,
-            delete_folder_move_contents,
-            get_app_version,
-            get_document_dir,
-            connect_github,
-            start_github_oauth,
-            complete_github_oauth,
-            sync_now,
-            start_watch
+            list_notes, list_folders, save_note, delete_note, rename_note,
+            read_metadata, save_metadata, rename_folder, create_folder,
+            delete_folder_recursive, delete_folder_move_contents,
+            get_app_version, get_document_dir, connect_github,
+            start_github_oauth, complete_github_oauth, sync_now, start_watch,
+            clear_github_credentials
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {
-            log::info!("App is setting up...");
+            let _ = app.handle();
             Ok(())
         })
         .run(tauri::generate_context!())

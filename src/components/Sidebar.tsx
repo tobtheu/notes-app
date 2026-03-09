@@ -340,17 +340,6 @@ export function Sidebar({
                 </button>
             </div>
 
-            {/* --- SYNC STATUS --- */}
-            {!isCollapsed && (
-                <div className="px-3 pb-1">
-                    <SyncStatusBadge
-                        syncStatus={syncStatus}
-                        lastSyncedAt={lastSyncedAt}
-                        conflictFiles={conflictFiles}
-                        onSync={onSync}
-                    />
-                </div>
-            )}
 
             {/* --- ACTIONS HEADER --- */}
             <div className="px-2 pt-4 pb-2">
@@ -472,19 +461,30 @@ export function Sidebar({
                 </DndContext>
             </div>
 
-            {/* --- FOOTER / SETTINGS --- */}
-            <div className="p-2 border-t border-gray-100 dark:border-gray-800 flex flex-col items-center shrink-0">
+            {/* --- FOOTER / SETTINGS & SYNC --- */}
+            <div className="p-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between shrink-0 gap-1">
                 <button
                     onClick={onOpenSettings}
                     className={clsx(
                         "flex items-center text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors",
-                        isCollapsed ? "justify-center p-3" : "w-full px-3 py-2 gap-3 text-sm font-medium"
+                        isCollapsed ? "justify-center p-3" : "flex-1 px-3 py-2 gap-3 text-sm font-medium"
                     )}
                     title="Settings"
                 >
                     <Settings size={isCollapsed ? 20 : 18} />
                     {!isCollapsed && <span>Settings</span>}
                 </button>
+
+                {!isCollapsed && onSync && (
+                    <div className="shrink-0">
+                        <SyncStatusBadge
+                            syncStatus={syncStatus}
+                            lastSyncedAt={lastSyncedAt}
+                            conflictFiles={conflictFiles}
+                            onSync={onSync}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     );

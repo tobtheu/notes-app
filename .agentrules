@@ -1,0 +1,17 @@
+# Agent Rules & Coding Standards
+
+## 1. Communication & Language
+- **Chat Language**: Always reply in **German**.
+- **Code Comments**: Always write code comments in **English**.
+- **Comment Depth**: Provide **extensive and detailed** comments for all logic, especially complex hooks and state management.
+- **Naming Convention**: Use **self-explanatory, descriptive names** for variables, functions, and arguments. Avoid cryptic abbreviations (e.g., `userAuthenticationStatus` instead of `uAuth`).
+
+## 2. Cross-Platform Compatibility
+- **Testing**: Before finalizing any UI or system-level change, verify that it works across **Windows** and **macOS** and **Linux**.
+- **Mobile Readiness**: Ensure UI components are responsive and functional on smaller screens (Mobile view), considering Tauri's mobile capabilities.
+- **OS Specifics**: Be mindful of path separators and OS-specific window behaviors.
+
+## 3. Performance & Tiptap
+- **Rendering**: Maintain optimizations to prevent unnecessary re-renders in the Tiptap editor.
+- **State management**: Ensure that background processes (Sync/Polling) do not interrupt the user's typing experience or cursor position.
+- **Cleanup**: Always ensure proper cleanup of timeouts and event listeners in `useEffect` hooks.

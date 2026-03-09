@@ -27,3 +27,10 @@ pub fn save_github_credentials(app: &AppHandle, token: &str, username: &str) {
         let _ = store.save();
     }
 }
+
+pub fn clear_github_credentials(app: &AppHandle) {
+    if let Ok(store) = app.store("settings.json") {
+        let _ = store.delete("github-sync");
+        let _ = store.save();
+    }
+}

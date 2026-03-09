@@ -180,6 +180,7 @@ body {
   @apply outline-none flex-1;
   white-space: pre-wrap !important;
   position: relative !important;
+  min-height: 100%;
 }
 
 /* Tiptap Placeholder */
@@ -189,21 +190,27 @@ body {
 }
 
 /* Tiptap Task List Styles */
+.prose .tiptap ul[data-type="taskList"],
 .tiptap ul[data-type="taskList"] {
-  list-style: none;
-  padding: 0;
+  list-style: none !important;
+  padding: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 .tiptap ul[data-type="taskList"] li {
   display: flex;
   align-items: flex-start;
-  @apply gap-2 my-0;
+  @apply gap-2 my-0 !pl-0;
+  margin-left: 0 !important;
 }
 
 .tiptap ul[data-type="taskList"] li>label {
   flex: 0 0 auto;
   user-select: none;
-  @apply mt-1;
+  display: flex;
+  align-items: center;
+  margin-top: 5px;
 }
 
 .tiptap ul[data-type="taskList"] li>div {
@@ -212,6 +219,7 @@ body {
 
 .tiptap ul[data-type="taskList"] input[type="checkbox"] {
   @apply h-4 w-4 rounded border-gray-300 accent-primary-600 cursor-pointer;
+  margin: 0;
 }
 
 .tiptap ul[data-type="taskList"] li[data-checked="true"]>div {
@@ -220,15 +228,15 @@ body {
 
 /* Standard Tailwind Colors & General Styles */
 .prose h1 {
-  @apply !text-4xl !font-bold !mb-2 !mt-4 !text-gray-700;
+  @apply !text-2xl !font-bold !mb-2 !mt-4 !text-gray-700;
 }
 
 .prose h2 {
-  @apply !text-3xl !font-bold !mb-2 !mt-4 !text-gray-700;
+  @apply !text-xl !font-bold !mb-2 !mt-4 !text-gray-700;
 }
 
 .prose h3 {
-  @apply !text-2xl !font-bold !mb-1 !mt-3 !text-gray-700;
+  @apply !text-lg !font-bold !mb-1 !mt-3 !text-gray-700;
 }
 
 .prose h4,
@@ -247,11 +255,20 @@ body {
 }
 
 .prose li {
-  @apply !mb-0.5;
+  @apply !my-0 !py-0.5;
+}
+
+.prose ul,
+.prose ol {
+  @apply !my-0;
 }
 
 .prose li p {
   @apply !mb-0 !m-0;
+}
+
+.prose p {
+  @apply !text-sm !leading-relaxed;
 }
 
 .prose blockquote {

@@ -68,6 +68,7 @@ export interface TauriAPI {
         error?: string;
         version?: string;
     }) => void) => () => void;
+    clearGithubCredentials: () => Promise<void>;
     connectGithub: (token: string, folderPath: string) => Promise<{ success: boolean; username?: string; error?: string }>;
     syncNow: (folderPath: string) => Promise<{ hadChanges: boolean; hadConflicts: boolean; conflictPairs: ConflictPair[]; pushSucceeded: boolean }>;
     startGithubOAuth: () => Promise<{ deviceCode: string; userCode: string; verificationUri: string; interval: number; expiresIn: number }>;

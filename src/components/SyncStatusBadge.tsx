@@ -23,45 +23,39 @@ function formatRelativeTime(date: Date): string {
 export function SyncStatusBadge({ syncStatus, lastSyncedAt, conflictFiles = [], onSync }: SyncStatusBadgeProps) {
     const config = {
         idle: {
-            icon: <Cloud size={13} />,
+            icon: <Cloud size={18} />,
             label: 'Sync',
             color: 'text-gray-400 dark:text-gray-500',
-            dot: 'bg-gray-300 dark:bg-gray-600',
             clickable: true,
         },
         syncing: {
-            icon: <RefreshCw size={13} className="animate-spin" />,
+            icon: <RefreshCw size={18} className="animate-spin" />,
             label: 'Syncing…',
             color: 'text-blue-500 dark:text-blue-400',
-            dot: 'bg-blue-400',
             clickable: false,
         },
         synced: {
-            icon: <CheckCircle2 size={13} />,
+            icon: <CheckCircle2 size={18} />,
             label: lastSyncedAt ? formatRelativeTime(lastSyncedAt) : 'Synced',
             color: 'text-emerald-500 dark:text-emerald-400',
-            dot: 'bg-emerald-400',
             clickable: true,
         },
         offline: {
-            icon: <CloudOff size={13} />,
+            icon: <CloudOff size={18} />,
             label: 'Offline',
             color: 'text-gray-400 dark:text-gray-500',
-            dot: 'bg-gray-400',
             clickable: false,
         },
         error: {
-            icon: <XCircle size={13} />,
+            icon: <XCircle size={18} />,
             label: 'Sync failed',
             color: 'text-red-500 dark:text-red-400',
-            dot: 'bg-red-400',
             clickable: true,
         },
         conflict: {
-            icon: <AlertTriangle size={13} />,
+            icon: <AlertTriangle size={18} />,
             label: conflictFiles && conflictFiles.length > 0 ? `Konflikt in ${conflictFiles.length} Datei(en)` : 'Konflikt',
             color: 'text-orange-500 dark:text-orange-400',
-            dot: 'bg-orange-400',
             clickable: true,
         },
     }[syncStatus];
@@ -80,14 +74,13 @@ export function SyncStatusBadge({ syncStatus, lastSyncedAt, conflictFiles = [], 
                             : 'Sync with GitHub'
             }
             className={clsx(
-                'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all select-none',
+                'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors select-none',
                 config.color,
                 config.clickable && onSync
-                    ? 'hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer'
+                    ? 'hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer'
                     : 'cursor-default opacity-75'
             )}
         >
-            <span className={clsx('w-1.5 h-1.5 rounded-full flex-shrink-0', config.dot)} />
             {config.icon}
             <span>{config.label}</span>
         </button>

@@ -183,7 +183,8 @@ export const tauriAPI: TauriAPI = {
             await store.save();
             return true;
         } catch { return false; }
-    }
+    },
+    clearGithubCredentials: () => invoke<void>('clear_github_credentials')
 };
 
 // Attach to window globally

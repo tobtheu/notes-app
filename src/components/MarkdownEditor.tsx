@@ -306,14 +306,23 @@ const BubbleToolbarContent: React.FC<{
     useEffect(() => {
         if (!editor) return;
 
+        // Use requestAnimationFrame to batch transaction updates.
+        // Without this, BubbleMenu's internal plugin dispatches transactions
+        // during re-render, creating a synchronous infinite loop.
+        let rafId: number | null = null;
         const updateHandler = () => {
-            setUpdateCount(prev => prev + 1);
+            if (rafId !== null) return; // Already scheduled for this frame
+            rafId = requestAnimationFrame(() => {
+                rafId = null;
+                setUpdateCount(prev => prev + 1);
+            });
         };
 
         editor.on('transaction', updateHandler);
 
         return () => {
             editor.off('transaction', updateHandler);
+            if (rafId !== null) cancelAnimationFrame(rafId);
         };
     }, [editor]);
 
@@ -504,6 +513,7 @@ export const MarkdownEditor = ({
             StarterKit.configure({
                 heading: false,
                 codeBlock: false,
+                link: false, // Turn off Link in StarterKit to avoid duplication with the explicit Link extension
             }),
             CodeBlockLowlight.extend({
                 addNodeView() { return ReactNodeViewRenderer(CodeBlockComponent); },
@@ -517,7 +527,9 @@ export const MarkdownEditor = ({
                 },
             }),
 
-            Markdown,
+            Markdown.configure({
+                transformPastedText: true,
+            }),
             TaskList,
             TaskItem.configure({ nested: true }),
             Highlight.configure({ multicolor: true }),
@@ -877,18 +889,24 @@ export const MarkdownEditor = ({
 
             {/* Content area - isolated scroll area */}
             <div
-                className="flex-1 overflow-y-auto custom-scrollbar min-h-0"
+                className="flex-1 overflow-y-auto custom-scrollbar min-h-0 cursor-text"
                 onScroll={handleScroll}
+                onClick={(e) => {
+                    // Only focus if clicking the container directly (the empty space)
+                    if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('max-w-4xl')) {
+                        editor.chain().focus('end').run();
+                    }
+                }}
             >
-                <div className="max-w-4xl mx-auto py-8 px-8">
+                <div className="max-w-4xl mx-auto py-8 px-8 min-h-full flex flex-col">
                     {header}
-                    <EditorContent editor={editor} className="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl" />
+                    <EditorContent editor={editor} className="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl flex-1 flex flex-col" />
                 </div>
             </div>
 
             {/* Footer Toolbar - stays fixed at bottom of MarkdownEditor */}
             {toolbarVisible && (
-                <div className="shrink-0 pt-2 editor-toolbar-padding bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex justify-center w-full">
+                <div className="shrink-0 p-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex items-center justify-center w-full min-h-[57px]">
                     <EditorToolbar
                         editor={editor}
                         onLinkClick={() => openLinkModal()}

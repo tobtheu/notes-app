@@ -3,11 +3,17 @@ import type { Note } from '../types';
 import { MarkdownEditor } from './MarkdownEditor';
 import clsx from 'clsx';
 import { MoreVertical, FileDown, Eye, EyeOff, ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
+import { getPathId, normalizeStr } from '../utils/path';
+
+const extractTitle = (content: string) => {
+    const firstLine = content.split('\n')[0] || '';
+    return firstLine.replace(/^#\s*/, '').trim();
+};
 
 interface EditorProps {
     note: Note;
     allNotes?: Note[];
-    onSave: (filename: string, content: string, folder?: string) => void;
+    onSave: (id: string, filename: string, content: string, folder?: string, skipRename?: boolean) => Promise<string | void>;
     onUpdateLocally: (filename: string, content: string, folder?: string, updateTimestamp?: boolean) => void;
     onNavigate?: (id: string, anchor?: string) => void;
     markdownEnabled: boolean;
@@ -53,10 +59,13 @@ export function Editor({
 
     // tracks if the component is in its "initial loading" phase for a specific note
     const isMounting = useRef(true);
-    const lastNoteId = useRef(`${note.folder}/${note.filename}`);
+    const lastNoteId = useRef(getPathId(note.filename, note.folder || ""));
 
     // Tracks the last version committed to disk to avoid redundant saves
     const lastSavedContent = useRef(note.content);
+
+    // Tracks if we have unsaved/unflushed modifications (prevents parent overwriting our typing)
+    const isDirty = useRef(false);
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -66,26 +75,21 @@ export function Editor({
      * --- SIDE EFFECTS: STATE SYNC ---
      */
 
-    // Sync internal state when a DIFFERENT note is loaded OR when the backend updates the same note
+    // Sync internal state when a DIFFERENT note is loaded
     useEffect(() => {
-        const currentNoteId = `${note.folder}/${note.filename}`;
-        if (currentNoteId !== lastNoteId.current) {
-            // Note switched
-            setContent(note.content);
-            lastSavedContent.current = note.content;
-            lastNoteId.current = currentNoteId;
+        const currentNoteId = getPathId(note.filename, note.folder || "");
 
-            // Auto-focus the title field for new (empty) notes
-            const isNewNote = !note.content || note.content.trim() === '' || note.content.trim() === '#';
-            if (isNewNote) {
-                setTimeout(() => titleRef.current?.focus(), 50);
+        if (currentNoteId !== lastNoteId.current) {
+            // Because of the 'key' prop in App.tsx, a change here WITHOUT umounting
+            // means this is 100% a background auto-rename while we were typing.
+            // We just update our reference ID and keep our local typing state.
+            lastNoteId.current = currentNoteId;
+        } else {
+            // Parent updated the SAME note (e.g. from GitHub). Only accept if we aren't typing.
+            if (!isDirty.current && note.content !== lastSavedContent.current) {
+                setContent(note.content);
+                lastSavedContent.current = note.content;
             }
-        } else if (note.content !== lastSavedContent.current) {
-            // BACKEND/SYNC UPDATE: The file on disk changed independently of our typing (e.g. Git Pull).
-            // Only update if the incoming content is genuinely different from what we last saved.
-            // We do NOT include `content` in the dependency array to avoid infinite loops.
-            setContent(note.content);
-            lastSavedContent.current = note.content;
         }
     }, [note.folder, note.filename, note.content]);
 
@@ -93,6 +97,13 @@ export function Editor({
     // to prevent Tiptap's initial HTML normalization from triggering a save.
     useEffect(() => {
         isMounting.current = true;
+
+        // Auto-focus the title field for new (empty) notes
+        const isNewNote = !note.content || note.content.trim() === '' || note.content.trim() === '#';
+        if (isNewNote) {
+            setTimeout(() => titleRef.current?.focus(), 50);
+        }
+
         const timer = setTimeout(() => {
             isMounting.current = false;
         }, 1500);
@@ -144,37 +155,82 @@ export function Editor({
      * --- AUTO-SAVE LOGIC ---
      */
 
-    // 1. Optimistic UI Update: Syncs editor state to the global note list state immediately
+    // 1. Optimistic UI Update: Syncs editor state to the global note list state for elegant previews
     useEffect(() => {
         if (isMounting.current) return;
 
-        if (content !== note.content) {
-            const isSignificantChange = content.trim() !== note.content.trim();
-            if (isSignificantChange) {
-                // updateTimestamp: false avoids re-sorting the list while the user is still typing.
+        const isSignificantChange = content.trim() !== note.content.trim();
+        if (isSignificantChange) {
+            isDirty.current = true; // Protects local content from background auto-renames
+
+            // Debounce the UI preview update slightly to keep typing 100% fluid
+            const handler = setTimeout(() => {
                 onUpdateLocally(note.filename, content, note.folder, false);
-                // Mark this content as "known" so the sync guard doesn't treat
-                // the parent's reflected update as an external change.
-                lastSavedContent.current = content;
-            }
+            }, 300);
+            return () => clearTimeout(handler);
         }
     }, [content, note.filename, note.folder, onUpdateLocally, note.content]);
 
     // 2. Disk Persistence: Debounced save to the underlying .md file.
     useEffect(() => {
         // Configuration Point: Auto-save Debounce Delay (ms)
-        const handler = setTimeout(() => {
+        const handler = setTimeout(async () => {
             if (content !== lastSavedContent.current) {
-                const isSignificant = content.trim() !== lastSavedContent.current.trim();
-                if (isSignificant) {
-                    onSave(note.filename, content, note.folder);
-                }
+                // AUTO-SAVE: Always skip rename while typing to stay fluid
+                const newId = await onSave(lastNoteId.current, note.filename, content, note.folder, true);
+                if (newId && typeof newId === 'string') lastNoteId.current = newId;
                 lastSavedContent.current = content;
             }
         }, 1000);
 
         return () => clearTimeout(handler);
     }, [content, note.filename, note.folder, onSave]);
+
+    // 2.1 Inactivity Rename: Performs the physical rename if user is idle for 5s
+    useEffect(() => {
+        const handler = setTimeout(async () => {
+            if (content !== lastSavedContent.current || (contentRef.current && normalizeStr(extractTitle(contentRef.current) + '.md') !== normalizeStr(note.filename))) {
+                // Check if title actually differs from disk filename
+                const currentTitle = extractTitle(content);
+                const currentDiskBase = note.filename.replace('.md', '');
+
+                if (normalizeStr(currentTitle) !== normalizeStr(currentDiskBase) && currentTitle.length > 0) {
+                    const newId = await onSave(lastNoteId.current, note.filename, content, note.folder, false);
+                    if (newId && typeof newId === 'string') lastNoteId.current = newId;
+                }
+            }
+        }, 5000);
+
+        return () => clearTimeout(handler);
+    }, [content, note.filename, note.folder, onSave]);
+
+    // 3. Flush on Note Switch / Unmount
+    const contentRef = useRef(content);
+    useEffect(() => { contentRef.current = content; }, [content]);
+
+    useEffect(() => {
+        return () => {
+            // ONLY flush if we actually have unsaved changes.
+            // This prevents "zombie" duplicate creation during background refreshes.
+            if (isDirty.current) {
+                const currentTitle = extractTitle(contentRef.current);
+                const currentDiskBase = note.filename.replace('.md', '');
+                const titleChanged = normalizeStr(currentTitle) !== normalizeStr(currentDiskBase) && currentTitle.length > 0;
+                const contentDirty = contentRef.current !== lastSavedContent.current;
+
+                if (contentDirty || titleChanged) {
+                    // SESSION END: Perform physical rename now
+                    onSave(lastNoteId.current, note.filename, contentRef.current, note.folder, false);
+                }
+            }
+        };
+    }, [note.filename, note.folder, onSave]);
+
+
+
+
+
+
 
     /**
      * --- UI HELPERS ---
@@ -292,7 +348,7 @@ export function Editor({
                     header={
                         <textarea
                             ref={titleRef}
-                            className="w-full p-0 text-4xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700"
+                            className="w-full p-0 text-xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700"
                             placeholder="Note Title"
                             value={title}
                             onChange={(e) => handleTitleChange(e.target.value)}
@@ -306,7 +362,7 @@ export function Editor({
                 <div className="flex-1 flex flex-col p-8 max-w-4xl mx-auto w-full">
                     <textarea
                         ref={titleRef}
-                        className="w-full p-0 text-4xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700"
+                        className="w-full p-0 text-xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700"
                         placeholder="Note Title"
                         value={title}
                         onChange={(e) => handleTitleChange(e.target.value)}
@@ -315,7 +371,7 @@ export function Editor({
                     />
                     <textarea
                         ref={textareaRef}
-                        className="w-full p-0 text-lg bg-transparent border-none outline-none resize-none text-gray-800 dark:text-gray-300 leading-relaxed flex-1"
+                        className="w-full p-0 text-sm bg-transparent border-none outline-none resize-none text-gray-800 dark:text-gray-300 leading-relaxed flex-1"
                         placeholder="Start typing your note here..."
                         value={body}
                         onChange={(e) => handleBodyChange(e.target.value)}

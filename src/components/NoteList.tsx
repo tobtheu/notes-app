@@ -157,7 +157,11 @@ export function NoteList({
                                                 "font-bold truncate dark:text-gray-100",
                                                 isCompact ? "text-sm" : "text-base mb-1"
                                             )}>
-                                                {note.filename.replace('.md', '')}
+                                                {(() => {
+                                                    const firstLine = note.content.split('\n')[0] || '';
+                                                    const extractedTitle = firstLine.replace(/^#\s*/, '').trim();
+                                                    return extractedTitle || note.filename.replace('.md', '');
+                                                })()}
                                             </h3>
                                             <div className="flex items-center shrink-0">
                                                 {/* Pin Toggle */}

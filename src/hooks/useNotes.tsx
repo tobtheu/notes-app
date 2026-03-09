@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Note, AppMetadata, FolderMetadata } from '../types';
-
-const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
+import { normalizeStr, getPathId } from '../utils/path';
 
 /**
  * useNotes Hook
@@ -17,6 +16,8 @@ export function useNotes() {
      */
     const [baseFolder, setBaseFolder] = useState<string | null>(null); // The root directory of the notes
     const [notes, setNotes] = useState<Note[]>([]); // Current list of all notes found on disk
+    const notesRef = useRef<Note[]>([]);
+    useEffect(() => { notesRef.current = notes; }, [notes]);
     const [folders, setFolders] = useState<string[]>([]); // List of subdirectories (categories)
     const [metadata, setMetadata] = useState<AppMetadata>({ folders: {}, pinnedNotes: [] }); // UI settings (order, pins)
     const [isLoading, setIsLoading] = useState(false);
@@ -28,17 +29,17 @@ export function useNotes() {
     const [searchTerm, setSearchTerm] = useState('');
     const isRepairing = useRef(false); // Guard against recursive calls during metadata repair
     const lastSaveTime = useRef<number>(0);
+    const lastLoadTime = useRef<number>(0);
+    const savingNotes = useRef<Record<string, Promise<any> | undefined>>({}); // Serialize saves for same note ID
 
     /**
      * Unique Identifier Generation
      * Consistent IDs are critical for tracking notes across renames and moves.
      * Logic: Lowercased "folder/filename.md" normalized to NFC.
      */
-    const getNoteId = (note: Note) => {
-        const folder = note.folder ? note.folder.replace(/\\/g, '/') : '';
-        const path = folder ? `${folder}/${note.filename}` : note.filename;
-        return normalizeStr(path);
-    };
+    const getNoteId = useCallback((note: Note) => {
+        return getPathId(note.filename, note.folder || "");
+    }, []);
 
     /**
      * --- INITIALIZATION ---
@@ -66,12 +67,10 @@ export function useNotes() {
     const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
     const [conflictPairs, setConflictPairs] = useState<{ original: string; conflictCopy: string }[]>([]);
 
-    const loadNotes = useCallback(async () => {
+    const loadNotes = useCallback(async (showLoader: boolean = true) => {
         if (!baseFolder || isRepairing.current) return;
-        setIsLoading(true);
+        if (showLoader) setIsLoading(true);
         try {
-            console.log('Loading notes from:', baseFolder);
-
             const [loadedNotes, loadedFolders, meta] = await Promise.all([
                 window.tauriAPI.listNotes(baseFolder).catch(e => { console.error('listNotes failed:', e); return []; }),
                 window.tauriAPI.listFolders(baseFolder).catch(e => { console.error('listFolders failed:', e); return []; }),
@@ -142,7 +141,8 @@ export function useNotes() {
         } catch (error) {
             console.error("Failed to load notes or folders", error);
         } finally {
-            setIsLoading(false);
+            if (showLoader) setIsLoading(false);
+            lastLoadTime.current = Date.now();
         }
     }, [baseFolder]);
 
@@ -198,9 +198,8 @@ export function useNotes() {
         const intervalId = setInterval(() => {
             if (!navigator.onLine) return;
             const timeSinceLastSave = Date.now() - lastSaveTime.current;
-            // Only pull if user hasn't typed in the last 5 seconds to avoid interruptions
-            if (timeSinceLastSave > 5000 && !isSyncing) {
-                console.log("Auto-pulling from GitHub in the background...");
+            // Only pull if user hasn't typed in the last 30 seconds to avoid interruptions
+            if (timeSinceLastSave > 30000 && !isSyncing) {
                 triggerSync();
             }
         }, 60000); // 60 seconds
@@ -218,8 +217,7 @@ export function useNotes() {
         // Initial load
         loadNotes();
 
-        // Perform initial remote sync exactly once upon mounting the folder
-        window.tauriAPI.syncNow(baseFolder).catch(e => console.error("Initial Auto-sync failed:", e));
+        triggerSync();
 
         window.tauriAPI.startWatch(baseFolder);
 
@@ -227,21 +225,26 @@ export function useNotes() {
         let debounceTimer: any = null;
         const cleanup = window.tauriAPI.onFileChanged(() => {
             const now = Date.now();
-            if (now - lastSaveTime.current < 500) return; // Increased guard
+            if (now - lastSaveTime.current < 2000) return; // Increased guard to 2s
+            if (isSyncing) return; // Ignore changes while syncing to avoid loops
 
             if (debounceTimer) clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
-                loadNotes();
+                loadNotes(false);
                 debounceTimer = null;
-            }, 300); // Debounce to batch multiple rapid changes
+            }, 300);
         });
 
 
-        // Configuration Point: Polling Interval (ms)
         // Fallback for cases where OS events fail or cloud drives sync silently
         const pollInterval = setInterval(() => {
             const now = Date.now();
-            if (now - lastSaveTime.current > 5000) loadNotes();
+            // Fallback for cases where OS events fail
+            // Only poll if no recent save AND no recent load AND not currently syncing
+            // Increased guard to 30s for save and 45s for load to be more conservative during typing
+            if (now - lastSaveTime.current > 30000 && now - lastLoadTime.current > 45000 && !isSyncing) {
+                loadNotes(false);
+            }
         }, 30000);
 
         return () => {
@@ -266,13 +269,50 @@ export function useNotes() {
         }
     };
 
+    const setupDefaultWorkspace = async (updateState = true) => {
+        try {
+            const docDir = await window.tauriAPI.getDocumentDir();
+            const defaultPath = `${docDir}/NotizApp`.replace(/\\/g, '/');
+            await window.tauriAPI.createFolder(docDir, defaultPath);
+            if (updateState) {
+                setBaseFolder(defaultPath);
+                localStorage.setItem('notes-folder', defaultPath);
+            }
+            return defaultPath;
+        } catch (error) {
+            console.error('Hook: Error setting up default workspace', error);
+            throw error;
+        }
+    };
+
+    const startGitHubOnboarding = async () => {
+        return await window.tauriAPI.startGithubOAuth();
+    };
+
+    const completeGitHubOnboarding = async (deviceCode: string, interval: number, folderPath: string) => {
+        const username = await window.tauriAPI.completeGithubOAuth(deviceCode, interval, folderPath);
+
+        // After success, we MUST set the base folder and save it to localStorage
+        // so the app actually "lands" in the new workspace.
+        setBaseFolder(folderPath);
+        localStorage.setItem('notes-folder', folderPath);
+
+        setSyncStatus('idle');
+        triggerSync();
+        return username;
+    };
+
     /**
      * updateNoteLocally
      * Performs an "Optimistic Update" on the UI state without waiting for the disk write.
      * Crucial for smooth typing experiences.
      */
-    const updateNoteLocally = (filename: string, content: string, folder: string = "", updateTimestamp: boolean = false) => {
-        const id = folder ? `${folder}/${filename}`.toLowerCase() : filename.toLowerCase();
+    const updateNoteLocally = useCallback((filename: string, content: string, folder: string = "", updateTimestamp: boolean = false) => {
+        const id = getPathId(filename, folder);
+
+        // CRITICAL: Update lastSaveTime to block background sync/poll while typing
+        lastSaveTime.current = Date.now();
+
         setNotes(prev => prev.map((n: Note) =>
             getNoteId(n) === id
                 ? {
@@ -282,89 +322,161 @@ export function useNotes() {
                 }
                 : n
         ));
-    };
+    }, []);
 
     /**
      * saveNote
      * Handles: Content saving, Auto-renaming based on the first line (Title),
      * and ID synchronization (updating pins if renamed).
      */
-    const saveNote = async (filename: string, content: string, folder: string | null = null) => {
-        if (!baseFolder) return;
+    const saveNote = useCallback(async (currentId: string, filename: string, content: string, folder: string | null = null, skipRename: boolean = false) => {
+        if (!baseFolder) return currentId;
 
-        // PREEMPTIVE GUARD: Block the file watcher immediately before the async work starts
-        lastSaveTime.current = Date.now();
-
-        // Configuration Point: Filename Generation Logic
-        const lines = content.split('\n');
-        const firstLine = lines[0].replace(/^#\s*/, '').trim();
-        const safeTitle = firstLine.replace(/[^a-z0-9äöüß ]/gi, '').trim().substring(0, 50);
-
-        let targetFilename = filename;
-        if (safeTitle && safeTitle.length > 0) {
-            targetFilename = `${safeTitle}.md`;
+        // --- SERIALIZATION ---
+        // If there's an active save for this logical note, wait for it to finish
+        // to ensure we always have the latest on-disk state and valid ID.
+        if (savingNotes.current[currentId]) {
+            try { await savingNotes.current[currentId]; } catch (e) { /* ignore */ }
         }
 
-        const folderPath = folder ? `${baseFolder}/${folder}`.replace(/\/+/g, '/') : baseFolder;
-        const currentNote = selectedNoteId ? notes.find((n: Note) => getNoteId(n) === selectedNoteId) : null;
-        const isRenaming = currentNote && currentNote.filename !== targetFilename;
+        let resolveSave: (val: any) => void;
+        const currentSavePromise = new Promise(resolve => { resolveSave = resolve; });
+        savingNotes.current[currentId] = currentSavePromise;
 
-        if (isRenaming) {
-            // Check for collisions to avoid accidentally overwriting existing files
-            const collision = notes.find((n: Note) => n.filename === targetFilename && n.folder === (folder || ""));
-            if (collision && getNoteId(collision) !== selectedNoteId) {
-                targetFilename = currentNote!.filename;
-            } else {
-                const renameResult = await window.tauriAPI.renameNote({
-                    rootPath: baseFolder,
-                    oldFilename: currentNote!.filename,
-                    newFilename: targetFilename
-                });
+        try {
+            // PREEMPTIVE GUARD: Block the file watcher immediately before the async work starts
+            lastSaveTime.current = Date.now();
 
-                if (renameResult.success) {
-                    const oldPath = selectedNoteId!;
-                    const newPath = (folder ? `${folder}/${targetFilename}` : targetFilename).toLowerCase();
+            // Use the Ref instead of the state to avoid stale closure issues during rapid saves
+            const currentNotes = notesRef.current;
 
-                    // Migrate pins if the note was renamed
-                    if (metadata.pinnedNotes?.includes(oldPath)) {
-                        const newMeta = { ...metadata };
-                        newMeta.pinnedNotes = (newMeta.pinnedNotes || []).map((p: string) =>
-                            p.toLowerCase() === oldPath ? newPath : p.toLowerCase()
-                        );
-                        setMetadata(newMeta);
-                        await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
-                    }
+            // Configuration Point: Filename Generation Logic
+            const lines = content.split('\n');
+            const firstLine = lines[0].replace(/^#\s*/, '').trim();
+            const safeTitle = firstLine.replace(/[^a-z0-9äöüß ]/gi, '').trim().substring(0, 50);
 
-                    // Optimistic update to keep the Note object in memory
-                    setNotes(prev => prev.map((n: Note) =>
-                        getNoteId(n) === oldPath
-                            ? { ...n, filename: targetFilename, folder: folder || "" }
-                            : n
-                    ));
-                    setSelectedNoteId(newPath);
-                } else {
+            let targetFilename = filename;
+            if (safeTitle && safeTitle.length > 0) {
+                targetFilename = `${safeTitle}.md`;
+            }
+
+            const folderPath = folder ? `${baseFolder}/${folder}`.replace(/\/+/g, '/') : baseFolder;
+
+            // Use the passed-in ID to find the note, which is more reliable than the hook's state
+            let currentNote = currentNotes.find((n: Note) => getNoteId(n) === currentId);
+
+            // FALLBACK LOOKUP: If ID lookup failed (e.g. background state refresh), try identifying by filename/folder
+            if (!currentNote && currentId) {
+                currentNote = currentNotes.find((n: Note) =>
+                    normalizeStr(n.filename) === normalizeStr(filename) &&
+                    normalizeStr(n.folder) === normalizeStr(folder || "")
+                );
+            }
+
+            // CRITICAL: Zombie Protection
+            // If we have an ID but NO currentNote (even after fallback), it means the note is missing 
+            // from the current app state (maybe a sync is in progress). 
+            // ABORT to avoid creating a new duplicate file from a stale ID.
+            if (currentId && !currentNote) {
+                console.warn(`[saveNote] Aborting save: Note ID ${currentId} is not in current state. Prevents duplicate creation.`);
+                return currentId;
+            }
+
+            if (skipRename) {
+                if (currentNote) {
+                    await window.tauriAPI.saveNote({
+                        rootPath: baseFolder,
+                        folderPath,
+                        filename: currentNote.filename,
+                        content
+                    });
+                }
+                return currentId;
+            }
+
+            const isRenaming = currentNote && normalizeStr(currentNote.filename) !== normalizeStr(targetFilename);
+
+            let finalId = currentId;
+
+            if (isRenaming) {
+                // Check for collisions to avoid accidentally overwriting existing files
+                const collision = currentNotes.find((n: Note) => normalizeStr(n.filename) === normalizeStr(targetFilename) && normalizeStr(n.folder) === normalizeStr(folder || ""));
+
+                if (collision && getNoteId(collision) !== currentId) {
                     targetFilename = currentNote!.filename;
+                } else {
+                    const oldRelativePath = folder ? `${folder}/${currentNote!.filename}` : currentNote!.filename;
+                    const newRelativePath = folder ? `${folder}/${targetFilename}` : targetFilename;
+
+                    const renameResult = await window.tauriAPI.renameNote({
+                        rootPath: baseFolder,
+                        oldFilename: oldRelativePath,
+                        newFilename: newRelativePath
+                    });
+
+                    if (renameResult.success) {
+                        const oldPathId = currentId;
+                        const newPathId = getPathId(targetFilename, folder || "");
+
+                        // Migrate pins if the note was renamed
+                        if (metadata.pinnedNotes?.some(p => normalizeStr(p) === oldPathId)) {
+                            const newMeta = { ...metadata };
+                            newMeta.pinnedNotes = (newMeta.pinnedNotes || []).map((p: string) =>
+                                normalizeStr(p) === oldPathId ? newPathId : p
+                            );
+                            setMetadata(newMeta);
+                            await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
+                        }
+
+                        // Optimistic update to keep the Note object in memory
+                        setNotes(prev => {
+                            const updated = prev.map((n: Note) =>
+                                getNoteId(n) === oldPathId
+                                    ? { ...n, filename: targetFilename, folder: folder || "" }
+                                    : n
+                            );
+                            const uniqueMap = new Map<string, Note>();
+                            updated.forEach(n => uniqueMap.set(getNoteId(n), n));
+                            return Array.from(uniqueMap.values());
+                        });
+
+                        // IF the note we just renamed is still the one actually selected in the hook,
+                        // we update the hook's selection state.
+                        if (selectedNoteId === oldPathId) {
+                            setSelectedNoteId(newPathId);
+                        }
+                        finalId = newPathId;
+                    } else {
+                        targetFilename = currentNote!.filename;
+                    }
                 }
             }
-        }
 
-        const result = await window.tauriAPI.saveNote({
-            rootPath: baseFolder,
-            folderPath,
-            filename: targetFilename,
-            content
-        });
+            const result = await window.tauriAPI.saveNote({
+                rootPath: baseFolder,
+                folderPath,
+                filename: isRenaming ? targetFilename : (currentNote?.filename || filename),
+                content
+            });
 
-        if (result) {
-            await loadNotes();
+            if (result) {
+                // Already updated locally and optimistically, no need for full loadNotes flicker
+                // await loadNotes(false);
+                return finalId;
+            }
+            return currentId;
+        } finally {
+            // Unblock next save
+            delete savingNotes.current[currentId];
+            resolveSave!(null);
         }
-    };
+    }, [baseFolder, getNoteId, metadata.pinnedNotes, selectedNoteId]);
 
     /**
      * moveNote
      * Relocates a file between root and category folders.
      */
-    const moveNote = async (noteId: string, targetFolder: string | null) => {
+    const moveNote = useCallback(async (noteId: string, targetFolder: string | null) => {
         if (!baseFolder) return;
         const note = notes.find(n => getNoteId(n) === noteId);
         if (!note || note.folder === (targetFolder || "")) return;
@@ -394,13 +506,18 @@ export function useNotes() {
                 await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
             }
 
-            setNotes(prev => prev.map(n => getNoteId(n) === noteId ? { ...n, folder: targetFolder || "" } : n));
+            setNotes(prev => {
+                const updated = prev.map(n => getNoteId(n) === noteId ? { ...n, folder: targetFolder || "" } : n);
+                const uniqueMap = new Map<string, Note>();
+                updated.forEach(n => uniqueMap.set(getNoteId(n), n));
+                return Array.from(uniqueMap.values());
+            });
             if (selectedNoteId === noteId) setSelectedNoteId(newPath);
             await loadNotes();
         }
-    };
+    }, [baseFolder, getNoteId, loadNotes, metadata.pinnedNotes, notes, selectedNoteId]);
 
-    const createNote = async () => {
+    const createNote = useCallback(async () => {
         if (!baseFolder) return;
         lastSaveTime.current = Date.now();
         const folderRelative = selectedCategory || "";
@@ -416,9 +533,9 @@ export function useNotes() {
         await window.tauriAPI.saveNote({ rootPath: baseFolder, folderPath: folderAbsolute, filename, content: '# ' });
         await loadNotes();
         setSelectedNoteId(`${folderRelative ? folderRelative + '/' : ''}${filename}`.toLowerCase());
-    };
+    }, [baseFolder, loadNotes, notes, selectedCategory]);
 
-    const deleteNote = async (id: string) => {
+    const deleteNote = useCallback(async (id: string) => {
         if (!baseFolder) return;
         lastSaveTime.current = Date.now();
         const normalizedId = id.toLowerCase();
@@ -429,13 +546,13 @@ export function useNotes() {
         await window.tauriAPI.deleteNote({ rootPath: baseFolder, folderPath, filename: note.filename });
         if (selectedNoteId === normalizedId) setSelectedNoteId(null);
         await loadNotes();
-    };
+    }, [baseFolder, getNoteId, loadNotes, notes, selectedNoteId]);
 
     /**
      * --- CORE ACTIONS: FOLDERS ---
      */
 
-    const deleteFolder = async (folderRelative: string, mode: 'recursive' | 'move') => {
+    const deleteFolder = useCallback(async (folderRelative: string, mode: 'recursive' | 'move') => {
         if (!baseFolder) return;
         lastSaveTime.current = Date.now();
         const folderAbsolute = `${baseFolder}/${folderRelative}`;
@@ -460,9 +577,9 @@ export function useNotes() {
         await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
         if (selectedCategory === folderRelative) setSelectedCategory(null);
         await loadNotes();
-    };
+    }, [baseFolder, loadNotes, metadata, selectedCategory]);
 
-    const createFolder = async (folderName: string) => {
+    const createFolder = useCallback(async (folderName: string) => {
         if (!baseFolder) return;
         lastSaveTime.current = Date.now();
         await window.tauriAPI.createFolder(baseFolder, `${baseFolder}/${folderName}`);
@@ -476,9 +593,9 @@ export function useNotes() {
         lastSaveTime.current = Date.now();
         await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
         await loadNotes();
-    };
+    }, [baseFolder, folders, loadNotes, metadata]);
 
-    const reorderFolders = async (newOrder: string[]) => {
+    const reorderFolders = useCallback(async (newOrder: string[]) => {
         if (!baseFolder) return;
         const currentOrder = metadata.folderOrder || folders;
         const newOrderNormalized = newOrder.map(f => normalizeStr(f));
@@ -489,9 +606,9 @@ export function useNotes() {
         setFolders(newOrder); // Optimistic UI update
         lastSaveTime.current = Date.now();
         await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
-    };
+    }, [baseFolder, folders, metadata]);
 
-    const renameFolder = async (oldName: string, newName: string) => {
+    const renameFolder = useCallback(async (oldName: string, newName: string) => {
         if (!baseFolder) return;
         lastSaveTime.current = Date.now();
         const result = await window.tauriAPI.renameFolder({ rootPath: baseFolder, oldName, newName });
@@ -519,9 +636,9 @@ export function useNotes() {
             await loadNotes();
         }
         return result;
-    };
+    }, [baseFolder, loadNotes, metadata, selectedCategory]);
 
-    const togglePinNote = async (note: Note) => {
+    const togglePinNote = useCallback(async (note: Note) => {
         if (!baseFolder) return;
         const notePath = getNoteId(note);
         const newMeta = { ...metadata };
@@ -530,9 +647,9 @@ export function useNotes() {
         setMetadata(newMeta);
         lastSaveTime.current = Date.now();
         await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMeta });
-    };
+    }, [baseFolder, getNoteId, metadata]);
 
-    const updateFolderMetadata = async (folderName: string, meta: FolderMetadata) => {
+    const updateFolderMetadata = useCallback(async (folderName: string, meta: FolderMetadata) => {
         if (!baseFolder) return;
         const newMetadata = { ...metadata };
         const normalizedTarget = normalizeStr(folderName);
@@ -542,23 +659,35 @@ export function useNotes() {
         setMetadata(newMetadata);
         lastSaveTime.current = Date.now();
         await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMetadata });
-    };
+    }, [baseFolder, metadata]);
 
-    const saveSettings = async (settings: any) => {
+    const saveSettings = useCallback(async (settings: any) => {
         if (!baseFolder) return;
         const newMetadata = { ...metadata, settings: { ...metadata.settings, ...settings } };
         setMetadata(newMetadata);
         lastSaveTime.current = Date.now();
         await window.tauriAPI.saveMetadata({ rootPath: baseFolder, metadata: newMetadata });
-    };
+    }, [baseFolder, metadata]);
 
-    const isNotePinned = (note: Note) => (metadata.pinnedNotes?.includes(getNoteId(note)) || false);
+    const isNotePinned = useCallback((note: Note) => (metadata.pinnedNotes?.includes(getNoteId(note)) || false), [getNoteId, metadata.pinnedNotes]);
 
     /**
      * --- DERIVED STATE: FILTERING & SORTING ---
      */
 
-    const selectedNote = notes.find(n => getNoteId(n) === selectedNoteId) || null;
+    /**
+     * --- STICKY SELECTION ---
+     * Derived selectedNote object. 
+     * We keep the last valid note object in a ref so if the 'notes' array 
+     * is temporarily empty (polling/sync), the editor doesn't unmount.
+     */
+    const lastValidSelectedNote = useRef<Note | null>(null);
+    const selectedNote = notes.find(n => getNoteId(n) === selectedNoteId) || lastValidSelectedNote.current;
+
+    // Update the sticky ref whenever we find the selected note in the actual list
+    if (selectedNote && (!lastValidSelectedNote.current || getNoteId(selectedNote) !== getNoteId(lastValidSelectedNote.current) || selectedNote.content !== lastValidSelectedNote.current.content)) {
+        lastValidSelectedNote.current = selectedNote;
+    }
 
     const filteredNotes = notes
         .filter(note => {
@@ -583,14 +712,15 @@ export function useNotes() {
         });
 
     /**
-     * Auto-deselect: If the active note disappears from the filtered list (e.g. category switch),
-     * we clear the selection to avoid editing a hidden note.
+     * Auto-deselect: If the active note disappears from the ENTIRE disk (e.g. deleted elsewhere),
+     * we clear the selection. We check allNotes instead of filteredNotes to ensure
+     * that searching or temporary renaming transitions don't unmount the editor.
      */
-    useEffect(() => {
-        if (selectedNoteId && !filteredNotes.some(n => getNoteId(n) === selectedNoteId)) {
-            setSelectedNoteId(null);
-        }
-    }, [filteredNotes, selectedNoteId]);
+    /**
+     * Remove auto-deselect. We want the selection to be sticky
+     * so that background refreshes don't unmount the editor.
+     * deselecting should only happen explicitly via UI.
+     */
 
     return {
         currentFolder: baseFolder,
@@ -598,6 +728,7 @@ export function useNotes() {
         allNotes: notes,
         folders,
         metadata,
+        selectedNoteId,
         selectedNote,
         setSelectedNote: setSelectedNoteId,
         selectedCategory,
@@ -620,6 +751,10 @@ export function useNotes() {
         isNotePinned,
         reloadNotes: loadNotes,
         triggerSync,
+        startGitHubOnboarding,
+        completeGitHubOnboarding,
+        setupDefaultWorkspace,
+        clearGithubCredentials: window.tauriAPI.clearGithubCredentials,
         isSyncing,
         syncStatus,
         lastSyncedAt,
