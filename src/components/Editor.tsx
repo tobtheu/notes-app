@@ -294,8 +294,10 @@ export function Editor({
                 }
                 .note-body input[type="checkbox"] {
                     margin-right: 0.5rem;
-                    width: 1rem;
-                    height: 1rem;
+                    width: 0.9rem;
+                    height: 0.9rem;
+                    position: relative;
+                    top: -1px; /* Nudge it up slightly to align with text */
                     vertical-align: middle;
                     accent-color: #2563eb;
                 }
