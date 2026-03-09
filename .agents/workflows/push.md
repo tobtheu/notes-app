@@ -2,7 +2,8 @@
 description: Committe und pushe die aktuelle stabile Version
 ---
 
-Dieser Workflow hilft dabei, die aktuellen Änderungen sauber zu speichern und auf das Remote-Repository zu übertragen.
+// turbo-all
+Dieser Workflow hilft dabei, die aktuellen Änderungen sauber zu speichern und auf das Remote-Repository (tobtheu/notes-app) zu übertragen.
 
 1. **Status prüfen**
 ```bash
