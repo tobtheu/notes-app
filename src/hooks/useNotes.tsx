@@ -146,6 +146,11 @@ export function useNotes() {
         }
     }, [baseFolder]);
 
+    const resetSyncStatus = useCallback(() => {
+        setSyncStatus('idle');
+        setConflictPairs([]);
+    }, []);
+
     const triggerSync = useCallback(async () => {
         if (!baseFolder || !navigator.onLine) return;
         setIsSyncing(true);
@@ -759,6 +764,7 @@ export function useNotes() {
         syncStatus,
         lastSyncedAt,
         conflictPairs,
+        resetSyncStatus,
         getNoteId,
         isLoading
     };

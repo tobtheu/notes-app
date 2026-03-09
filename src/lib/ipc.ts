@@ -54,7 +54,53 @@ export const tauriAPI: TauriAPI = {
     readMetadata: (rootPath) => invoke<AppMetadata>('read_metadata', { rootPath }),
     saveMetadata: (data) => invoke<boolean>('save_metadata', data).then(() => true).catch(() => false),
 
-    exportPdf: (_html) => Promise.resolve(false), // Placeholder: PDF logic is usually handled via system print
+    exportPdf: async (htmlContent: string) => {
+        try {
+            // Standard web technique to print specific content: 
+            // 1. Create a hidden iframe
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
+
+            // 2. Write the content to the iframe
+            const doc = iframe.contentWindow?.document;
+            if (doc) {
+                doc.open();
+                doc.write(`
+                    <html>
+                        <head>
+                            <title>Note Export</title>
+                        </head>
+                        <body>${htmlContent}</body>
+                    </html>
+                `);
+                doc.close();
+
+                // 3. Trigger print and cleanup
+                // Wait for any potential layout/resource loading
+                setTimeout(() => {
+                    iframe.contentWindow?.focus();
+                    iframe.contentWindow?.print();
+
+                    // Cleanup after a delay (giving time for the print dialog to open)
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                    }, 1000);
+                }, 500);
+
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.error('PDF Export failed:', e);
+            return false;
+        }
+    },
 
     /**
      * Real-time Watching

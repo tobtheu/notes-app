@@ -6,6 +6,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { DeleteFolderModal } from './components/DeleteFolderModal';
 import { UpdateModal } from './components/UpdateModal';
 import { ConflictModal } from './components/ConflictModal';
+import { FolderEditModal } from './components/FolderEditModal';
 import { useNotes } from './hooks/useNotes';
 import { useSettings } from './hooks/useSettings';
 import { useTheme } from './hooks/useTheme';
@@ -30,7 +31,8 @@ function App() {
     deleteNote,
     createFolder,
     deleteFolder,
-    renameFolder: _renameFolder,
+    renameFolder,
+    updateFolderMetadata,
     reorderFolders,
     selectedNote,
     setSelectedNote,
@@ -43,13 +45,14 @@ function App() {
     searchTerm,
     setSearchTerm,
     triggerSync,
-    isSyncing,
     syncStatus,
     lastSyncedAt,
     conflictPairs,
+    resetSyncStatus,
     setupDefaultWorkspace,
     startGitHubOnboarding,
     completeGitHubOnboarding,
+    reloadNotes,
     clearGithubCredentials
   } = useNotes();
 
@@ -96,6 +99,7 @@ function App() {
   // Mobile View Management
   const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('notelist');
   const [selectionCount, setSelectionCount] = useState(0);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
 
   const { theme, setTheme } = useTheme();
 
@@ -152,6 +156,34 @@ function App() {
     setSelectionCount(prev => prev + 1);
     setSelectedNote(getNoteId(note));
     setActiveView('editor');
+  };
+
+  const handleCreateNote = async () => {
+    await createNote();
+    setSelectionCount(prev => prev + 1);
+    setActiveView('editor');
+  };
+
+  const handleNavigate = (id: string) => {
+    if (!id) return;
+    setSelectedNote(id);
+    setSelectionCount(prev => prev + 1);
+    setActiveView('editor');
+  };
+
+  const handleSaveCategory = async (newName: string, folderMeta: any) => {
+    if (!editingCategory) return;
+    const oldName = editingCategory;
+
+    // 1. Rename on disk if needed
+    if (newName !== oldName) {
+      await renameFolder(oldName, newName);
+    }
+
+    // 2. Update visual meta (icon, color)
+    await updateFolderMetadata(newName, folderMeta);
+
+    setEditingCategory(null);
   };
 
   const handleDeleteCategory = async () => {
@@ -311,10 +343,10 @@ function App() {
         metadata={metadata}
         selectedCategory={selectedCategory}
         isCollapsed={isSidebarCollapsed}
-        onCreateNote={createNote}
+        onCreateNote={handleCreateNote}
         onCreateFolder={createFolder}
         onDeleteCategory={setCategoryToDelete}
-        onEditCategory={() => { }}
+        onEditCategory={setEditingCategory}
         onSelectCategory={handleSelectCategory}
         onReorderFolders={reorderFolders}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -364,9 +396,7 @@ function App() {
           toolbarVisible={toolbarVisible}
           setToolbarVisible={setToolbarVisible}
           spellcheckEnabled={spellcheckEnabled}
-          onNavigate={(id, _anchor) => setSelectedNote(id)}
-          onSync={triggerSync}
-          isSyncing={isSyncing}
+          onNavigate={(id, _anchor) => handleNavigate(id)}
         />
       ) : (
         <div className={clsx(
@@ -403,6 +433,16 @@ function App() {
         />
       )}
 
+      {editingCategory && (
+        <FolderEditModal
+          isOpen={true}
+          onClose={() => setEditingCategory(null)}
+          folderName={editingCategory}
+          metadata={metadata.folders[editingCategory] || {}}
+          onSave={handleSaveCategory}
+        />
+      )}
+
       {categoryToDelete && (
         <DeleteFolderModal
           folderName={categoryToDelete}
@@ -428,7 +468,10 @@ function App() {
           conflictPairs={conflictPairs}
           baseFolder={currentFolder}
           onClose={() => setIsConflictModalOpen(false)}
-          onReload={() => triggerSync()}
+          onReload={() => {
+            resetSyncStatus();
+            reloadNotes(false);
+          }}
         />
       )}
 

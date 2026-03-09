@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// A pair describing a conflict: the local (winning) file and the created conflict copy.
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ConflictPair {
     pub original: String,       // Relative path of the local (winning) file
     pub conflict_copy: String,  // Relative path of the newly created conflict copy
@@ -11,6 +12,7 @@ pub struct ConflictPair {
 
 /// Result of a pull operation.
 #[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct PullResult {
     pub had_changes: bool,
     pub had_conflicts: bool,
@@ -35,6 +37,8 @@ pub fn commit_changes(repo_path: &Path, message: &str) -> Result<(), git2::Error
 
     // Add all changes, deletions, and untracked files
     index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None)?;
+    let count = index.len();
+    println!("[git.rs] Index size after add_all: {}", count);
     index.write()?;
 
     let oid = index.write_tree()?;
@@ -288,9 +292,9 @@ pub fn pull_changes(repo_path: &Path, token: &str, username: &str) -> Result<Pul
                     Some("HEAD"),
                     &signature,
                     &signature,
-                    "Conflict resolved: saved remote as conflict copies",
+                    "Conflict resolved: saved remote as conflict copies (merge)",
                     &tree,
-                    &[&current_head],
+                    &[&current_head, &fetch_commit_obj],
                 )?;
 
                 return Ok(PullResult {

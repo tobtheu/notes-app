@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
-use log::LevelFilter;
 use std::fs;
 use std::path::{Path, PathBuf};
-use chrono::{DateTime, Utc, Local};
+use chrono::{DateTime, Utc};
 use std::sync::{Arc, Mutex};
 use notify::{Watcher, RecursiveMode};
 use tauri::{Emitter, Manager};
@@ -106,7 +105,7 @@ fn parse_frontmatter(raw: &str, file_path: &Path) -> (String, String) {
             let frontmatter = &raw[after_open..close_index];
             
             // The content starts after "\n---" (4 chars) followed by optional newline
-            let mut content_start = close_index + 4;
+            let content_start = close_index + 4;
             
             // Extract content safely
             let content = if content_start < raw.len() {
@@ -189,6 +188,14 @@ async fn save_note(app: tauri::AppHandle, root_path: String, folder_path: String
     let final_content = inject_frontmatter(&content, &now);
     
     fs::write(&file_path, final_content).map_err(|e| e.to_string())?;
+    
+    if let Ok(_) = git::ensure_repo(root) {
+        let msg = format!("Update: {}", filename);
+        if let Ok(_) = git::commit_changes(root, &msg) {
+            spawn_sync(app, root_path);
+        }
+    }
+    
     Ok(())
 }
 
@@ -233,7 +240,13 @@ async fn delete_note(app: tauri::AppHandle, root_path: String, folder_path: Stri
     if let Ok(_) = git::ensure_repo(root) {
         let msg = format!("Delete: {}", filename);
         if let Ok(_) = git::commit_changes(root, &msg) {
-            spawn_sync(app, root_path);
+            println!("[lib.rs] Commited deletion: {}", filename);
+            if let Some(creds) = store::get_github_credentials(&app) {
+                match git::push_changes(root, &creds.token, &creds.username) {
+                    Ok(success) => println!("[lib.rs] Push deletion success: {}", success),
+                    Err(e) => println!("[lib.rs] Push deletion FAILED: {}", e),
+                }
+            }
         }
     }
 
@@ -250,7 +263,9 @@ async fn rename_note(app: tauri::AppHandle, root_path: String, old_filename: Str
     if let Ok(_) = git::ensure_repo(root) {
         let msg = format!("Rename: {} -> {}", old_filename, new_filename);
         if let Ok(_) = git::commit_changes(root, &msg) {
-            spawn_sync(app, root_path);
+            if let Some(creds) = store::get_github_credentials(&app) {
+                let _ = git::push_changes(root, &creds.token, &creds.username);
+            }
         }
     }
 
@@ -319,7 +334,9 @@ async fn rename_folder(app: tauri::AppHandle, root_path: String, old_name: Strin
     if let Ok(_) = git::ensure_repo(root) {
         let msg = format!("Rename folder: {} -> {}", old_name, new_name);
         if let Ok(_) = git::commit_changes(root, &msg) {
-            spawn_sync(app, root_path);
+            if let Some(creds) = store::get_github_credentials(&app) {
+                let _ = git::push_changes(root, &creds.token, &creds.username);
+            }
         }
     }
 
@@ -335,7 +352,9 @@ async fn create_folder(app: tauri::AppHandle, root_path: String, folder_path: St
         let folder_name = Path::new(&folder_path).file_name().unwrap_or_default().to_string_lossy();
         let msg = format!("Created folder: {}", folder_name);
         if let Ok(_) = git::commit_changes(root, &msg) {
-            spawn_sync(app, root_path);
+            if let Some(creds) = store::get_github_credentials(&app) {
+                let _ = git::push_changes(root, &creds.token, &creds.username);
+            }
         }
     }
 
@@ -351,7 +370,9 @@ async fn delete_folder_recursive(app: tauri::AppHandle, root_path: String, folde
         let folder_name = Path::new(&folder_path).file_name().unwrap_or_default().to_string_lossy();
         let msg = format!("Deleted folder (recursive): {}", folder_name);
         if let Ok(_) = git::commit_changes(root, &msg) {
-            spawn_sync(app, root_path);
+            if let Some(creds) = store::get_github_credentials(&app) {
+                let _ = git::push_changes(root, &creds.token, &creds.username);
+            }
         }
     }
 
@@ -385,7 +406,9 @@ async fn delete_folder_move_contents(app: tauri::AppHandle, folder_path: String,
         let folder_name = folder.file_name().unwrap_or_default().to_string_lossy();
         let msg = format!("Deleted folder (moved contents): {}", folder_name);
         if let Ok(_) = git::commit_changes(root, &msg) {
-            spawn_sync(app, root_path);
+            if let Some(creds) = store::get_github_credentials(&app) {
+                let _ = git::push_changes(root, &creds.token, &creds.username);
+            }
         }
     }
 
@@ -529,10 +552,22 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
 
         let push_succeeded = git::push_changes(root, &creds.token, &creds.username).unwrap_or(false);
 
+        let mut conflict_pairs = pull_result.conflict_pairs;
+        let mut had_conflicts = pull_result.had_conflicts;
+
+        // If no new conflicts, still check for "ongoing" conflicts on disk
+        if !had_conflicts {
+            let disk_conflicts = detect_ongoing_conflicts(root);
+            if !disk_conflicts.is_empty() {
+                conflict_pairs = disk_conflicts;
+                had_conflicts = true;
+            }
+        }
+
         let payload = SyncResultPayload {
             had_changes: pull_result.had_changes,
-            had_conflicts: pull_result.had_conflicts,
-            conflict_pairs: pull_result.conflict_pairs,
+            had_conflicts,
+            conflict_pairs,
             push_succeeded,
         };
         app.emit("sync-complete", &payload).ok();
@@ -540,6 +575,38 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
     } else {
         Err("Not connected to GitHub".into())
     }
+}
+
+/// Scans the directory for files containing " (Konflikt " and returns them as ConflictPairs.
+fn detect_ongoing_conflicts(root: &Path) -> Vec<git::ConflictPair> {
+    let mut pairs = Vec::new();
+    let files = get_files_recursively(root);
+    for file in files {
+        let filename = file.file_name().unwrap_or_default().to_string_lossy();
+        if filename.contains(" (Konflikt ") {
+            println!("[lib.rs] Detected ongoing conflict file: {}", filename);
+            // Reconstruct the potential original filename: "Note (Konflikt 2024-01-01).md" -> "Note.md"
+            if let Some(pos) = filename.find(" (Konflikt ") {
+                let stem = &filename[..pos];
+                let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("md");
+                let original_filename = format!("{}.{}", stem, ext);
+                
+                let relative_conflict = file.strip_prefix(root).ok()
+                    .map(|p| p.to_string_lossy().replace("\\", "/"))
+                    .unwrap_or_default();
+                    
+                let relative_original = file.parent().and_then(|p| p.strip_prefix(root).ok())
+                    .map(|p| p.join(&original_filename).to_string_lossy().replace("\\", "/"))
+                    .unwrap_or_else(|| original_filename.clone());
+
+                pairs.push(git::ConflictPair {
+                    original: relative_original,
+                    conflict_copy: relative_conflict,
+                });
+            }
+        }
+    }
+    pairs
 }
 
 fn spawn_sync(app: tauri::AppHandle, folder_path: String) {
