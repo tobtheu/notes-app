@@ -210,7 +210,9 @@ body {
   user-select: none;
   display: flex;
   align-items: center;
-  margin-top: 5px;
+  margin-top: 0;
+  padding-top: 3px;
+  /* Precise nudge to align with the text's cap height/x-height */
 }
 
 .tiptap ul[data-type="taskList"] li>div {
