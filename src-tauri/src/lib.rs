@@ -348,6 +348,12 @@ async fn create_folder(app: tauri::AppHandle, root_path: String, folder_path: St
     let root = Path::new(&root_path);
     fs::create_dir_all(&folder_path).map_err(|e| e.to_string())?;
     
+    // Create .gitkeep to ensure Git tracks the empty folder
+    let gitkeep_path = Path::new(&folder_path).join(".gitkeep");
+    if !gitkeep_path.exists() {
+        let _ = fs::write(gitkeep_path, "");
+    }
+
     if let Ok(_) = git::ensure_repo(root) {
         let folder_name = Path::new(&folder_path).file_name().unwrap_or_default().to_string_lossy();
         let msg = format!("Created folder: {}", folder_name);
@@ -547,6 +553,21 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
         let pull_result = git::pull_changes(root, &creds.token, &creds.username)
             .map_err(|e| format!("Pull failed: {}", e))?;
         
+        // 1. Recover physical folders from metadata that might be missing after a pull
+        // (This addresses the "missing empty folder" issue since Git doesn't track them without .gitkeep)
+        if let Ok(meta) = read_metadata(folder_path.clone()).await {
+            if let Some(folder_order) = meta.folder_order {
+                for folder_name in folder_order {
+                    let full_path = root.join(&folder_name);
+                    if !full_path.exists() {
+                        let _ = fs::create_dir_all(&full_path);
+                        let _ = fs::write(full_path.join(".gitkeep"), "");
+                        println!("[lib.rs] Recovered missing folder from metadata: {}", folder_name);
+                    }
+                }
+            }
+        }
+
         // Commit any merge results before pushing
         let _ = git::commit_changes(root, "Merge remote changes");
 
