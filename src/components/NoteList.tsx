@@ -90,13 +90,13 @@ const NoteListItem = memo(({
             <div
                 onClick={() => onSelectNote(note)}
                 className={clsx(
-                    "group relative p-3 rounded-xl cursor-pointer transition-[background-color,border-color,box-shadow] duration-200 mb-1 border-2",
+                    "group relative p-2.5 rounded-xl cursor-pointer transition-[background-color,border-color,box-shadow] duration-200 mb-0.5 border-2",
                     isSelected
                         ? "bg-primary-50/50 dark:bg-primary-900/20 border-primary-500 shadow-sm"
                         : "bg-transparent border-transparent hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-gray-100 dark:hover:border-gray-700"
                 )}
             >
-                <div className="flex flex-col min-w-0 gap-2 w-full">
+                <div className="flex flex-col min-w-0 gap-1.5 w-full">
                     <div className="flex items-start justify-between min-w-0 gap-2 w-full">
                         <h3 className={clsx(
                             "font-bold truncate dark:text-gray-100",
@@ -138,7 +138,7 @@ const NoteListItem = memo(({
                                 </span>
                             )}
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-0.5">
                             <div className="relative">
                                 <button
                                     onClick={(e) => {
@@ -268,7 +268,7 @@ export function NoteList({
 
             {/* --- HEADER: SEARCH & FILTER --- */}
             <div
-                className="p-4 space-y-3"
+                className="p-3 space-y-2"
             >
                 <div className="flex items-center gap-3">
                     {onBack && (
@@ -294,10 +294,10 @@ export function NoteList({
                 {/* CURRENT CONTEXT INFO */}
                 <div className="flex items-center justify-between px-1">
                     <div className="flex flex-col min-w-0">
-                        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 truncate">
+                        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 truncate">
                             {folders.includes(selectedCategory || '') ? selectedCategory : 'All Notes'}
                         </h2>
-                        <span className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                             {notes.length} {notes.length === 1 ? 'Note' : 'Notes'}
                         </span>
                     </div>

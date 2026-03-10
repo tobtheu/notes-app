@@ -11,6 +11,8 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
+import BulletList from '@tiptap/extension-bullet-list';
+import OrderedList from '@tiptap/extension-ordered-list';
 import Highlight from '@tiptap/extension-highlight';
 import Link from '@tiptap/extension-link';
 import Heading from '@tiptap/extension-heading';
@@ -166,20 +168,39 @@ const WikiLinkSuggestion = Extension.create({
                     const encodedId = id.split('/').map((s: string) => encodeURIComponent(s)).join('/');
                     const url = `note://${encodedId}${anchor ? `#${anchor}` : ''}`;
 
+                    // Calculate replacement range: covers trigger [[ + query + any auto-added ]]
+                    const { state } = editor;
+                    let from = range.from;
+                    let to = range.to;
+
+                    // The range usually covers the [[ and the query.
+                    // We also want to suck in any trailing ]] that we might have auto-inserted.
+                    if (state.doc.textBetween(range.to, range.to + 2) === ']]') {
+                        to = range.to + 2;
+                    } else if (state.doc.textBetween(range.to, range.to + 1) === ']') {
+                        to = range.to + 1;
+                    }
+
                     editor
                         .chain()
                         .focus()
-                        .deleteRange(range)
+                        .deleteRange({ from, to })
                         .setLink({ href: url })
                         .insertContent(`[[${label}]]`)
                         .run();
                 },
                 items: ({ query }: { query: string }) => {
-                    const allNotes = this.options.allNotesRef.current as Note[];
-                    return allNotes.filter(note =>
-                        note.filename.toLowerCase().includes(query.toLowerCase()) ||
-                        (note.folder && note.folder.toLowerCase().includes(query.toLowerCase()))
-                    ).slice(0, 10);
+                    const allNotes = this.options.allNotesRef.current || [];
+                    const cleanQuery = query.toLowerCase();
+                    const filtered = allNotes.filter((note: Note) =>
+                        note.filename.toLowerCase().includes(cleanQuery) ||
+                        (note.folder && note.folder.toLowerCase().includes(cleanQuery))
+                    );
+
+                    if (query === '') {
+                        return allNotes.slice(0, 10);
+                    }
+                    return filtered.slice(0, 10);
                 },
                 render: () => {
                     let component: any;
@@ -187,6 +208,16 @@ const WikiLinkSuggestion = Extension.create({
 
                     return {
                         onStart: props => {
+                            // Auto-insert closing brackets when suggest starts.
+                            // Since char is '[[' and we just finished typing it,
+                            // we can insert ]] and place selection between them.
+                            const { editor, range } = props;
+
+                            // Check if they are already there (e.g. if backspacing and re-triggering)
+                            if (editor.state.doc.textBetween(range.to, range.to + 2) !== ']]') {
+                                editor.chain().insertContent(']]').setTextSelection(range.to).run();
+                            }
+
                             component = new ReactRenderer(WikiLinkMenu, {
                                 props,
                                 editor: props.editor,
@@ -510,15 +541,36 @@ export const MarkdownEditor = ({
     // Dynamic values like 'allNotes' are passed via a ref which is internally used by the extension.
     const extensions = useMemo(() => {
         const rawExtensions = [
+            // 1. ABSOLUTE PRIORITY: Suggestions & Input Rules
+            WikiLinkSuggestion.configure({ allNotesRef }),
+            SlashCommands,
+
+            // 2. Core Block Parsing
+            TaskList.configure({
+                HTMLAttributes: { class: 'task-list' },
+            }),
+            TaskItem.configure({
+                nested: true,
+                HTMLAttributes: { class: 'task-item' },
+            }),
+
+            // 3. Formatting (Separated to ensure order)
             StarterKit.configure({
                 heading: false,
                 codeBlock: false,
-                link: false, // Turn off Link in StarterKit to avoid duplication with the explicit Link extension
+                link: false,
+                bulletList: false,
+                orderedList: false,
+            }),
+            BulletList.configure({
+                HTMLAttributes: { class: 'bullet-list' },
+            }),
+            OrderedList.configure({
+                HTMLAttributes: { class: 'ordered-list' },
             }),
             CodeBlockLowlight.extend({
                 addNodeView() { return ReactNodeViewRenderer(CodeBlockComponent); },
             }).configure({ lowlight }),
-
             Heading.extend({
                 renderHTML({ node, HTMLAttributes }) {
                     const text = node.textContent;
@@ -526,14 +578,11 @@ export const MarkdownEditor = ({
                     return [`h${node.attrs.level}`, mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { id }), 0];
                 },
             }),
-
             Markdown.configure({
                 transformPastedText: true,
+                linkify: true,
             }),
-            TaskList,
-            TaskItem.configure({ nested: true }),
             Highlight.configure({ multicolor: true }),
-
             Link.configure({
                 openOnClick: false,
                 autolink: true,
@@ -541,14 +590,10 @@ export const MarkdownEditor = ({
                     class: 'cursor-pointer text-primary-600 hover:text-primary-700 underline underline-offset-4',
                 },
             }),
-
             ImageWithCaption,
             Table.extend({ addNodeView() { return ReactNodeViewRenderer(TableNode); } }).configure({ resizable: true }),
             TableRow, TableHeader, TableCell,
-
-            Placeholder.configure({ placeholder: "Type '/' for commands..." }),
-            SlashCommands,
-            WikiLinkSuggestion.configure({ allNotesRef }),
+            Placeholder.configure({ placeholder: "Type '/' for commands or '[[' for links..." }),
         ];
 
         return rawExtensions;

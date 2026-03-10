@@ -317,16 +317,17 @@ export function SettingsModal({
                                     <button
                                         key={color}
                                         onClick={() => setAccentColor(color)}
+                                        data-accent={color}
                                         className={clsx(
                                             "w-8 h-8 rounded-full flex items-center justify-center transition-all ring-offset-2 dark:ring-offset-gray-800",
                                             accentColor === color ? "ring-2 ring-gray-400 dark:ring-gray-400 scale-110" : "hover:scale-110"
                                         )}
                                         style={{
-                                            backgroundColor: `var(--color-primary-500)`,
-                                            background: color === 'blue' ? '#3b82f6' :
+                                            backgroundColor: color === 'blue' ? '#3b82f6' :
                                                 color === 'purple' ? '#a855f7' :
                                                     color === 'green' ? '#22c55e' :
-                                                        '#f97316'
+                                                        color === 'red' ? '#ef4444' :
+                                                            '#f97316'
                                         }}
                                         title={color.charAt(0).toUpperCase() + color.slice(1)}
                                     >

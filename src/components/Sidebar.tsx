@@ -5,6 +5,7 @@ import {
     Plus, Settings, Trash2, PanelLeftClose, PanelLeftOpen, Pencil, GripVertical
 } from 'lucide-react';
 import clsx from 'clsx';
+import logo from '../assets/logo.png';
 import { SyncStatusBadge } from './SyncStatusBadge';
 import type { AppMetadata, ConflictPair } from '../types';
 import {
@@ -46,7 +47,7 @@ const COLOR_MAP: Record<string, any> = {
     amber: { bg: 'bg-amber-100', text: 'text-amber-600', darkBg: 'dark:bg-amber-900/30', darkText: 'dark:text-amber-400' },
     green: { bg: 'bg-emerald-100', text: 'text-emerald-600', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400' },
     cyan: { bg: 'bg-cyan-100', text: 'text-cyan-600', darkBg: 'dark:bg-cyan-900/30', darkText: 'dark:text-cyan-400' },
-    blue: { bg: 'bg-primary-100', text: 'text-primary-600', darkBg: 'dark:bg-primary-900/30', darkText: 'dark:text-primary-400' },
+    blue: { bg: 'bg-blue-100', text: 'text-blue-600', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400' },
     indigo: { bg: 'bg-indigo-100', text: 'text-indigo-600', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400' },
     purple: { bg: 'bg-purple-100', text: 'text-purple-600', darkBg: 'dark:bg-purple-900/30', darkText: 'dark:text-purple-400' },
     pink: { bg: 'bg-pink-100', text: 'text-pink-600', darkBg: 'dark:bg-pink-900/30', darkText: 'dark:text-pink-400' },
@@ -324,8 +325,8 @@ export function Sidebar({
             <div className={clsx("p-4 pb-2 flex items-center shrink-0", isCollapsed ? "justify-center" : "justify-between")}>
                 {!isCollapsed && (
                     <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
-                        <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center shadow-sm shrink-0">
-                            <span className="text-white font-bold text-xs">NA</span>
+                        <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                            <img src={logo} alt="Logo" className="w-7 h-7 object-contain" />
                         </div>
                         <span className="font-bold text-gray-800 dark:text-gray-100">NotizApp</span>
                     </div>

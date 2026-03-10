@@ -15,6 +15,7 @@ import { Loader2, Book } from 'lucide-react';
 import clsx from 'clsx';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import logo from './assets/logo.png';
 
 function App() {
   const {
@@ -109,6 +110,11 @@ function App() {
     document.documentElement.style.fontSize = px;
   }, [fontSize]);
 
+  // Apply accent color to document root for CSS variable overrides
+  useEffect(() => {
+    document.documentElement.setAttribute('data-accent', accentColor);
+  }, [accentColor]);
+
   useEffect(() => {
     const checkForUpdates = async () => {
       try {
@@ -178,12 +184,12 @@ function App() {
     // 1. Rename on disk if needed
     if (newName !== oldName) {
       await renameFolder(oldName, newName);
+      // Only update if the modal hasn't been closed (set to null) in the meantime
+      setEditingCategory(prev => prev === oldName ? newName : prev);
     }
 
     // 2. Update visual meta (icon, color)
     await updateFolderMetadata(newName, folderMeta);
-
-    setEditingCategory(null);
   };
 
   const handleDeleteCategory = async () => {
@@ -239,8 +245,8 @@ function App() {
   if (!currentFolder) {
     return (
       <div className="flex flex-col items-center justify-center fixed inset-0 bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 p-6 text-center">
-        <div className="w-20 h-20 bg-primary-600 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-primary-500/20 rotate-3 animate-in fade-in zoom-in duration-500">
-          <span className="text-4xl">📝</span>
+        <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-primary-500/10 rotate-3 animate-in fade-in zoom-in duration-500 overflow-hidden">
+          <img src={logo} alt="Logo" className="w-16 h-16 object-contain" />
         </div>
 
         {onboardingStep === 'choice' ? (
