@@ -321,7 +321,7 @@ export function Sidebar({
             )}
         >
             {/* --- SIDEBAR TOP SECTION --- */}
-            <div className={clsx("px-4 py-2 flex items-center shrink-0", isCollapsed ? "justify-center" : "justify-end")}>
+            <div className={clsx("h-14 px-3 flex items-center shrink-0", isCollapsed ? "justify-center" : "justify-end")}>
                 {/* Collapse Toggle - Hidden on small screens (layout is auto-managed there) */}
                 <button
                     onClick={onToggleCollapse}
