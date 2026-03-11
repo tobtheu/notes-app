@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Note } from '../types';
 import { MarkdownEditor } from './MarkdownEditor';
 import clsx from 'clsx';
-import { MoreVertical, FileDown, Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-react';
+import { MoreVertical, FileDown, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { getPathId, normalizeStr } from '../utils/path';
 
 const extractTitle = (content: string) => {
@@ -20,7 +20,7 @@ interface EditorProps {
     toolbarVisible: boolean;
     setToolbarVisible: (visible: boolean) => void;
     spellcheckEnabled: boolean;
-    onBack?: () => void;
+    workspacePath: string;
     className?: string;
 }
 
@@ -43,7 +43,7 @@ export function Editor({
     spellcheckEnabled,
     toolbarVisible,
     setToolbarVisible,
-    onBack,
+    workspacePath,
     className
 }: EditorProps) {
     /**
@@ -319,19 +319,10 @@ export function Editor({
     };
 
     return (
-        <div className={clsx("h-full overflow-hidden flex flex-col bg-white dark:bg-gray-900 border-l border-gray-100 dark:border-gray-800", className)}>
+        <div className={clsx("h-full overflow-hidden flex flex-col bg-white dark:bg-gray-900 md:border-l border-gray-100 dark:border-gray-800", className)}>
 
             {/* --- FLOATING HEADER ACTIONS --- */}
             <div className="fixed top-0 right-8 z-50 flex gap-2" ref={menuRef}>
-                {onBack && (
-                    <button
-                        onClick={onBack}
-                        className="md:hidden p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg transition shadow-sm border border-gray-200 dark:border-gray-700"
-                        title="Back to List"
-                    >
-                        <ArrowLeft size={18} />
-                    </button>
-                )}
 
                 {/* Visual Save Status Indicator */}
                 <div className="text-xs text-gray-300 self-center mr-2 italic">
@@ -395,6 +386,7 @@ export function Editor({
                 <MarkdownEditor
                     content={body}
                     allNotes={allNotes}
+                    workspacePath={workspacePath}
                     onChange={handleBodyChange}
                     onNavigate={onNavigate}
                     toolbarVisible={toolbarVisible}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
@@ -104,6 +104,27 @@ function App() {
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
 
   const { theme, setTheme } = useTheme();
+  const lastWidth = useRef(window.innerWidth);
+
+  // Responsive Behavior: Auto-collapse and Mobile View transitions
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      const prev = lastWidth.current;
+
+      // Auto-collapse/expand when crossing the desktop/tablet threshold (1024px)
+      if (width < 1024 && prev >= 1024) {
+        setIsSidebarCollapsed(true);
+      } else if (width >= 1024 && prev < 1024) {
+        setIsSidebarCollapsed(false);
+      }
+
+      lastWidth.current = width;
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isSidebarCollapsed]);
 
   // Apply font size to <html> so all rem-based Tailwind classes scale with it
   useEffect(() => {
@@ -340,7 +361,12 @@ function App() {
         fontFamily: fontFamily === 'inter' ? "'Inter', sans-serif" : fontFamily === 'roboto' ? "'Roboto', sans-serif" : "ui-sans-serif, system-ui, sans-serif",
       }}
     >
-      <TitleBar />
+      <TitleBar
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        activeView={activeView}
+        onBack={() => setActiveView('notelist')}
+      />
 
       <div className="flex-1 flex overflow-hidden">
         {/* SIDEBAR — always visible except in editor view on mobile */}
@@ -359,7 +385,6 @@ function App() {
           onEditCategory={setEditingCategory}
           onSelectCategory={handleSelectCategory}
           onReorderFolders={reorderFolders}
-          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           syncStatus={syncStatus}
           lastSyncedAt={lastSyncedAt}
@@ -370,7 +395,7 @@ function App() {
         {/* NOTELIST — visible when not in sidebar-only or editor view */}
         <NoteList
           className={clsx(
-            "md:flex md:w-80 shrink-0 border-r border-gray-100 dark:border-gray-800",
+            "flex-1 md:flex-none md:w-80 shrink-0",
             activeView === 'editor' ? "hidden md:flex" :
               activeView === 'sidebar' ? "hidden md:flex" : "flex"
           )}
@@ -386,7 +411,6 @@ function App() {
           onSearchChange={setSearchTerm}
           folders={folders}
           selectedCategory={selectedCategory}
-          onBack={() => setActiveView('sidebar')}
         />
 
         {/* EDITOR — takes full width on mobile, hides sidebar + notelist */}
@@ -399,9 +423,9 @@ function App() {
             )}
             note={selectedNote}
             allNotes={allNotes}
+            workspacePath={currentFolder || ''}
             onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
             onUpdateLocally={updateNoteLocally}
-            onBack={() => setActiveView('notelist')}
             markdownEnabled={markdownEnabled}
             toolbarVisible={toolbarVisible}
             setToolbarVisible={setToolbarVisible}
@@ -491,8 +515,6 @@ function App() {
           <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
         </div>
       )}
-
-
     </div>
   );
 }

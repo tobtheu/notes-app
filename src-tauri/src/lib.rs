@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use std::sync::{Arc, Mutex};
 use notify::{Watcher, RecursiveMode};
 use tauri::{Emitter, Manager};
+use base64::{engine::general_purpose, Engine as _};
 
 mod git;
 mod github;
@@ -639,6 +640,56 @@ fn spawn_sync(app: tauri::AppHandle, folder_path: String) {
     });
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveAssetResponse {
+    pub success: bool,
+    pub path: Option<String>,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+async fn save_asset(app: tauri::AppHandle, root_path: String, filename: String, content_base64: String) -> Result<SaveAssetResponse, String> {
+    let root = Path::new(&root_path);
+    let assets_dir = root.join("assets");
+    
+    if !assets_dir.exists() {
+        fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
+    }
+    
+    // Create .gitkeep to ensure Git tracks the folder
+    let gitkeep_path = assets_dir.join(".gitkeep");
+    if !gitkeep_path.exists() {
+        let _ = fs::write(&gitkeep_path, "");
+    }
+    
+    // Decode base64 
+    // Handle potential data URI prefix e.g., "data:image/png;base64,iVBORw0K..."
+    let b64_data = if let Some(idx) = content_base64.find("base64,") {
+        &content_base64[idx + 7..]
+    } else {
+        &content_base64
+    };
+    
+    let decoded = general_purpose::STANDARD.decode(b64_data).map_err(|e| format!("Base64 Error: {}", e))?;
+    let file_path = assets_dir.join(&filename);
+    
+    fs::write(&file_path, decoded).map_err(|e| e.to_string())?;
+    
+    if let Ok(_) = git::ensure_repo(root) {
+        let msg = format!("Added asset: {}", filename);
+        if let Ok(_) = git::commit_changes(root, &msg) {
+            spawn_sync(app, root_path);
+        }
+    }
+    
+    Ok(SaveAssetResponse {
+        success: true,
+        path: Some(format!("assets/{}", filename).replace("\\", "/")),
+        error: None,
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(target_os = "ios")]
@@ -661,7 +712,7 @@ pub fn run() {
             delete_folder_recursive, delete_folder_move_contents,
             get_app_version, get_document_dir, connect_github,
             start_github_oauth, complete_github_oauth, sync_now, start_watch,
-            clear_github_credentials
+            clear_github_credentials, save_asset
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {

@@ -22,6 +22,7 @@ import 'highlight.js/styles/github-dark.css';
 
 // Image import removed as it is replaced by ImageWithCaption
 import { ImageWithCaption } from '../extensions/ImageWithCaption';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import Suggestion from '@tiptap/suggestion';
 import tippy, { type Instance } from 'tippy.js';
 import { EditorToolbar } from './EditorToolbar';
@@ -48,6 +49,7 @@ interface MarkdownEditorProps {
     onNavigate?: (id: string, anchor?: string) => void;
     toolbarVisible?: boolean;
     spellcheckEnabled?: boolean;
+    workspacePath: string;
     header?: React.ReactNode;
 }
 
@@ -510,6 +512,7 @@ export const MarkdownEditor = ({
     onNavigate,
     toolbarVisible = true,
     spellcheckEnabled = true,
+    workspacePath,
     header
 }: MarkdownEditorProps) => {
     /**
@@ -529,13 +532,15 @@ export const MarkdownEditor = ({
 
     const hideTimeoutRef = useRef<any>(null);
     const scrollTimeoutRef = useRef<any>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     /**
      * --- EDITOR CONFIGURATION ---
      */
     const allNotesRef = useRef<Note[]>([]);
+    const workspacePathRef = useRef<string>(workspacePath);
+
     useEffect(() => { allNotesRef.current = allNotes || []; }, [allNotes]);
+    useEffect(() => { workspacePathRef.current = workspacePath; }, [workspacePath]);
 
     // We memoize extensions with a completely empty dependency array to prevent editor re-creation.
     // Dynamic values like 'allNotes' are passed via a ref which is internally used by the extension.
@@ -590,7 +595,7 @@ export const MarkdownEditor = ({
                     class: 'cursor-pointer text-primary-600 hover:text-primary-700 underline underline-offset-4',
                 },
             }),
-            ImageWithCaption,
+            ImageWithCaption.configure({ workspacePathRef }),
             Table.extend({ addNodeView() { return ReactNodeViewRenderer(TableNode); } }).configure({ resizable: true }),
             TableRow, TableHeader, TableCell,
             Placeholder.configure({ placeholder: "Type '/' for commands or '[[' for links..." }),
@@ -643,26 +648,26 @@ export const MarkdownEditor = ({
                         }
                     }
                     return false;
-                }
-            },
-            handleDrop: (view, event, _slice, moved) => {
-                setIsDragging(false);
-                if (!moved && event.dataTransfer?.files.length) {
-                    const file = event.dataTransfer.files[0];
-                    if (file.type.startsWith('image/')) {
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            const coords = view.posAtCoords({ left: event.clientX, top: event.clientY });
-                            if (coords && e.target?.result) {
-                                view.dispatch(view.state.tr.insert(coords.pos, view.state.schema.nodes.image.create({ src: e.target.result })));
-                            }
-                        };
-                        reader.readAsDataURL(file);
-                        return true;
+                },
+                dragenter: () => {
+                    setIsDragging(true);
+                    return false;
+                },
+                dragover: (_view, event) => {
+                    setIsDragging(true);
+                    // Required to allow drop
+                    event.preventDefault();
+                    return false;
+                },
+                dragleave: (_view, event) => {
+                    // Only hide if we are truly leaving the editor area
+                    if (!(_view.dom as HTMLElement).contains(event.relatedTarget as Node)) {
+                        setIsDragging(false);
                     }
+                    return false;
                 }
-                return false;
             },
+            // handleDrop removed to allow the wrapper div's onDrop to handle the event consistently in Webview2
         },
         onUpdate: ({ editor }) => {
             const markdown = (editor.storage as any).markdown.getMarkdown();
@@ -783,32 +788,27 @@ export const MarkdownEditor = ({
         setIsLinkModalOpen(false);
     };
 
-    const saveImage = (src: string, caption?: string) => {
+    const saveImage = async (src: string, _text?: string, caption?: string) => {
         if (!editor) return;
 
         if (src) {
-            if (editor.isActive('image')) {
-                editor.chain().focus().updateAttributes('image', { src, alt: caption }).run();
+            if (src.startsWith('data:image/')) {
+                const extMatch = src.match(/data:image\/([a-zA-Z0-9]+);base64,/);
+                const extension = extMatch ? extMatch[1] : 'png';
+                const filename = `img-${Date.now()}.${extension}`;
+                try {
+                    const res = await window.tauriAPI.saveAsset(workspacePath, filename, src);
+                    if (res.success && res.path) {
+                        editor.chain().focus().setImage({ src: res.path, alt: caption }).run();
+                    }
+                } catch (e) {
+                    console.error("Failed to save image asset", e);
+                }
             } else {
-                (editor.chain().focus() as any).setImage({ src, alt: caption }).run();
+                editor.chain().focus().setImage({ src, alt: caption }).run();
             }
         }
         setIsImageModalOpen(false);
-    };
-
-    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file && editor) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                if (event.target?.result) {
-                    (editor.chain().focus() as any).setImage({ src: event.target.result as string }).run();
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-        // Reset input value so same file can be selected again
-        if (e.target) e.target.value = '';
     };
 
     if (!editor) {
@@ -833,7 +833,7 @@ export const MarkdownEditor = ({
                 onSave={saveLink}
             />
 
-            {/* Image Modal (reusing UrlInputModal for now, but type is 'image') */}
+            {/* Image Modal */}
             <UrlInputModal
                 isOpen={isImageModalOpen}
                 type="image"
@@ -841,7 +841,7 @@ export const MarkdownEditor = ({
                 initialCaption={imageModalData.caption}
                 onClose={() => setIsImageModalOpen(false)}
                 onSave={saveImage}
-                onBrowseFiles={() => fileInputRef.current?.click()}
+                workspacePath={workspacePath}
             />
 
             {/* Merged Formatting & Link Menu */}
@@ -864,7 +864,15 @@ export const MarkdownEditor = ({
                         }}
                         onImagePreview={() => {
                             const attrs = editor.getAttributes('image');
-                            setLightboxImage({ src: attrs.src, caption: attrs.alt });
+                            let previewSrc = attrs.src;
+                            if (previewSrc && previewSrc.startsWith('assets/')) {
+                                try {
+                                    previewSrc = convertFileSrc(`${workspacePath}/${previewSrc}`);
+                                } catch (e) {
+                                    console.warn("Could not convert image src to asset URL:", e);
+                                }
+                            }
+                            setLightboxImage({ src: previewSrc, caption: attrs.alt });
                         }}
                         onNavigate={onNavigate}
                     />
@@ -923,19 +931,62 @@ export const MarkdownEditor = ({
                 </div>
             )}
 
-            {/* Hidden File Input */}
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={onFileChange}
-                className="hidden"
-            />
 
             {/* Content area - isolated scroll area */}
             <div
-                className="flex-1 overflow-y-auto custom-scrollbar min-h-0 cursor-text"
+                className="flex-1 overflow-y-auto custom-scrollbar min-h-0 cursor-text group/editor"
                 onScroll={handleScroll}
+                onDragEnter={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                }}
+                onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                    // Only hide if we are truly leaving this container
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    if (
+                        e.clientX <= rect.left ||
+                        e.clientX >= rect.right ||
+                        e.clientY <= rect.top ||
+                        e.clientY >= rect.bottom
+                    ) {
+                        setIsDragging(false);
+                    }
+                }}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDragging(false);
+                    if (e.dataTransfer?.files?.length) {
+                        const file = e.dataTransfer.files[0];
+                        if (file.type.startsWith('image/')) {
+                            const reader = new FileReader();
+                            reader.onload = async (re) => {
+                                if (re.target?.result && editor) {
+                                    // Make sure it inserts at the latest cursor or at least visually
+                                    const base64 = re.target.result as string;
+                                    const extension = file.name.split('.').pop() || 'png';
+                                    const filename = `img-${Date.now()}.${extension}`;
+
+                                    try {
+                                        const res = await window.tauriAPI.saveAsset(workspacePath, filename, base64);
+                                        if (res.success && res.path) {
+                                            editor.chain().focus().setImage({ src: res.path }).run();
+                                        } else {
+                                            console.error("Failed to save asset:", res.error);
+                                        }
+                                    } catch (err) {
+                                        console.error("Save asset error:", err);
+                                    }
+                                }
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    }
+                }}
                 onClick={(e) => {
                     // Only focus if clicking the container directly (the empty space)
                     if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('max-w-4xl')) {

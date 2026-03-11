@@ -1,6 +1,6 @@
 import { useState, memo, useMemo } from 'react';
 import {
-    Search, List, LayoutList, Trash2, Pin, FolderTree, ArrowLeft
+    Search, List, LayoutList, Trash2, Pin, FolderTree
 } from 'lucide-react';
 import clsx from 'clsx';
 import type { Note } from '../types';
@@ -20,7 +20,6 @@ interface NoteListProps {
     isNotePinned: (note: Note) => boolean;
     getNoteId: (note: Note) => string;
     selectedCategory: string | null;
-    onBack?: () => void;
 }
 const stripMarkdown = (text: string) => {
     if (!text) return '';
@@ -242,7 +241,6 @@ export function NoteList({
     isNotePinned,
     getNoteId,
     selectedCategory,
-    onBack,
 }: NoteListProps) {
     /**
      * --- LOCAL STATE ---
@@ -264,21 +262,18 @@ export function NoteList({
     };
 
     return (
-        <div className={clsx("flex flex-col h-full bg-white dark:bg-gray-900", className)}>
+        <div className={clsx(
+            "flex flex-col h-full bg-white dark:bg-gray-900 md:border-r border-gray-100 dark:border-gray-800",
+            // Add significant padding on mobile so it doesn't touch the screen edge
+            "pr-6 md:pr-0",
+            className
+        )}>
 
             {/* --- HEADER: SEARCH & FILTER --- */}
             <div
                 className="p-3 space-y-2"
             >
                 <div className="flex items-center gap-3">
-                    {onBack && (
-                        <button
-                            onClick={onBack}
-                            className="md:hidden p-2 -ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                        >
-                            <ArrowLeft size={20} />
-                        </button>
-                    )}
                     <div className="relative group flex-1">
                         <Search className="absolute left-3 top-2.5 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={18} />
                         <input

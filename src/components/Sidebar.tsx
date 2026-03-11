@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import {
     Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
     Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart,
-    Plus, Settings, Trash2, PanelLeftClose, PanelLeftOpen, Pencil, GripVertical
+    Plus, Settings, Trash2, Pencil, GripVertical
 } from 'lucide-react';
 import clsx from 'clsx';
 import { SyncStatusBadge } from './SyncStatusBadge';
@@ -65,7 +65,6 @@ interface SidebarProps {
     onEditCategory: (name: string) => void;
     onSelectCategory: (name: string | null) => void;
     onReorderFolders?: (newOrder: string[]) => void;
-    onToggleCollapse: () => void;
     onOpenSettings?: () => void;
     syncStatus?: 'idle' | 'syncing' | 'synced' | 'offline' | 'error' | 'conflict';
     lastSyncedAt?: Date | null;
@@ -256,7 +255,6 @@ export function Sidebar({
     onEditCategory,
     onSelectCategory,
     onReorderFolders = undefined,
-    onToggleCollapse,
     onOpenSettings,
     syncStatus = 'idle',
     lastSyncedAt = null,
@@ -320,17 +318,7 @@ export function Sidebar({
                 className
             )}
         >
-            {/* --- SIDEBAR TOP SECTION --- */}
-            <div className={clsx("h-14 px-3 flex items-center shrink-0", isCollapsed ? "justify-center" : "justify-end")}>
-                {/* Collapse Toggle - Hidden on small screens (layout is auto-managed there) */}
-                <button
-                    onClick={onToggleCollapse}
-                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                    title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-                >
-                    {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-                </button>
-            </div>
+            {/* --- SIDEBAR TOP SECTION REMOVED (Moved to TitleBar) --- */}
 
 
             {/* --- ACTIONS HEADER --- */}

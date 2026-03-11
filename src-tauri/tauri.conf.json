@@ -19,10 +19,17 @@
         "width": 1200,
         "height": 800,
         "decorations": true,
-        "transparent": true
+        "transparent": true,
+        "dragDropEnabled": false
       }
     ],
     "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "**"
+        ]
+      },
       "csp": null
     }
   },

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { X, Upload, Search, FileText, ChevronRight, Hash, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import type { Note } from '../types';
 import clsx from 'clsx';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 interface UrlInputModalProps {
     isOpen: boolean;
@@ -12,19 +13,14 @@ interface UrlInputModalProps {
     allNotes?: Note[];
     onClose: () => void;
     onSave: (url: string, text?: string, caption?: string) => void;
-    onBrowseFiles?: () => void;
+    workspacePath?: string;
 }
 
 /**
  * UrlInputModal
  * A versatile modal used for inserting both hyperlink and image references.
- * Features:
- * - External URL input
- * - Internal note linking with anchor (headline) support
- * - Searchable list of all notes
- * - File browser integration for local images
  */
-export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, initialUrl, initialText, initialCaption, allNotes = [], onClose, onSave, onBrowseFiles }) => {
+export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, initialUrl, initialText, initialCaption, allNotes = [], onClose, onSave, workspacePath }) => {
     /**
      * --- STATE MANAGEMENT ---
      */
@@ -36,6 +32,20 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     const [selectedHeadline, setSelectedHeadline] = useState<string>('');
     const inputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [localFileName, setLocalFileName] = useState<string | null>(null);
+
+    const previewUrl = useMemo(() => {
+        if (url && url.startsWith('assets/') && workspacePath) {
+            try {
+                return convertFileSrc(`${workspacePath}/${url}`);
+            } catch (e) {
+                console.warn("Could not convert asset URL for preview:", e);
+                return url;
+            }
+        }
+        return url;
+    }, [url, workspacePath]);
 
     // Synchronize local state with props when modal opens
     useEffect(() => {
@@ -43,6 +53,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
             setUrl(initialUrl || '');
             setText(initialText || '');
             setCaption(initialCaption || '');
+            setLocalFileName(null);
 
             // Auto-focus logic for better UX
             if (type !== 'image') {
@@ -53,7 +64,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
         }
     }, [isOpen, initialUrl, initialText, initialCaption, type]);
 
-    // Detective logic: check if the initial URL is an internal note link
+    // Detective logic for internal links
     useEffect(() => {
         if (isOpen && initialUrl?.startsWith('note://')) {
             setLinkType('internal');
@@ -74,9 +85,6 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
         }
     }, [isOpen, initialUrl, allNotes]);
 
-    /**
-     * --- COMPUTED DATA ---
-     */
     const filteredNotes = useMemo(() => {
         if (!searchNoteTerm) return allNotes;
         return allNotes.filter(n =>
@@ -85,7 +93,6 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
         );
     }, [allNotes, searchNoteTerm]);
 
-    // Extracts all Markdown headings from the selected note for anchor linking
     const headlines = useMemo(() => {
         if (!selectedNote) return [];
         const matches = selectedNote.content.matchAll(/^#+\s+(.+)$/gm);
@@ -94,74 +101,90 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
 
     if (!isOpen) return null;
 
-    /**
-     * --- EVENT HANDLERS ---
-     */
+    const handleFileSelect = (file: File) => {
+        if (file && file.type.startsWith('image/')) {
+            setLocalFileName(file.name);
+            const reader = new FileReader();
+            reader.onload = (re) => {
+                if (re.target?.result) {
+                    setUrl(re.target.result as string);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         let finalUrl = url;
 
         if (type === 'link' && linkType === 'internal' && selectedNote) {
             const notePath = selectedNote.folder ? `${selectedNote.folder}/${selectedNote.filename}` : selectedNote.filename;
-            // Encode the path to ensure spaces and special characters don't break the markdown syntax
             const encodedPath = notePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
-
-            // Configuration Point: Anchor normalization logic
-            // Matches the logic in MarkdownEditor's Heading extension
             const anchorId = selectedHeadline
                 ? `#${selectedHeadline.toLowerCase().replace(/[^a-z0-9äöüß ]/gi, '').trim().replace(/\s+/g, '-')}`
                 : '';
-
             finalUrl = `note://${encodedPath}${anchorId}`;
         }
 
         onSave(finalUrl, text, caption);
-        onClose();
     };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-4 animate-in zoom-in-95 duration-200">
-
-                {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-100">
                         {type === 'link' ? 'Insert Link' : 'Insert Image'}
                     </h3>
-                    <button
-                        onClick={onClose}
-                        className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
+                    <button onClick={onClose} className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                         <X size={20} />
                     </button>
                 </div>
 
-                {/* Local File Browser (Images Only) */}
-                {type === 'image' && onBrowseFiles && (
+                {type === 'image' && (
                     <div className="mb-6">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleFileSelect(file);
+                            }}
+                            className="hidden"
+                        />
                         <button
                             type="button"
-                            onClick={() => {
-                                onBrowseFiles();
-                                onClose();
+                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); (e.currentTarget as HTMLElement).classList.add('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20'); }}
+                            onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); (e.currentTarget as HTMLElement).classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20'); }}
+                            onDrop={(e) => {
+                                e.preventDefault(); e.stopPropagation();
+                                (e.currentTarget as HTMLElement).classList.remove('border-primary-500', 'bg-primary-50', 'dark:bg-primary-900/20');
+                                const file = e.dataTransfer.files?.[0];
+                                if (file) handleFileSelect(file);
                             }}
-                            className="w-full py-4 px-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex flex-col items-center gap-2 hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all group"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full py-4 px-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex flex-col items-center gap-2 hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all group overflow-hidden"
                         >
-                            <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center group-hover:bg-primary-100 dark:group-hover:bg-primary-800 transition-colors">
-                                <Upload className="text-gray-500 dark:text-gray-400 group-hover:text-primary-600" size={20} />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary-700 dark:group-hover:text-primary-300">
-                                Browse local files
-                            </span>
+                            {previewUrl && (previewUrl.startsWith('data:') || previewUrl.startsWith('asset://') || previewUrl.startsWith('http')) ? (
+                                <div className="relative w-full aspect-video rounded-md overflow-hidden bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+                                    <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium">Click or drop to change</div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center group-hover:bg-primary-100 dark:group-hover:bg-primary-800 transition-colors">
+                                        <Upload className="text-gray-500 dark:text-gray-400 group-hover:text-primary-600" size={20} />
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary-700 dark:group-hover:text-primary-300">{localFileName || 'Browse or Drop local files'}</span>
+                                </>
+                            )}
                         </button>
-
                         <div className="relative my-6">
-                            <div className="absolute inset-0 flex items-center">
-                                <span className="w-full border-t border-gray-200 dark:border-gray-700"></span>
-                            </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-white dark:bg-gray-800 px-2 text-gray-500 dark:text-gray-400">Or use a URL</span>
-                            </div>
+                            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-200 dark:border-gray-700"></span></div>
+                            <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-gray-800 px-2 text-gray-500 dark:text-gray-400">Or use a URL</span></div>
                         </div>
                     </div>
                 )}
@@ -169,156 +192,48 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                 <form onSubmit={handleSubmit}>
                     {type === 'link' && (
                         <>
-                            {/* Display Text Input */}
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Text
-                                </label>
-                                <input
-                                    type="text"
-                                    placeholder="Link text"
-                                    value={text}
-                                    onChange={(e) => setText(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                />
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Text</label>
+                                <input type="text" placeholder="Link text" value={text} onChange={(e) => setText(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                             </div>
-
-                            {/* Internal vs External Toggle */}
                             <div className="flex bg-gray-100 dark:bg-gray-900 p-1 rounded-lg mb-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setLinkType('external')}
-                                    className={clsx(
-                                        "flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-all",
-                                        linkType === 'external'
-                                            ? "bg-white dark:bg-gray-800 text-primary-600 shadow-sm"
-                                            : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                    )}
-                                >
-                                    <ExternalLink size={14} />
-                                    External
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setLinkType('internal')}
-                                    className={clsx(
-                                        "flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-all",
-                                        linkType === 'internal'
-                                            ? "bg-white dark:bg-gray-800 text-primary-600 shadow-sm"
-                                            : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                    )}
-                                >
-                                    <LinkIcon size={14} />
-                                    Internal Note
-                                </button>
+                                <button type="button" onClick={() => setLinkType('external')} className={clsx("flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-all", linkType === 'external' ? "bg-white dark:bg-gray-800 text-primary-600 shadow-sm" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200")}><ExternalLink size={14} />External</button>
+                                <button type="button" onClick={() => setLinkType('internal')} className={clsx("flex-1 flex items-center justify-center gap-2 py-1.5 text-xs font-medium rounded-md transition-all", linkType === 'internal' ? "bg-white dark:bg-gray-800 text-primary-600 shadow-sm" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200")}><LinkIcon size={14} />Internal Note</button>
                             </div>
-
-                            {/* Conditional URL / Note Picker */}
                             {linkType === 'external' ? (
                                 <div className="mb-4">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        URL
-                                    </label>
-                                    <input
-                                        ref={inputRef}
-                                        type="text"
-                                        placeholder="https://example.com"
-                                        value={url}
-                                        onChange={(e) => setUrl(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                    />
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL</label>
+                                    <input ref={inputRef} type="text" placeholder="https://example.com" value={url} onChange={(e) => setUrl(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                                 </div>
                             ) : (
                                 <div className="mb-4 flex flex-col gap-3">
                                     {!selectedNote ? (
                                         <div className="flex flex-col gap-2">
-                                            {/* Search box for notes */}
                                             <div className="relative">
                                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Search notes..."
-                                                    value={searchNoteTerm}
-                                                    onChange={(e) => setSearchNoteTerm(e.target.value)}
-                                                    className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                                />
+                                                <input type="text" placeholder="Search notes..." value={searchNoteTerm} onChange={(e) => setSearchNoteTerm(e.target.value)} className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
                                             </div>
                                             <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md">
-                                                {filteredNotes.length > 0 ? (
-                                                    filteredNotes.map(n => (
-                                                        <button
-                                                            key={`${n.folder}/${n.filename}`}
-                                                            type="button"
-                                                            onClick={() => setSelectedNote(n)}
-                                                            className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-0"
-                                                        >
-                                                            <div className="flex items-center gap-2 overflow-hidden">
-                                                                <FileText className="shrink-0 text-gray-400" size={16} />
-                                                                <span className="text-sm text-gray-700 dark:text-gray-300 truncate font-medium">{n.filename.replace('.md', '')}</span>
-                                                            </div>
-                                                            <ChevronRight className="text-gray-300" size={14} />
-                                                        </button>
-                                                    ))
-                                                ) : (
-                                                    <div className="p-4 text-center text-sm text-gray-400">No notes found</div>
-                                                )}
+                                                {filteredNotes.length > 0 ? (filteredNotes.map(n => (
+                                                    <button key={`${n.folder}/${n.filename}`} type="button" onClick={() => setSelectedNote(n)} className="w-full flex items-center justify-between gap-3 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-0 border-solid">
+                                                        <div className="flex items-center gap-2 overflow-hidden"><FileText className="shrink-0 text-gray-400" size={16} /><span className="text-sm text-gray-700 dark:text-gray-300 truncate font-medium">{n.filename.replace('.md', '')}</span></div>
+                                                        <ChevronRight className="text-gray-300" size={14} />
+                                                    </button>
+                                                ))) : (<div className="p-4 text-center text-sm text-gray-400">No notes found</div>)}
                                             </div>
                                         </div>
                                     ) : (
                                         <div className="flex flex-col gap-3">
-                                            {/* Selected Note Indicator */}
                                             <div className="flex items-center justify-between p-2 bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-800 rounded-md">
-                                                <div className="flex items-center gap-2 overflow-hidden">
-                                                    <FileText className="text-primary-600" size={16} />
-                                                    <span className="text-sm font-medium text-primary-700 dark:text-primary-300 truncate">
-                                                        {selectedNote.filename.replace('.md', '')}
-                                                    </span>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSelectedNote(null)}
-                                                    className="text-xs text-primary-600 hover:underline font-medium"
-                                                >
-                                                    Change
-                                                </button>
+                                                <div className="flex items-center gap-2 overflow-hidden"><FileText className="text-primary-600" size={16} /><span className="text-sm font-medium text-primary-700 dark:text-primary-300 truncate">{selectedNote.filename.replace('.md', '')}</span></div>
+                                                <button type="button" onClick={() => setSelectedNote(null)} className="text-xs text-primary-600 hover:underline font-medium">Change</button>
                                             </div>
-
-                                            {/* Headline/Anchor Picker */}
                                             {headlines.length > 0 && (
                                                 <div className="flex flex-col gap-1.5">
-                                                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">
-                                                        Link to Section (Optional)
-                                                    </label>
+                                                    <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider ml-1">Link to Section (Optional)</label>
                                                     <div className="max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSelectedHeadline('')}
-                                                            className={clsx(
-                                                                "w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors border-b border-gray-100 dark:border-gray-800",
-                                                                selectedHeadline === ''
-                                                                    ? "bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium"
-                                                                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-                                                            )}
-                                                        >
-                                                            <Hash size={14} className={selectedHeadline === '' ? "text-primary-500" : "text-gray-400"} />
-                                                            Whole Note
-                                                        </button>
-                                                        {headlines.map(h => (
-                                                            <button
-                                                                key={h}
-                                                                type="button"
-                                                                onClick={() => setSelectedHeadline(h)}
-                                                                className={clsx(
-                                                                    "w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors border-b border-gray-100 dark:border-gray-800 last:border-0",
-                                                                    selectedHeadline === h
-                                                                        ? "bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium"
-                                                                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-                                                                )}
-                                                            >
-                                                                <Hash size={14} className={selectedHeadline === h ? "text-primary-500" : "text-gray-400"} />
-                                                                <span className="truncate">{h}</span>
-                                                            </button>
-                                                        ))}
+                                                        <button type="button" onClick={() => setSelectedHeadline('')} className={clsx("w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors border-b border-gray-100 dark:border-gray-800 border-solid", selectedHeadline === '' ? "bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium" : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800")}><Hash size={14} className={selectedHeadline === '' ? "text-primary-500" : "text-gray-400"} />Whole Note</button>
+                                                        {headlines.map(h => (<button key={h} type="button" onClick={() => setSelectedHeadline(h)} className={clsx("w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors border-b border-gray-100 dark:border-gray-800 border-solid last:border-0", selectedHeadline === h ? "bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-medium" : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800")}><Hash size={14} className={selectedHeadline === h ? "text-primary-500" : "text-gray-400"} /><span className="truncate">{h}</span></button>))}
                                                     </div>
                                                 </div>
                                             )}
@@ -329,54 +244,22 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                         </>
                     )}
 
-                    {/* Image URL Input */}
                     {type === 'image' && (
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Image URL
-                            </label>
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                placeholder="https://example.com/image.png"
-                                value={url}
-                                onChange={(e) => setUrl(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                            />
-                        </div>
+                        <>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Image URL</label>
+                                <input ref={inputRef} type="text" placeholder="https://example.com/image.png" value={url} onChange={(e) => setUrl(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                            </div>
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Caption</label>
+                                <input type="text" placeholder="Add a caption..." value={caption} onChange={(e) => setCaption(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                            </div>
+                        </>
                     )}
 
-                    {/* Image Caption Input */}
-                    {type === 'image' && (
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Caption
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="Add a caption..."
-                                value={caption}
-                                onChange={(e) => setCaption(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                            />
-                        </div>
-                    )}
-
-                    {/* Footer Actions */}
                     <div className="flex justify-end gap-2">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors"
-                        >
-                            Save
-                        </button>
+                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors">Cancel</button>
+                        <button type="submit" disabled={!url} className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors">Save</button>
                     </div>
                 </form>
             </div>

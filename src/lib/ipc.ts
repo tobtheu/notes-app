@@ -36,6 +36,7 @@ export const tauriAPI: TauriAPI = {
     listNotes: (folderPath: string) => invoke<Note[]>('list_notes', { folderPath }),
     listFolders: (folderPath: string) => invoke<string[]>('list_folders', { folderPath }),
     saveNote: (data) => invoke<boolean>('save_note', data).then(() => true).catch(() => false),
+    saveAsset: (rootPath, filename, contentBase64) => invoke<{ success: boolean, path?: string, error?: string }>('save_asset', { rootPath, filename, contentBase64 }),
     deleteNote: (data) => invoke<boolean>('delete_note', data).then(() => true).catch(() => false),
     renameNote: (data) => invoke<void>('rename_note', {
         rootPath: data.rootPath,

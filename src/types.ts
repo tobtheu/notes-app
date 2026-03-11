@@ -47,6 +47,7 @@ export interface TauriAPI {
     listNotes: (folderPath: string) => Promise<Note[]>;
     listFolders: (folderPath: string) => Promise<string[]>;
     saveNote: (data: { rootPath: string; folderPath: string; filename: string; content: string }) => Promise<boolean>;
+    saveAsset: (rootPath: string, filename: string, contentBase64: string) => Promise<{ success: boolean; path?: string; error?: string }>;
     deleteNote: (data: { rootPath: string; folderPath: string; filename: string }) => Promise<boolean>;
     renameNote: (data: { rootPath: string; oldFilename: string; newFilename: string }) => Promise<{ success: boolean; error?: string }>;
     createFolder: (rootPath: string, folderPath: string) => Promise<boolean>;
