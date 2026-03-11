@@ -645,6 +645,7 @@ pub fn run() {
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_log::Builder::default()
             .level(log::LevelFilter::Info)
             .build())
@@ -664,7 +665,19 @@ pub fn run() {
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {
-            let _ = app.handle();
+            let window = app.get_webview_window("main").unwrap();
+            
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::TitleBarStyle;
+                let _ = window.set_title_bar_style(TitleBarStyle::Overlay);
+            }
+
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = window.set_decorations(false);
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())

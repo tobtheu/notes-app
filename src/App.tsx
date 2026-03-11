@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
+import { TitleBar } from './components/TitleBar';
 import { SettingsModal } from './components/SettingsModal';
 import { DeleteFolderModal } from './components/DeleteFolderModal';
 import { UpdateModal } from './components/UpdateModal';
@@ -334,89 +335,93 @@ function App() {
 
   return (
     <div
-      className="h-full flex bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 overflow-hidden"
+      className="h-screen flex flex-col bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 overflow-hidden"
       style={{
         fontFamily: fontFamily === 'inter' ? "'Inter', sans-serif" : fontFamily === 'roboto' ? "'Roboto', sans-serif" : "ui-sans-serif, system-ui, sans-serif",
       }}
     >
-      {/* SIDEBAR — always visible except in editor view on mobile */}
-      <Sidebar
-        className={clsx(
-          "md:flex",
-          activeView === 'editor' ? "hidden md:flex" : "flex"
-        )}
-        folders={folders}
-        metadata={metadata}
-        selectedCategory={selectedCategory}
-        isCollapsed={isSidebarCollapsed}
-        onCreateNote={handleCreateNote}
-        onCreateFolder={createFolder}
-        onDeleteCategory={setCategoryToDelete}
-        onEditCategory={setEditingCategory}
-        onSelectCategory={handleSelectCategory}
-        onReorderFolders={reorderFolders}
-        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        syncStatus={syncStatus}
-        lastSyncedAt={lastSyncedAt}
-        conflictFiles={conflictPairs}
-        onSync={triggerSync}
-      />
+      <TitleBar />
 
-      {/* NOTELIST — visible when not in sidebar-only or editor view */}
-      <NoteList
-        className={clsx(
-          "md:flex md:w-80 shrink-0 border-r border-gray-100 dark:border-gray-800",
-          activeView === 'editor' ? "hidden md:flex" :
-            activeView === 'sidebar' ? "hidden md:flex" : "flex"
-        )}
-        notes={notes}
-        selectedNote={selectedNote}
-        onSelectNote={handleSelectNote}
-        onDeleteNote={deleteNote}
-        onMoveNote={moveNote}
-        onTogglePin={togglePinNote}
-        isNotePinned={isNotePinned}
-        getNoteId={getNoteId}
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        folders={folders}
-        selectedCategory={selectedCategory}
-        onBack={() => setActiveView('sidebar')}
-      />
-
-      {/* EDITOR — takes full width on mobile, hides sidebar + notelist */}
-      {selectedNote ? (
-        <Editor
-          key={selectionCount}
+      <div className="flex-1 flex overflow-hidden">
+        {/* SIDEBAR — always visible except in editor view on mobile */}
+        <Sidebar
           className={clsx(
-            "flex-1",
-            activeView === 'editor' ? "flex" : "hidden md:flex"
+            "md:flex",
+            activeView === 'editor' ? "hidden md:flex" : "flex"
           )}
-          note={selectedNote}
-          allNotes={allNotes}
-          onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
-          onUpdateLocally={updateNoteLocally}
-          onBack={() => setActiveView('notelist')}
-          markdownEnabled={markdownEnabled}
-          toolbarVisible={toolbarVisible}
-          setToolbarVisible={setToolbarVisible}
-          spellcheckEnabled={spellcheckEnabled}
-          onNavigate={(id, _anchor) => handleNavigate(id)}
+          folders={folders}
+          metadata={metadata}
+          selectedCategory={selectedCategory}
+          isCollapsed={isSidebarCollapsed}
+          onCreateNote={handleCreateNote}
+          onCreateFolder={createFolder}
+          onDeleteCategory={setCategoryToDelete}
+          onEditCategory={setEditingCategory}
+          onSelectCategory={handleSelectCategory}
+          onReorderFolders={reorderFolders}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          syncStatus={syncStatus}
+          lastSyncedAt={lastSyncedAt}
+          conflictFiles={conflictPairs}
+          onSync={triggerSync}
         />
-      ) : (
-        <div className={clsx(
-          "flex-1 items-center justify-center text-gray-400 bg-white dark:bg-gray-900",
-          activeView === 'editor' ? "flex" : "hidden md:flex"
-        )}>
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
-              <Book className="text-gray-300 dark:text-gray-600" size={32} />
+
+        {/* NOTELIST — visible when not in sidebar-only or editor view */}
+        <NoteList
+          className={clsx(
+            "md:flex md:w-80 shrink-0 border-r border-gray-100 dark:border-gray-800",
+            activeView === 'editor' ? "hidden md:flex" :
+              activeView === 'sidebar' ? "hidden md:flex" : "flex"
+          )}
+          notes={notes}
+          selectedNote={selectedNote}
+          onSelectNote={handleSelectNote}
+          onDeleteNote={deleteNote}
+          onMoveNote={moveNote}
+          onTogglePin={togglePinNote}
+          isNotePinned={isNotePinned}
+          getNoteId={getNoteId}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          folders={folders}
+          selectedCategory={selectedCategory}
+          onBack={() => setActiveView('sidebar')}
+        />
+
+        {/* EDITOR — takes full width on mobile, hides sidebar + notelist */}
+        {selectedNote ? (
+          <Editor
+            key={selectionCount}
+            className={clsx(
+              "flex-1",
+              activeView === 'editor' ? "flex" : "hidden md:flex"
+            )}
+            note={selectedNote}
+            allNotes={allNotes}
+            onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
+            onUpdateLocally={updateNoteLocally}
+            onBack={() => setActiveView('notelist')}
+            markdownEnabled={markdownEnabled}
+            toolbarVisible={toolbarVisible}
+            setToolbarVisible={setToolbarVisible}
+            spellcheckEnabled={spellcheckEnabled}
+            onNavigate={(id, _anchor) => handleNavigate(id)}
+          />
+        ) : (
+          <div className={clsx(
+            "flex-1 items-center justify-center text-gray-400 bg-white dark:bg-gray-900",
+            activeView === 'editor' ? "flex" : "hidden md:flex"
+          )}>
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
+                <Book className="text-gray-300 dark:text-gray-600" size={32} />
+              </div>
+              <p className="text-sm font-medium">Select a note to start editing</p>
             </div>
-            <p className="text-sm font-medium">Select a note to start editing</p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {isSettingsOpen && (
         <SettingsModal

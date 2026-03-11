@@ -34,4 +34,5 @@ rustls = { version = "0.23", features = ["ring"] }
 git2 = { version = "0.19", features = ["vendored-libgit2", "https", "vendored-openssl"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-native-roots"] }
 tauri-plugin-store = "2"
+tauri-plugin-os = "2"
 tokio = { version = "1", features = ["time"] }

@@ -5,7 +5,6 @@ import {
     Plus, Settings, Trash2, PanelLeftClose, PanelLeftOpen, Pencil, GripVertical
 } from 'lucide-react';
 import clsx from 'clsx';
-import logo from '../assets/logo.png';
 import { SyncStatusBadge } from './SyncStatusBadge';
 import type { AppMetadata, ConflictPair } from '../types';
 import {
@@ -322,15 +321,7 @@ export function Sidebar({
             )}
         >
             {/* --- SIDEBAR TOP SECTION --- */}
-            <div className={clsx("p-4 pb-2 flex items-center shrink-0", isCollapsed ? "justify-center" : "justify-between")}>
-                {!isCollapsed && (
-                    <div className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
-                        <div className="w-8 h-8 flex items-center justify-center shrink-0">
-                            <img src={logo} alt="Logo" className="w-7 h-7 object-contain" />
-                        </div>
-                        <span className="font-bold text-gray-800 dark:text-gray-100">NotizApp</span>
-                    </div>
-                )}
+            <div className={clsx("px-4 py-2 flex items-center shrink-0", isCollapsed ? "justify-center" : "justify-end")}>
                 {/* Collapse Toggle - Hidden on small screens (layout is auto-managed there) */}
                 <button
                     onClick={onToggleCollapse}
