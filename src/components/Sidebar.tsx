@@ -312,7 +312,7 @@ export function Sidebar({
     return (
         <div
             className={clsx(
-                "flex flex-col h-full bg-gray-50 dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 transition-all duration-300 shrink-0 overflow-x-hidden",
+                "flex flex-col h-full bg-gray-50 dark:bg-gray-950 border-r border-gray-100 dark:border-gray-800 transition-all duration-300 shrink-0 overflow-x-hidden",
                 // Configuration Point: Sidebar Widths
                 isCollapsed ? "w-16" : "w-64",
                 className

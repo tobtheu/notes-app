@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "NotizApp",
+        "title": "",
         "resizable": true,
         "fullscreen": false,
         "width": 1200,
@@ -27,7 +27,9 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "**"
+          "**",
+          "**/.*",
+          "**/.*/**"
         ]
       },
       "csp": null

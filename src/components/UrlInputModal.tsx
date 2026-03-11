@@ -36,7 +36,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
     const [localFileName, setLocalFileName] = useState<string | null>(null);
 
     const previewUrl = useMemo(() => {
-        if (url && url.startsWith('assets/') && workspacePath) {
+        if (url && url.startsWith('.assets/') && workspacePath) {
             try {
                 return convertFileSrc(`${workspacePath}/${url}`);
             } catch (e) {

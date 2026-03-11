@@ -34,7 +34,7 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
         <div
             id="titlebar"
             onMouseDown={handleMouseDown}
-            className="h-10 min-h-[40px] flex items-center justify-between bg-gray-50 dark:bg-gray-900 select-none relative z-[9999]"
+            className="h-10 min-h-[40px] flex items-center justify-between bg-gray-50 dark:bg-gray-950 select-none relative z-[9999]"
         >
             {/* Sidebar / Back Button Area */}
             <div

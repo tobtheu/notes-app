@@ -9,7 +9,7 @@ export const ResizableImageNode: React.FC<NodeViewProps> = (props) => {
     const { src, alt, width } = node.attrs;
 
     let finalSrc = src;
-    if (finalSrc && finalSrc.startsWith('assets/')) {
+    if (finalSrc && finalSrc.startsWith('.assets/')) {
         const workspacePath = extension.options.workspacePathRef?.current;
         if (workspacePath) {
             try {

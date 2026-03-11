@@ -43,7 +43,7 @@ export const ImageWithCaption = Image.extend<ImageWithCaptionOptions>({
         const { alt, src, width, ...imgAttributes } = HTMLAttributes;
         let finalSrc = src;
 
-        if (finalSrc && finalSrc.startsWith('assets/') && this.options.workspacePathRef?.current) {
+        if (finalSrc && finalSrc.startsWith('.assets/') && this.options.workspacePathRef?.current) {
             const absolutePath = `${this.options.workspacePathRef.current}/${finalSrc}`;
             try {
                 finalSrc = convertFileSrc(absolutePath);

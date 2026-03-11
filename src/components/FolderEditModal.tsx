@@ -51,31 +51,19 @@ const COLORS = [
     { id: 'gray', bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200', darkBg: 'dark:bg-gray-800', darkText: 'dark:text-gray-400' },
 ];
 
-/**
- * FolderEditModal
- * A modal for customizing folder metadata (name, icon, and color).
- * This component handles "optimistic" saving on every change (icon click, color selection).
- */
 export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave }: FolderEditModalProps) {
     const [name, setName] = useState(folderName);
     const [selectedIcon, setSelectedIcon] = useState(metadata.icon || 'Folder');
     const [selectedColor, setSelectedColor] = useState(metadata.color || 'gray');
 
-    // Sync state when modal source changes or modal opens
     useEffect(() => {
         if (isOpen) {
             setName(folderName);
             setSelectedIcon(metadata.icon || 'Folder');
             setSelectedColor(metadata.color || 'gray');
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, folderName]);
 
-    /**
-     * Configuration Point: Auto-Save Logic
-     * Icons and Colors save immediately on click. 
-     * The name saves on "Blur" (when focus leaves the input) or "Enter".
-     */
     const handleIconSelect = (iconId: string) => {
         setSelectedIcon(iconId);
         onSave(name, { icon: iconId, color: selectedColor });
@@ -106,14 +94,10 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            {/* 
-                Stellschraube: Modal Width and Styling
-                Tailwind classes like 'max-w-md' and 'rounded-2xl' define the visual footprint.
-            */}
-            <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
 
                 {/* Header with Preview */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800">
+                <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 shrink-0">
                     <div className="flex items-center gap-3">
                         <div className={clsx("p-2 rounded-lg transition-colors duration-300", selectedColorData.bg, selectedColorData.darkBg)}>
                             <SelectedIconComponent size={24} className={clsx("transition-colors duration-300", selectedColorData.text, selectedColorData.darkText)} />
@@ -125,7 +109,7 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                     </button>
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
                     {/* Name Input */}
                     <div className="space-y-3">
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-400">
@@ -168,12 +152,11 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                     </div>
 
                     {/* Icon Picker Section */}
-                    {/* Stellschraube: Grid Columns and Scroll Area Height */}
                     <div className="space-y-3">
                         <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-400">
                             <Folder size={16} /> Icon
                         </label>
-                        <div className="grid grid-cols-5 gap-3 h-48 overflow-y-auto px-1 custom-scrollbar">
+                        <div className="grid grid-cols-5 gap-3 min-h-[200px] px-1">
                             {ICONS.map(({ id, icon: IconComponent }) => (
                                 <button
                                     key={id}
@@ -194,17 +177,17 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                             ))}
                         </div>
                     </div>
+                </div>
 
-                    {/* Footer Button - Just used to close since saving is automatic */}
-                    <div className="pt-4">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="w-full px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold transition-all shadow-lg shadow-primary-500/20 active:scale-95 text-center"
-                        >
-                            Done
-                        </button>
-                    </div>
+                {/* Footer Button */}
+                <div className="p-6 border-t border-gray-100 dark:border-gray-800 shrink-0">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="w-full px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold transition-all shadow-lg shadow-primary-500/20 active:scale-95 text-center"
+                    >
+                        Done
+                    </button>
                 </div>
             </div>
         </div>

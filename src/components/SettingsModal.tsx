@@ -145,7 +145,7 @@ export function SettingsModal({
 
     return (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6 relative animate-in fade-in zoom-in duration-200 flex flex-col">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6 relative animate-in fade-in zoom-in duration-200 flex flex-col max-h-[85vh]">
                 <button
                     onClick={onClose}
                     className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors z-10"
@@ -157,7 +157,7 @@ export function SettingsModal({
 
                 <div
                     ref={scrollContainerRef}
-                    className="overflow-y-auto max-h-[70vh] pr-2 -mr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700"
+                    className="overflow-y-auto flex-1 pr-2 -mr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700"
                 >
                     {/* --- SYNC SECTION --- */}
                     <div className="mb-8">

@@ -42,6 +42,10 @@ import { CodeBlockComponent } from './CodeBlockComponent';
 
 const lowlight = createLowlight(common);
 
+export interface MarkdownEditorRef {
+    focus: (position?: 'start' | 'end') => void;
+}
+
 interface MarkdownEditorProps {
     content: string;
     allNotes?: Note[];
@@ -51,6 +55,8 @@ interface MarkdownEditorProps {
     spellcheckEnabled?: boolean;
     workspacePath: string;
     header?: React.ReactNode;
+    isFocusMode?: boolean;
+    onArrowUpAtStart?: () => void;
 }
 
 // suggestion items definition
@@ -505,7 +511,7 @@ const BubbleToolbarContent: React.FC<{
  * Provides: Markdown parsing, Slash Commands, Wiki-style internal linking,
  * Image handling (drag & drop), and dynamic toolbars.
  */
-export const MarkdownEditor = ({
+export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>(({
     content,
     allNotes,
     onChange,
@@ -513,8 +519,10 @@ export const MarkdownEditor = ({
     toolbarVisible = true,
     spellcheckEnabled = true,
     workspacePath,
-    header
-}: MarkdownEditorProps) => {
+    header,
+    isFocusMode = false,
+    onArrowUpAtStart
+}, ref) => {
     /**
      * --- LOCAL STATE ---
      */
@@ -668,6 +676,18 @@ export const MarkdownEditor = ({
                 }
             },
             // handleDrop removed to allow the wrapper div's onDrop to handle the event consistently in Webview2
+            handleKeyDown: (view, event) => {
+                if (event.key === 'ArrowUp' && onArrowUpAtStart) {
+                    const { selection } = view.state;
+                    // Check if selection is empty and at the very beginning (pos 0 or 1 depending on node structure)
+                    // In most tip-tap setups, pos 1 is the start of the first paragraph.
+                    if (selection.empty && selection.$from.pos <= 1) {
+                        onArrowUpAtStart();
+                        return true;
+                    }
+                }
+                return false;
+            }
         },
         onUpdate: ({ editor }) => {
             const markdown = (editor.storage as any).markdown.getMarkdown();
@@ -675,6 +695,19 @@ export const MarkdownEditor = ({
             onChangeRef.current(markdown);
         },
     }, []); // Empty dependency array ensures stability
+
+    useImperativeHandle(ref, () => ({
+        focus: (position?: 'start' | 'end') => {
+            if (!editor) return;
+            if (position === 'start') {
+                editor.chain().focus().setTextSelection(1).run(); // Start usually pos 1
+            } else if (position === 'end') {
+                editor.chain().focus('end').run();
+            } else {
+                editor.chain().focus().run();
+            }
+        }
+    }), [editor]);
 
     /**
      * --- SIDE EFFECTS ---
@@ -865,7 +898,7 @@ export const MarkdownEditor = ({
                         onImagePreview={() => {
                             const attrs = editor.getAttributes('image');
                             let previewSrc = attrs.src;
-                            if (previewSrc && previewSrc.startsWith('assets/')) {
+                            if (previewSrc && previewSrc.startsWith('.assets/')) {
                                 try {
                                     previewSrc = convertFileSrc(`${workspacePath}/${previewSrc}`);
                                 } catch (e) {
@@ -994,7 +1027,7 @@ export const MarkdownEditor = ({
                     }
                 }}
             >
-                <div className="max-w-4xl mx-auto py-8 px-8 min-h-full flex flex-col">
+                <div className="max-w-4xl mx-auto pt-0 pb-8 px-8 min-h-full flex flex-col">
                     {header}
                     <EditorContent editor={editor} className="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl flex-1 flex flex-col" />
                 </div>
@@ -1012,4 +1045,6 @@ export const MarkdownEditor = ({
             )}
         </div>
     );
-};
+});
+
+MarkdownEditor.displayName = 'MarkdownEditor';

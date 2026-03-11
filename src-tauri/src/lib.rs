@@ -559,6 +559,7 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
         if let Ok(meta) = read_metadata(folder_path.clone()).await {
             if let Some(folder_order) = meta.folder_order {
                 for folder_name in folder_order {
+                    if folder_name.starts_with('.') { continue; }
                     let full_path = root.join(&folder_name);
                     if !full_path.exists() {
                         let _ = fs::create_dir_all(&full_path);
@@ -651,7 +652,7 @@ pub struct SaveAssetResponse {
 #[tauri::command]
 async fn save_asset(app: tauri::AppHandle, root_path: String, filename: String, content_base64: String) -> Result<SaveAssetResponse, String> {
     let root = Path::new(&root_path);
-    let assets_dir = root.join("assets");
+    let assets_dir = root.join(".assets");
     
     if !assets_dir.exists() {
         fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
@@ -685,7 +686,7 @@ async fn save_asset(app: tauri::AppHandle, root_path: String, filename: String, 
     
     Ok(SaveAssetResponse {
         success: true,
-        path: Some(format!("assets/{}", filename).replace("\\", "/")),
+        path: Some(format!(".assets/{}", filename).replace("\\", "/")),
         error: None,
     })
 }

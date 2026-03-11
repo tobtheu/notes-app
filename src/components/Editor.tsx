@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Note } from '../types';
-import { MarkdownEditor } from './MarkdownEditor';
+import { MarkdownEditor, type MarkdownEditorRef } from './MarkdownEditor';
 import clsx from 'clsx';
-import { MoreVertical, FileDown, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { MoreVertical, FileDown, Eye, EyeOff, Loader2, Zap, X } from 'lucide-react';
 import { getPathId, normalizeStr } from '../utils/path';
 
 const extractTitle = (content: string) => {
@@ -21,6 +21,8 @@ interface EditorProps {
     setToolbarVisible: (visible: boolean) => void;
     spellcheckEnabled: boolean;
     workspacePath: string;
+    isFocusMode: boolean;
+    onToggleFocus: () => void;
     className?: string;
 }
 
@@ -44,6 +46,8 @@ export function Editor({
     toolbarVisible,
     setToolbarVisible,
     workspacePath,
+    isFocusMode,
+    onToggleFocus,
     className
 }: EditorProps) {
     /**
@@ -52,6 +56,7 @@ export function Editor({
     const [content, setContent] = useState(note.content);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const titleRef = useRef<HTMLTextAreaElement>(null);
+    const markdownEditorRef = useRef<MarkdownEditorRef>(null);
 
     // tracks if the component is in its "initial loading" phase for a specific note
     const isMounting = useRef(true);
@@ -167,6 +172,19 @@ export function Editor({
         }
     }, [content, note.filename, note.folder, onUpdateLocally, note.content]);
 
+    const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'ArrowDown') {
+            const { selectionStart, selectionEnd, value } = e.currentTarget;
+            if (selectionStart === selectionEnd && selectionStart === value.length) {
+                e.preventDefault();
+                markdownEditorRef.current?.focus('start');
+            }
+        } else if (e.key === 'Tab') {
+            e.preventDefault();
+            markdownEditorRef.current?.focus('start');
+        }
+    };
+
     // 2. Disk Persistence: Debounced save to the underlying .md file.
     useEffect(() => {
         // Configuration Point: Auto-save Debounce Delay (ms)
@@ -242,6 +260,17 @@ export function Editor({
         if (isMenuOpen) document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isMenuOpen]);
+    
+    // Listen for 'Esc' key to exit focus mode
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isFocusMode) {
+                onToggleFocus();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isFocusMode, onToggleFocus]);
 
     const handleExport = async () => {
         // Parse markdown to HTML
@@ -319,56 +348,116 @@ export function Editor({
     };
 
     return (
-        <div className={clsx("h-full overflow-hidden flex flex-col bg-white dark:bg-gray-900 md:border-l border-gray-100 dark:border-gray-800", className)}>
+        <div className={clsx(
+            "h-full overflow-hidden flex flex-col bg-white dark:bg-gray-900 md:border-l border-gray-100 dark:border-gray-800 transition-all duration-300",
+            isFocusMode ? "fixed inset-0 z-[10000] border-none animate-focus-enter" : "relative flex-1",
+            className
+        )}>
 
-            {/* --- FLOATING HEADER ACTIONS --- */}
-            <div className="fixed top-0 right-8 z-50 flex gap-2" ref={menuRef}>
-
-                {/* Visual Save Status Indicator */}
-                <div className="text-xs text-gray-300 self-center mr-2 italic">
-                    {content !== note.content ? 'Saving...' : 'Saved'}
-                </div>
-
-                <div className="relative">
+            {/* Focus Mode Controls (Floating Top Right) */}
+            {isFocusMode && (
+                <div className="fixed top-6 right-8 flex items-center gap-3 z-[10001] no-drag">
                     <button
-                        onClick={() => setIsMenuOpen(!isMenuOpen)}
-                        className="p-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg transition shadow-sm border border-gray-200 dark:border-gray-700"
-                        title="Actions"
+                        onClick={() => setToolbarVisible(!toolbarVisible)}
+                        className={clsx(
+                            "p-2 rounded-full transition-all active:scale-90",
+                            toolbarVisible 
+                                ? "text-primary-600 bg-primary-50 dark:bg-primary-900/40" 
+                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        )}
+                        title={toolbarVisible ? "Hide Toolbar" : "Show Toolbar"}
                     >
-                        <MoreVertical size={18} />
+                        {toolbarVisible ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
-
-                    {isMenuOpen && (
-                        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 p-1.5 animate-in fade-in zoom-in duration-200 backdrop-blur-xl">
-                            <button
-                                onClick={() => { handleExport(); setIsMenuOpen(false); }}
-                                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
-                            >
-                                <div className="w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 transition-colors group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400">
-                                    <FileDown size={16} />
-                                </div>
-                                <span className="font-medium">Export PDF</span>
-                            </button>
-
-                            <button
-                                onClick={() => { setToolbarVisible(!toolbarVisible); setIsMenuOpen(false); }}
-                                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
-                            >
-                                <div className={clsx(
-                                    "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                                    toolbarVisible
-                                        ? "bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
-                                        : "bg-gray-100 dark:bg-gray-700 text-gray-500 group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400"
-                                )}>
-                                    {toolbarVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </div>
-                                <span className="font-medium">{toolbarVisible ? 'Hide Toolbar' : 'Show Toolbar'}</span>
-                            </button>
-
-                        </div>
-                    )}
+                    <button
+                        onClick={onToggleFocus}
+                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all active:scale-90"
+                        title="Exit Focus Mode (Esc)"
+                    >
+                        <X size={24} />
+                    </button>
                 </div>
-            </div>
+            )}
+
+            {/* Title in Focus Mode removed - now passed as header prop to MarkdownEditor for scrolling */}
+
+            {/* Header with Title and Actions - Hidden in Focus Mode */}
+            {!isFocusMode && (
+                <div className="w-full pt-3">
+                    <div className={clsx(
+                        "flex items-start justify-between gap-4 max-w-4xl mx-auto px-8 w-full",
+                    )}>
+                        <textarea
+                            ref={titleRef}
+                            className="flex-1 p-0 text-xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight placeholder-gray-300 dark:placeholder-gray-700"
+                            placeholder="Note Title"
+                            value={title}
+                            onChange={(e) => handleTitleChange(e.target.value)}
+                            onKeyDown={handleTitleKeyDown}
+                            spellCheck={spellcheckEnabled}
+                            rows={1}
+                        />
+
+                        <div className="flex items-center gap-2 shrink-0 pt-0.5" ref={menuRef}>
+                            {/* Visual Save Status Indicator */}
+                            <div className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider italic">
+                                {content !== note.content ? 'Saving...' : 'Saved'}
+                            </div>
+
+                            <div className="relative">
+                                <button
+                                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
+                                    title="Actions"
+                                >
+                                    <MoreVertical size={18} />
+                                </button>
+
+                                {isMenuOpen && (
+                                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 p-1.5 animate-in fade-in zoom-in duration-200 z-[100] backdrop-blur-xl">
+                                        <button
+                                            onClick={() => { onToggleFocus(); setIsMenuOpen(false); }}
+                                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
+                                        >
+                                            <div className="w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 transition-colors group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                                                <Zap size={16} />
+                                            </div>
+                                            <span className="font-medium text-primary-600 dark:text-primary-400">Focus Mode</span>
+                                        </button>
+
+                                        <div className="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-1.5" />
+
+                                        <button
+                                            onClick={() => { handleExport(); setIsMenuOpen(false); }}
+                                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
+                                        >
+                                            <div className="w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 transition-colors group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                                                <FileDown size={16} />
+                                            </div>
+                                            <span className="font-medium">Export PDF</span>
+                                        </button>
+
+                                        <button
+                                            onClick={() => { setToolbarVisible(!toolbarVisible); setIsMenuOpen(false); }}
+                                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
+                                        >
+                                            <div className={clsx(
+                                                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                                                toolbarVisible
+                                                    ? "bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
+                                                    : "bg-gray-100 dark:bg-gray-700 text-gray-500 group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400"
+                                            )}>
+                                                {toolbarVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                                            </div>
+                                            <span className="font-medium">{toolbarVisible ? 'Hide' : 'Show'} Toolbar</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Loading Overlay for Lazy Content */}
             {note.content === undefined && (
@@ -391,30 +480,27 @@ export function Editor({
                     onNavigate={onNavigate}
                     toolbarVisible={toolbarVisible}
                     spellcheckEnabled={spellcheckEnabled}
-                    header={
-                        <textarea
-                            ref={titleRef}
-                            className="w-full p-0 text-xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700"
-                            placeholder="Note Title"
-                            value={title}
-                            onChange={(e) => handleTitleChange(e.target.value)}
-                            spellCheck={spellcheckEnabled}
-                            rows={1}
-                        />
-                    }
+                    header={isFocusMode ? (
+                        <div className="max-w-3xl mx-auto px-8 w-full pt-4 mb-2">
+                            <textarea
+                                ref={titleRef}
+                                className="w-full p-0 text-3xl font-black bg-transparent border-none outline-none resize-none text-gray-800 dark:text-gray-100 leading-tight placeholder-gray-300 dark:placeholder-gray-700 text-center"
+                                placeholder="Note Title"
+                                value={title}
+                                onChange={(e) => handleTitleChange(e.target.value)}
+                                onKeyDown={handleTitleKeyDown}
+                                spellCheck={spellcheckEnabled}
+                                rows={1}
+                            />
+                        </div>
+                    ) : null}
+                    isFocusMode={isFocusMode}
+                    ref={markdownEditorRef}
+                    onArrowUpAtStart={() => titleRef.current?.focus()}
                 />
             ) : (
                 /* PLAIN TEXT MODE - Standard Fallback */
-                <div className="flex-1 flex flex-col p-8 max-w-4xl mx-auto w-full">
-                    <textarea
-                        ref={titleRef}
-                        className="w-full p-0 text-xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight mb-6 placeholder-gray-300 dark:placeholder-gray-700"
-                        placeholder="Note Title"
-                        value={title}
-                        onChange={(e) => handleTitleChange(e.target.value)}
-                        spellCheck={spellcheckEnabled}
-                        rows={1}
-                    />
+                <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-8 pb-8">
                     <textarea
                         ref={textareaRef}
                         className="w-full p-0 text-sm bg-transparent border-none outline-none resize-none text-gray-800 dark:text-gray-300 leading-relaxed flex-1"

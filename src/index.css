@@ -17,6 +17,19 @@
   --color-primary-950: var(--primary-950);
   --animate-in: animate-in 0.2s ease-out;
   --animate-out: animate-out 0.2s ease-in;
+
+  /* Neutral Dark Gray Palette (Discord/Obsidian style) */
+  --color-gray-50: #f9f9f9;
+  --color-gray-100: #f0f0f0;
+  --color-gray-200: #e5e5e5;
+  --color-gray-300: #d4d4d4;
+  --color-gray-400: #a3a3a3;
+  --color-gray-500: #737373;
+  --color-gray-600: #525252;
+  --color-gray-700: #3d3d3d;
+  --color-gray-800: #262626;
+  --color-gray-900: #1a1a1a;
+  --color-gray-950: #111111;
 }
 
 @keyframes animate-in {
@@ -123,7 +136,7 @@
 }
 
 .dark {
-  --app-bg: #111827;
+  --app-bg: #1a1a1a;
 }
 
 html,
@@ -257,7 +270,7 @@ body {
 }
 
 .prose li {
-  @apply !my-0 !py-0.5;
+  @apply !my-0 !py-0;
 }
 
 .prose ul,
@@ -265,8 +278,17 @@ body {
   @apply !my-0;
 }
 
+.prose ul:not([data-type="taskList"]) li p,
+.prose ol li p {
+  @apply !my-0;
+}
+
 .prose li p {
   @apply !mb-0 !m-0;
+}
+
+.prose hr {
+  @apply !my-10;
 }
 
 .prose p {
@@ -308,6 +330,17 @@ body {
 .dark .prose ul,
 .dark .prose ol,
 .dark .prose li {
+  color: #d1d5db !important;
+}
+
+.dark .prose strong,
+.dark .prose h4,
+.dark .prose h5,
+.dark .prose h6 {
+  color: #ffffff !important;
+}
+
+.dark .prose li::marker {
   color: #d1d5db !important;
 }
 
@@ -487,10 +520,50 @@ body {
   from {
     opacity: 0;
   }
-
   to {
     opacity: 1;
   }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.8s ease-out forwards;
+}
+
+@keyframes focus-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.98) translateY(10px);
+    filter: blur(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+.animate-focus-enter {
+  animation: focus-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Focus Mode Specialized Styles */
+.focus-mode-active {
+    @apply flex flex-col items-center py-12 px-8 overflow-y-auto overflow-x-hidden transition-all duration-700;
+    scroll-behavior: smooth;
+}
+
+.focus-mode-active .tiptap {
+    @apply max-w-3xl mx-auto w-full min-h-max transition-all duration-500;
+}
+
+/* Ensure the editor container takes full width/height in focus mode */
+.focus-mode-active .ProseMirror {
+    @apply outline-none pt-4 pb-24;
+}
+
+/* Hide line numbers or other distractors if any exist in the future */
+.focus-mode-active .editor-gutter {
+    display: none !important;
 }
 
 @keyframes zoom-in {
