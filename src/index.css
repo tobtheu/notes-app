@@ -243,15 +243,15 @@ body {
 
 /* Standard Tailwind Colors & General Styles */
 .prose h1 {
-  @apply !text-2xl !font-bold !mb-2 !mt-4 !text-gray-700;
+  @apply !text-3xl !font-extrabold !mb-5 !mt-8 !text-gray-800 tracking-tight;
 }
 
 .prose h2 {
-  @apply !text-xl !font-bold !mb-2 !mt-4 !text-gray-700;
+  @apply !text-2xl !font-bold !mb-4 !mt-6 !text-gray-700;
 }
 
 .prose h3 {
-  @apply !text-lg !font-bold !mb-1 !mt-3 !text-gray-700;
+  @apply !text-xl !font-bold !mb-3 !mt-4 !text-gray-700;
 }
 
 .prose h4,
@@ -548,7 +548,7 @@ body {
 
 /* Focus Mode Specialized Styles */
 .focus-mode-active {
-    @apply flex flex-col items-center py-12 px-8 overflow-y-auto overflow-x-hidden transition-all duration-700;
+    @apply flex flex-col py-12 px-8 overflow-y-auto overflow-x-hidden transition-all duration-700;
     scroll-behavior: smooth;
 }
 

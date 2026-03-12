@@ -6,7 +6,7 @@ import { MoreVertical, FileDown, Eye, EyeOff, Loader2, Zap, X } from 'lucide-rea
 import { getPathId, normalizeStr } from '../utils/path';
 
 const extractTitle = (content: string) => {
-    const firstLine = content.split('\n')[0] || '';
+    const firstLine = content.split(/\r?\n/)[0] || '';
     return firstLine.replace(/^#\s*/, '').trim();
 };
 
@@ -114,7 +114,7 @@ export function Editor({
     /**
      * --- DATA PARSING ---
      */
-    const lines = content.split('\n');
+    const lines = content.split(/\r?\n/);
     const title = lines[0].replace(/^#\s*/, '');
     const body = lines.slice(1).join('\n');
 
@@ -126,7 +126,7 @@ export function Editor({
     const handleTitleChange = useCallback((newTitle: string) => {
         setContent(prevContent => {
             const current = prevContent;
-            const lines = current.split('\n');
+            const lines = current.split(/\r?\n/);
             const newContent = `# ${newTitle}\n${lines.slice(1).join('\n')}`;
             return newContent;
         });
@@ -136,7 +136,7 @@ export function Editor({
     const handleBodyChange = useCallback((newBody: string) => {
         setContent(prevContent => {
             const current = prevContent;
-            const lines = current.split('\n');
+            const lines = current.split(/\r?\n/);
             const newContent = `${lines[0] || ''}\n${newBody}`;
             return newContent;
         });
@@ -173,7 +173,10 @@ export function Editor({
     }, [content, note.filename, note.folder, onUpdateLocally, note.content]);
 
     const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'ArrowDown') {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            markdownEditorRef.current?.focus('start');
+        } else if (e.key === 'ArrowDown') {
             const { selectionStart, selectionEnd, value } = e.currentTarget;
             if (selectionStart === selectionEnd && selectionStart === value.length) {
                 e.preventDefault();
@@ -389,7 +392,7 @@ export function Editor({
                     )}>
                         <textarea
                             ref={titleRef}
-                            className="flex-1 p-0 text-xl font-bold bg-transparent border-none outline-none resize-none text-gray-700 dark:text-gray-100 leading-tight placeholder-gray-300 dark:placeholder-gray-700"
+                            className="flex-1 p-0 text-xl font-bold bg-transparent border-none outline-none resize-none overflow-hidden text-gray-700 dark:text-gray-100 leading-tight placeholder-gray-300 dark:placeholder-gray-700"
                             placeholder="Note Title"
                             value={title}
                             onChange={(e) => handleTitleChange(e.target.value)}
@@ -484,7 +487,7 @@ export function Editor({
                         <div className="max-w-3xl mx-auto px-8 w-full pt-4 mb-2">
                             <textarea
                                 ref={titleRef}
-                                className="w-full p-0 text-3xl font-black bg-transparent border-none outline-none resize-none text-gray-800 dark:text-gray-100 leading-tight placeholder-gray-300 dark:placeholder-gray-700 text-center"
+                                className="w-full p-0 text-3xl font-black bg-transparent border-none outline-none resize-none overflow-hidden text-gray-800 dark:text-gray-100 leading-tight placeholder-gray-300 dark:placeholder-gray-700 text-center"
                                 placeholder="Note Title"
                                 value={title}
                                 onChange={(e) => handleTitleChange(e.target.value)}

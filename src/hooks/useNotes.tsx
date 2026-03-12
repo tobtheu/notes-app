@@ -382,20 +382,19 @@ export function useNotes() {
             // If we have an ID but NO currentNote (even after fallback), it means the note is missing 
             // from the current app state (maybe a sync is in progress). 
             // ABORT to avoid creating a new duplicate file from a stale ID.
-            if (currentId && !currentNote) {
+            // EXCEPTION: Allow "Quick Note.md" to be created even if not in state yet.
+            if (currentId && !currentNote && filename !== 'Quick Note.md') {
                 console.warn(`[saveNote] Aborting save: Note ID ${currentId} is not in current state. Prevents duplicate creation.`);
                 return currentId;
             }
 
             if (skipRename) {
-                if (currentNote) {
-                    await window.tauriAPI.saveNote({
-                        rootPath: baseFolder,
-                        folderPath,
-                        filename: currentNote.filename,
-                        content
-                    });
-                }
+                await window.tauriAPI.saveNote({
+                    rootPath: baseFolder,
+                    folderPath,
+                    filename: currentNote?.filename || filename,
+                    content
+                });
                 return currentId;
             }
 

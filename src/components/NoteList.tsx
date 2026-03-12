@@ -24,7 +24,7 @@ interface NoteListProps {
 const stripMarkdown = (text: string) => {
     if (!text) return '';
     return text
-        .split('\n')[0] // Only preview the first line
+        .split(/\r?\n/)[0] // Only preview the first line
         .replace(/^#+\s+/, '') // Remove markdown headers
         .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1') // Remove image syntax
         .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Remove link syntax
@@ -69,7 +69,7 @@ const NoteListItem = memo(({
     folders: string[];
 }) => {
     const previewText = useMemo(() => {
-        return stripMarkdown(note.content.replace(/^#\s.*?\n/, '').trim()) || 'No additional content';
+        return stripMarkdown(note.content.replace(/^#\s.*?\r?\n/, '').trim()) || 'No additional content';
     }, [note.content]);
 
     const timeString = useMemo(() => {
@@ -79,7 +79,7 @@ const NoteListItem = memo(({
     }, [note.updatedAt]);
 
     const title = useMemo(() => {
-        const firstLine = note.content.split('\n')[0] || '';
+        const firstLine = note.content.split(/\r?\n/)[0] || '';
         const extractedTitle = firstLine.replace(/^#\s*/, '').trim();
         return extractedTitle || note.filename.replace('.md', '');
     }, [note.content, note.filename]);

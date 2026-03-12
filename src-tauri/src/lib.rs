@@ -11,6 +11,8 @@ mod git;
 mod github;
 mod store;
 
+use tauri_plugin_positioner::{WindowExt, Position};
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncResultPayload {
@@ -691,12 +693,22 @@ async fn save_asset(app: tauri::AppHandle, root_path: String, filename: String, 
     })
 }
 
+#[tauri::command]
+async fn hide_quick_note(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("quick-note") {
+        let _ = window.hide();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(target_os = "ios")]
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let _ = app.get_webview_window("main").expect("no main window").set_focus();
+        }))
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_log::Builder::default()
             .level(log::LevelFilter::Info)
@@ -704,6 +716,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_positioner::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -713,10 +726,57 @@ pub fn run() {
             delete_folder_recursive, delete_folder_move_contents,
             get_app_version, get_document_dir, connect_github,
             start_github_oauth, complete_github_oauth, sync_now, start_watch,
-            clear_github_credentials, save_asset
+            clear_github_credentials, save_asset, hide_quick_note
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {
+            use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButtonState};
+            use tauri::menu::{Menu, MenuItem};
+
+            let show_main = MenuItem::with_id(app, "show_main", "Hauptfenster zeigen", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_main, &quit])?;
+
+            let _tray = TrayIconBuilder::with_id("main-tray")
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        "show_main" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
+                    if let TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("quick-note") {
+                            let is_visible = window.is_visible().unwrap_or(false);
+                            if is_visible {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.as_ref().window().move_window(Position::TrayBottomCenter);
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    }
+                })
+                .build(app)?;
+
             let window = app.get_webview_window("main").unwrap();
             
             #[cfg(target_os = "macos")]

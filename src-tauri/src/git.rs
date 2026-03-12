@@ -37,8 +37,8 @@ pub fn commit_changes(repo_path: &Path, message: &str) -> Result<(), git2::Error
 
     // Add all changes, deletions, and untracked files
     index.add_all(["*"].iter(), IndexAddOption::DEFAULT, None)?;
-    let count = index.len();
-    // println!("[git.rs] Index size after add_all: {}", count);
+    let _count = index.len();
+    // println!("[git.rs] Index size after add_all: {}", _count);
     index.write()?;
 
     let oid = index.write_tree()?;

@@ -1030,9 +1030,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                     }
                 }}
             >
-                <div className="max-w-4xl mx-auto pt-0 pb-8 px-8 min-h-full flex flex-col">
+                <div className="max-w-4xl mx-auto pt-0 pb-8 px-8 min-h-full flex flex-col w-full">
                     {header}
-                    <EditorContent editor={editor} className="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl flex-1 flex flex-col" />
+                    <EditorContent editor={editor} className="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl flex-1 flex flex-col break-words [overflow-wrap:anywhere]" />
                 </div>
             </div>
 

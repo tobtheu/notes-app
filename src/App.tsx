@@ -11,14 +11,19 @@ import { FolderEditModal } from './components/FolderEditModal';
 import { useNotes } from './hooks/useNotes';
 import { useSettings } from './hooks/useSettings';
 import { useTheme } from './hooks/useTheme';
+import { QuickNote } from './components/QuickNote';
 import type { Note } from './types';
 import { Loader2, Book } from 'lucide-react';
 import clsx from 'clsx';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import logo from './assets/logo.png';
 
+const appWindow = getCurrentWindow();
+
 function App() {
+  const isQuickNote = appWindow.label === 'quick-note';
   const {
     allNotes,
     folders,
@@ -57,6 +62,10 @@ function App() {
     reloadNotes,
     clearGithubCredentials
   } = useNotes();
+
+  if (isQuickNote) {
+    return <QuickNote />;
+  }
 
   const {
     markdownEnabled,
