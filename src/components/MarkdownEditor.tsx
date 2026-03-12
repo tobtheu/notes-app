@@ -967,7 +967,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
 
             {/* Content area - isolated scroll area */}
             <div
-                className="flex-1 overflow-y-auto custom-scrollbar min-h-0 cursor-text group/editor"
+                className={clsx(
+                    "flex-1 overflow-y-auto custom-scrollbar min-h-0 cursor-text group/editor",
+                    isFocusMode && "focus-mode-active"
+                )}
                 onScroll={handleScroll}
                 onDragEnter={(e) => {
                     e.preventDefault();
