@@ -392,7 +392,7 @@ export function Editor({
                     )}>
                         <textarea
                             ref={titleRef}
-                            className="flex-1 p-0 text-xl font-bold bg-transparent border-none outline-none resize-none overflow-hidden text-gray-700 dark:text-gray-100 leading-tight placeholder-gray-300 dark:placeholder-gray-700"
+                            className="flex-1 p-0 text-3xl font-extrabold bg-transparent border-none outline-none resize-none overflow-hidden text-gray-700 dark:text-gray-100 leading-tight placeholder-gray-300 dark:placeholder-gray-700"
                             placeholder="Note Title"
                             value={title}
                             onChange={(e) => handleTitleChange(e.target.value)}
@@ -484,10 +484,10 @@ export function Editor({
                     toolbarVisible={toolbarVisible}
                     spellcheckEnabled={spellcheckEnabled}
                     header={isFocusMode ? (
-                        <div className="max-w-3xl mx-auto px-8 w-full pt-4 mb-2">
+                        <div className="max-w-3xl mx-auto px-8 w-full pt-8 mb-6">
                             <textarea
                                 ref={titleRef}
-                                className="w-full p-0 text-3xl font-black bg-transparent border-none outline-none resize-none overflow-hidden text-gray-800 dark:text-gray-100 leading-tight placeholder-gray-300 dark:placeholder-gray-700 text-center"
+                                className="w-full p-0 text-5xl font-black bg-transparent border-none outline-none resize-none overflow-hidden text-gray-800 dark:text-gray-100 leading-tight placeholder-gray-300 dark:placeholder-gray-700 text-center"
                                 placeholder="Note Title"
                                 value={title}
                                 onChange={(e) => handleTitleChange(e.target.value)}
