@@ -1,0 +1,292 @@
+
+> notiz-app@0.5.5 tauri
+> tauri build --verbose
+
+       Debug [tauri_cli::helpers::app_paths] Found Tauri project inside /Users/tobiastheunissen/Downloads/notes-app/src-tauri on early lookup
+        Info [tauri_cli::build] Looking up installed tauri packages to check mismatched versions...
+     Running [tauri_cli::helpers] beforeBuildCommand `npm run build`
+       Debug [tauri_cli::helpers] Setting environment for hook {"TAURI_ENV_PLATFORM_VERSION": "26.3.0", "TAURI_ENV_TARGET_TRIPLE": "aarch64-apple-darwin", "TAURI_ENV_PLATFORM": "darwin", "TAURI_ENV_ARCH": "aarch64", "TAURI_ENV_FAMILY": "unix"}
+     Running [tauri_cli] Command `sh -c npm run build`
+
+> notiz-app@0.5.5 build
+> tsc -b && vite build
+
+vite v7.3.1 building client environment for production...
+transforming...
+✓ 2474 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                         0.46 kB │ gzip:   0.30 kB
+dist/assets/logo-9L4ofPWL.png         176.65 kB
+dist/assets/index-ClD2c8s3.css        116.74 kB │ gzip:  17.60 kB
+dist/assets/marked.esm-DhWXLDY5.js     42.20 kB │ gzip:  12.78 kB
+dist/assets/index-Crn8CYQo.js       1,254.63 kB │ gzip: 398.67 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 5.22s
+     Running [tauri_cli] Command `cargo build --bins --features tauri/custom-protocol --release`
+   Compiling libc v0.2.182
+   Compiling serde_core v1.0.228
+   Compiling objc2-exception-helper v0.1.1
+   Compiling objc2-encode v4.1.0
+   Compiling zerofrom v0.1.6
+   Compiling serde v1.0.228
+   Compiling cfg-if v1.0.4
+   Compiling stable_deref_trait v1.2.1
+   Compiling itoa v1.0.17
+   Compiling bytes v1.11.1
+   Compiling yoke v0.8.1
+   Compiling zerovec v0.11.5
+   Compiling smallvec v1.15.1
+   Compiling memchr v2.8.0
+   Compiling litemap v0.8.1
+   Compiling value-bag v1.12.0
+   Compiling writeable v0.6.2
+   Compiling objc2 v0.6.3
+   Compiling tinystr v0.8.2
+   Compiling log v0.4.29
+   Compiling potential_utf v0.1.4
+   Compiling zerotrie v0.2.3
+   Compiling icu_normalizer_data v2.1.1
+   Compiling icu_locale_core v2.1.1
+   Compiling icu_collections v2.1.1
+   Compiling icu_properties_data v2.1.2
+   Compiling core-foundation-sys v0.8.7
+   Compiling once_cell v1.21.3
+   Compiling percent-encoding v2.3.2
+   Compiling pin-project-lite v0.2.16
+   Compiling http v1.4.0
+   Compiling form_urlencoded v1.2.2
+   Compiling zmij v1.0.21
+   Compiling utf8_iter v1.0.4
+   Compiling serde_json v1.0.149
+   Compiling tauri v2.10.2
+   Compiling core-foundation v0.10.1
+   Compiling icu_provider v2.1.1
+   Compiling block2 v0.6.2
+   Compiling icu_normalizer v2.1.1
+   Compiling icu_properties v2.1.2
+   Compiling mio v1.1.1
+   Compiling socket2 v0.6.2
+   Compiling bitflags v2.11.0
+   Compiling objc2-core-foundation v0.3.2
+   Compiling tokio v1.49.0
+   Compiling thiserror v2.0.18
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling powerfmt v0.2.0
+   Compiling crossbeam-utils v0.8.21
+   Compiling deranged v0.5.8
+   Compiling url v2.5.8
+   Compiling dpi v0.1.2
+   Compiling aho-corasick v1.1.4
+   Compiling objc2-foundation v0.3.2
+   Compiling objc2-core-text v0.3.2
+   Compiling objc2-core-graphics v0.3.2
+   Compiling objc2-core-video v0.3.2
+   Compiling num_threads v0.1.7
+   Compiling typeid v1.0.3
+   Compiling time-core v0.1.8
+   Compiling unic-char-range v0.9.0
+   Compiling alloc-no-stdlib v2.0.4
+   Compiling unic-common v0.9.0
+   Compiling simd-adler32 v0.3.8
+   Compiling raw-window-handle v0.6.2
+   Compiling regex-syntax v0.8.10
+   Compiling num-conv v0.2.0
+   Compiling time v0.3.47
+   Compiling unic-ucd-version v0.9.0
+   Compiling alloc-stdlib v0.2.2
+   Compiling unic-char-property v0.9.0
+   Compiling uuid v1.21.0
+   Compiling crc32fast v1.5.0
+   Compiling erased-serde v0.4.9
+   Compiling thiserror v1.0.69
+   Compiling fnv v1.0.7
+   Compiling base64 v0.22.1
+   Compiling same-file v1.0.6
+   Compiling siphasher v1.0.2
+   Compiling winnow v0.7.14
+   Compiling byteorder v1.5.0
+   Compiling adler2 v2.0.1
+   Compiling cfb v0.7.3
+   Compiling miniz_oxide v0.8.9
+   Compiling regex-automata v0.4.14
+   Compiling toml_parser v1.0.9+spec-1.1.0
+   Compiling phf_shared v0.11.3
+   Compiling walkdir v2.5.0
+   Compiling cookie v0.18.1
+   Compiling crossbeam-channel v0.5.15
+   Compiling unic-ucd-ident v0.9.0
+   Compiling brotli-decompressor v5.0.0
+   Compiling objc2-security v0.3.2
+   Compiling jsonptr v0.6.3
+   Compiling toml_datetime v0.7.5+spec-1.1.0
+   Compiling serde_spanned v1.0.4
+   Compiling objc2-javascript-core v0.3.2
+   Compiling anyhow v1.0.102
+   Compiling toml_writer v1.0.6+spec-1.1.0
+   Compiling foreign-types-shared v0.3.1
+   Compiling option-ext v0.2.0
+   Compiling dirs-sys v0.5.0
+   Compiling toml v0.9.12+spec-1.1.0
+   Compiling foreign-types v0.5.0
+   Compiling regex v1.12.3
+   Compiling brotli v8.0.2
+   Compiling urlpattern v0.3.0
+   Compiling json-patch v3.0.1
+   Compiling serde-untagged v0.1.9
+   Compiling flate2 v1.1.9
+   Compiling phf v0.11.3
+   Compiling infer v0.19.0
+   Compiling fdeflate v0.3.7
+   Compiling core-graphics-types v0.2.0
+   Compiling semver v1.0.27
+   Compiling serde_with v3.17.0
+   Compiling glob v0.3.3
+   Compiling bitflags v1.3.2
+   Compiling unicode-segmentation v1.12.0
+   Compiling dunce v1.0.5
+   Compiling keyboard-types v0.7.0
+   Compiling png v0.17.16
+   Compiling wry v0.54.2
+   Compiling tauri-runtime v2.10.0
+   Compiling objc2-quartz-core v0.3.2
+   Compiling objc2-core-data v0.3.2
+   Compiling objc2-cloud-kit v0.3.2
+   Compiling objc2-core-image v0.3.2
+   Compiling core-graphics v0.24.0
+   Compiling objc2-app-kit v0.3.2
+   Compiling dirs v6.0.0
+   Compiling futures-core v0.3.32
+   Compiling scopeguard v1.2.0
+   Compiling tauri-utils v2.8.2
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.16.1
+   Compiling dispatch v0.2.0
+   Compiling lazy_static v1.5.0
+   Compiling getrandom v0.3.4
+   Compiling tauri-runtime-wry v2.10.0
+   Compiling aws-lc-sys v0.37.1
+   Compiling indexmap v2.13.0
+   Compiling quick-xml v0.38.4
+   Compiling errno v0.3.14
+   Compiling serialize-to-javascript v0.1.2
+   Compiling mime v0.3.17
+   Compiling plist v1.8.0
+   Compiling http-range v0.1.5
+   Compiling zeroize v1.8.2
+   Compiling heck v0.5.0
+   Compiling embed_plist v1.2.2
+   Compiling ring v0.17.14
+   Compiling rustls-pki-types v1.14.0
+   Compiling getrandom v0.2.17
+   Compiling untrusted v0.9.0
+   Compiling http-body v1.0.1
+   Compiling tracing-core v0.1.36
+   Compiling futures-task v0.3.32
+   Compiling slab v0.4.12
+   Compiling futures-util v0.3.32
+   Compiling tracing v0.1.44
+   Compiling httparse v1.10.1
+   Compiling rustix v1.1.4
+   Compiling security-framework-sys v2.17.0
+   Compiling try-lock v0.2.5
+   Compiling tower-service v0.3.3
+   Compiling subtle v2.6.1
+   Compiling want v0.3.1
+   Compiling security-framework v3.7.0
+   Compiling libz-sys v1.1.24
+   Compiling openssl-sys v0.9.111
+   Compiling futures-channel v0.3.32
+   Compiling pin-utils v0.1.0
+   Compiling atomic-waker v1.1.2
+   Compiling hyper v1.8.1
+   Compiling num-traits v0.2.19
+   Compiling sync_wrapper v1.0.2
+   Compiling tower-layer v0.3.3
+   Compiling ipnet v2.11.0
+   Compiling tower v0.5.3
+   Compiling hyper-util v0.1.20
+   Compiling signal-hook v0.3.18
+   Compiling tauri-plugin-fs v2.4.5
+   Compiling rustls-native-certs v0.8.3
+   Compiling signal-hook-registry v1.4.8
+   Compiling iri-string v0.7.10
+   Compiling rust_decimal v1.40.0
+   Compiling nix v0.30.1
+   Compiling http-body-util v0.1.3
+   Compiling os_pipe v1.2.3
+   Compiling getrandom v0.4.1
+   Compiling futures-sink v0.3.32
+   Compiling arrayvec v0.7.6
+   Compiling rfd v0.16.0
+   Compiling tokio-util v0.7.18
+   Compiling tauri-plugin-log v2.8.0
+   Compiling tower-http v0.6.8
+   Compiling tauri-plugin-shell v2.3.5
+   Compiling tauri-plugin-updater v2.10.0
+   Compiling tauri-plugin-store v2.4.2
+   Compiling tauri-plugin-process v2.3.1
+   Compiling tauri-plugin-dialog v2.6.0
+   Compiling tauri-plugin-positioner v2.3.1
+   Compiling tauri-plugin-os v2.3.2
+   Compiling sigchld v0.2.4
+   Compiling xattr v1.6.1
+   Compiling dispatch2 v0.3.0
+   Compiling filetime v0.2.27
+   Compiling ryu v1.0.23
+   Compiling fastrand v2.3.0
+   Compiling pathdiff v0.2.3
+   Compiling utf8-width v0.1.8
+   Compiling tempfile v3.26.0
+   Compiling byte-unit v5.2.0
+   Compiling open v5.3.3
+   Compiling serde_urlencoded v0.7.1
+   Compiling tar v0.4.44
+   Compiling os_info v3.14.0
+   Compiling shared_child v1.1.1
+   Compiling gethostname v1.1.0
+   Compiling notify-types v2.1.0
+   Compiling iana-time-zone v0.1.65
+   Compiling fern v0.7.1
+   Compiling fsevent-sys v4.1.0
+   Compiling encoding_rs v0.8.35
+   Compiling minisign-verify v0.2.4
+   Compiling sys-locale v0.3.2
+   Compiling notify v8.2.0
+   Compiling chrono v0.4.44
+   Compiling app v0.5.5 (/Users/tobiastheunissen/Downloads/notes-app/src-tauri)
+   Compiling objc2-web-kit v0.3.2
+   Compiling tao v0.34.5
+   Compiling muda v0.17.1
+   Compiling tray-icon v0.21.3
+   Compiling window-vibrancy v0.6.0
+   Compiling objc2-osa-kit v0.3.2
+   Compiling osakit v0.3.1
+   Compiling aws-lc-rs v1.16.0
+   Compiling tauri-plugin-single-instance v2.4.0
+   Compiling rustls v0.23.37
+   Compiling rustls-webpki v0.103.9
+   Compiling tokio-rustls v0.26.4
+   Compiling rustls-platform-verifier v0.6.2
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.13.2
+   Compiling reqwest v0.12.28
+   Compiling libssh2-sys v0.3.1
+   Compiling libgit2-sys v0.17.0+1.8.1
+   Compiling git2 v0.19.0
+error: unknown field `bundle`, expected one of `windows`, `security`, `tray-icon`, `trayIcon`, `macOSPrivateApi`, `macos-private-api`, `with-global-tauri`, `withGlobalTauri`, `enable-gtk-app-id`, `enableGTKAppId`
+   --> src/lib.rs:828:14
+    |
+828 |         .run(tauri::generate_context!())
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this error originates in the macro `tauri::generate_context` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: could not compile `app` (lib) due to 1 previous error
+failed to build app: failed to build app
+       Error [tauri_cli_node] failed to build app: failed to build app
