@@ -6,14 +6,17 @@ A fast, lightweight, and modern note-taking application built with Tauri V2, Rea
 
 - Tauri V2 Powered: Blazing fast performance with a minimal security-first Rust backend.
 - Hybrid Markdown Editor: A powerful visual editor powered by Tiptap with full Markdown support.
+- Focus Mode: A minimalist writing interface that hides all distractions to help you focus on your thoughts.
 - Local-First Storage: Your notes stay on your machine. Stored as standard .md files for maximum compatibility.
 - GitHub Cloud Sync: Optional sync with GitHub repositories for backup and multi-device support.
 - Conflict Detection: Automatic detection of sync conflicts (e.g. from iCloud or concurrent GitHub edits).
 - Smart Internal Linking: Link notes together using note:// protocol. Supports deep-linking to specific headings.
 - Pinning System: Keep your most important thoughts at the top of your list.
 - Folder Organization: Simple and intuitive folder management for your workspace.
+- Customization: Adjustable accent colors, font sizes, and dark/light mode to suit your preferences.
+- Productivity Tools: Built-in spellchecking and toggleable toolbars.
 - Performance and Stability: Optimized scroll behavior, anti-flicker editor stabilization, and smart auto-save normalization.
-- Modern UI: Beautiful, responsive interface with a focus on typography and readability.
+- Modern UI: Beautiful, responsive interface with a focus on typography and readability across desktop and mobile.
 
 ## Technology Stack
 
@@ -29,7 +32,7 @@ A fast, lightweight, and modern note-taking application built with Tauri V2, Rea
 
 - Node.js (Latest LTS)
 - Rust (Stable)
-- Tauri Prerequisites for your OS
+- Tauri Prerequisites for your OS (see official Tauri documentation)
 
 ### Installation
 
@@ -52,11 +55,10 @@ npm run tauri build
 
 ## Project Structure
 
-- src/: React frontend source code
-- src/hooks/: Custom React hooks for state and note management
-- src/components/: Modular UI components
-- src-tauri/: Rust backend and Tauri configuration
-- src-tauri/src/lib.rs: Core file system and metadata logic
+- src/: React frontend source code and modular UI components.
+- src/hooks/: Custom React hooks for state, note, and settings management.
+- src-tauri/: Rust backend and Tauri configuration.
+- src-tauri/src/lib.rs: Core file system, Git integration, and metadata logic.
 
 ---
 Built using Antigravity
