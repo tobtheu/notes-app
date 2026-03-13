@@ -10,6 +10,7 @@ pub struct GitHubUser {
 
 #[derive(Deserialize)]
 pub struct GitHubRepo {
+    #[allow(dead_code)]
     pub name: String,
     pub clone_url: String,
 }

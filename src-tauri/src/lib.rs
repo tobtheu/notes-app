@@ -11,7 +11,7 @@ mod git;
 mod github;
 mod store;
 
-use tauri_plugin_positioner::{WindowExt, Position};
+// use tauri_plugin_positioner::{WindowExt, Position};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -755,7 +755,7 @@ pub fn run() {
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {
-            use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButtonState};
+            use tauri::tray::TrayIconBuilder; // TrayIconEvent, MouseButtonState
             use tauri::menu::{Menu, MenuItem};
 
             let show_main = MenuItem::with_id(app, "show_main", "Hauptfenster zeigen", true, None::<&str>)?;
@@ -765,7 +765,7 @@ pub fn run() {
             let _tray = TrayIconBuilder::with_id("main-tray")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
-                .menu_on_left_click(false)
+                .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| {
                     match event.id.as_ref() {
                         "quit" => {
