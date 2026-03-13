@@ -63,9 +63,11 @@ function App() {
     clearGithubCredentials
   } = useNotes();
 
+  /* 
   if (isQuickNote) {
     return <QuickNote />;
   }
+  */
 
   const {
     markdownEnabled,

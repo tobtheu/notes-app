@@ -598,7 +598,18 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
         app.emit("sync-complete", &payload).ok();
         Ok(payload)
     } else {
-        Err("Not connected to GitHub".into())
+        // No GitHub credentials, but we still check for local conflict files (e.g. from iCloud or offline sync)
+        let disk_conflicts = detect_ongoing_conflicts(root);
+        let had_conflicts = !disk_conflicts.is_empty();
+        
+        let payload = SyncResultPayload {
+            had_changes: false,
+            had_conflicts,
+            conflict_pairs: disk_conflicts,
+            push_succeeded: false,
+        };
+        app.emit("sync-complete", &payload).ok();
+        Ok(payload)
     }
 }
 
@@ -693,12 +704,26 @@ async fn save_asset(app: tauri::AppHandle, root_path: String, filename: String, 
     })
 }
 
+/*
 #[tauri::command]
 async fn hide_quick_note(app: tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("quick-note") {
         let _ = window.hide();
+        #[cfg(target_os = "macos")]
+        {
+            // Release focus back to the previous application by hiding the app process
+            let _ = app.hide();
+        }
     }
 }
+
+#[tauri::command]
+async fn open_quick_note_devtools(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("quick-note") {
+        window.open_devtools();
+    }
+}
+*/
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -726,7 +751,7 @@ pub fn run() {
             delete_folder_recursive, delete_folder_move_contents,
             get_app_version, get_document_dir, connect_github,
             start_github_oauth, complete_github_oauth, sync_now, start_watch,
-            clear_github_credentials, save_asset, hide_quick_note
+            clear_github_credentials, save_asset, /* hide_quick_note, open_quick_note_devtools */
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {
@@ -755,19 +780,25 @@ pub fn run() {
                         _ => {}
                     }
                 })
-                .on_tray_icon_event(|tray, event| {
-                    tauri_plugin_positioner::on_tray_event(tray.app_handle(), &event);
+                .on_tray_icon_event(|_tray, event| {
+                    tauri_plugin_positioner::on_tray_event(_tray.app_handle(), &event);
+                    /*
                     if let TrayIconEvent::Click {
                         button: tauri::tray::MouseButton::Left,
                         button_state: MouseButtonState::Up,
                         ..
                     } = event
                     {
-                        let app = tray.app_handle();
+                        let app = _tray.app_handle();
                         if let Some(window) = app.get_webview_window("quick-note") {
                             let is_visible = window.is_visible().unwrap_or(false);
                             if is_visible {
                                 let _ = window.hide();
+                                #[cfg(target_os = "macos")]
+                                {
+                                    // Release focus back to the previous application
+                                    let _ = app.hide();
+                                }
                             } else {
                                 let _ = window.as_ref().window().move_window(Position::TrayBottomCenter);
                                 let _ = window.show();
@@ -775,6 +806,7 @@ pub fn run() {
                             }
                         }
                     }
+                    */
                 })
                 .build(app)?;
 

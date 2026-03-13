@@ -147,7 +147,13 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: var(--app-bg);
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Ensure Tauri webview handles transparency correctly */
+:root {
+  background-color: transparent !important;
 }
 
 html,

@@ -9,11 +9,22 @@ export function QuickNote() {
   const [isSaving, setIsSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Focus on mount
+  // Focus on mount and Global shortcuts
   useEffect(() => {
     if (!isLoading && currentFolder && textareaRef.current) {
       textareaRef.current.focus();
     }
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Cmd + Option + I for DevTools (macOS) or Ctrl + Alt + I
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyI') {
+        e.preventDefault();
+        invoke('open_quick_note_devtools');
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [isLoading, currentFolder]);
 
   const handleSave = async () => {
@@ -64,31 +75,35 @@ export function QuickNote() {
       handleClose();
     } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       handleClose();
+    } else if (e.key === 'i' && e.metaKey && e.altKey) {
+      // Handled by global listener but keeping for redundancy if focused
+      invoke('open_quick_note_devtools');
     }
   };
 
   if (!currentFolder) {
     return (
-      <div className="flex items-center justify-center h-screen bg-white dark:bg-gray-900">
+      <div className="flex items-center justify-center h-screen bg-transparent">
         <Loader2 className="animate-spin text-primary-500" />
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden shadow-2xl">
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-50/50 dark:bg-gray-800/50 border-bottom border-gray-100 dark:border-gray-700 drag">
-        <div className="flex items-center gap-2">
-          <Zap size={16} className="text-primary-500" />
-          <span className="text-sm font-bold text-gray-700 dark:text-gray-200">Quick Note</span>
+    <div className="h-screen w-screen p-3 bg-transparent overflow-hidden" style={{ background: 'transparent' }}>
+      <div className="h-full flex flex-col bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden shadow-2xl">
+        <div className="flex items-center justify-between px-4 py-3 bg-gray-50/50 dark:bg-gray-800/50 border-bottom border-gray-100 dark:border-gray-700 drag">
+          <div className="flex items-center gap-2">
+            <Zap size={16} className="text-primary-500" />
+            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">Quick Note</span>
+          </div>
+          <button 
+            onClick={handleClose}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors no-drag"
+          >
+            <X size={16} className="text-gray-500" />
+          </button>
         </div>
-        <button 
-          onClick={handleClose}
-          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors no-drag"
-        >
-          <X size={16} className="text-gray-500" />
-        </button>
-      </div>
 
       <div className="flex-1 p-4 flex flex-col">
         <textarea
@@ -108,6 +123,7 @@ export function QuickNote() {
         <span className="text-[10px] text-gray-400">
           Cmd + Enter to save & close
         </span>
+      </div>
       </div>
     </div>
   );
