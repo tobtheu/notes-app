@@ -15,3 +15,6 @@
 - **Rendering**: Maintain optimizations to prevent unnecessary re-renders in the Tiptap editor.
 - **State management**: Ensure that background processes (Sync/Polling) do not interrupt the user's typing experience or cursor position.
 - **Cleanup**: Always ensure proper cleanup of timeouts and event listeners in `useEffect` hooks.
+## 4. Documentation & README
+- **Up-to-date**: Always keep the `README.md` updated when introducing new features or changes to the project structure.
+- **Emoji-free**: Do NOT use emojis or icons in the `README.md`. The style should be clean, professional, and strictly text-based markdown headers/lists.
