@@ -5,7 +5,16 @@ import { PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react';
 import { Minus, Square, X } from 'lucide-react';
 import clsx from 'clsx';
 
-const appWindow = getCurrentWindow();
+// Guard against module-level failure on iOS/environments where __TAURI_INTERNALS__
+// may not be injected yet when the module is evaluated.
+let appWindow: ReturnType<typeof getCurrentWindow> | null = null;
+try {
+    if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+        appWindow = getCurrentWindow();
+    }
+} catch (e) {
+    console.warn('[TitleBar] Could not get appWindow:', e);
+}
 
 interface TitleBarProps {
     isSidebarCollapsed: boolean;
@@ -18,15 +27,20 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
     const [platform, setPlatform] = useState<string | null>(null);
 
     useEffect(() => {
-        setPlatform(type());
+        try {
+            setPlatform(type());
+        } catch (e) {
+            console.warn('[TitleBar] Could not detect platform:', e);
+        }
     }, []);
 
     // On macOS we use "Overlay" style which provides native traffic lights on the left.
     const isMac = platform === 'macos';
+    const isIOS = platform === 'ios';
 
     const handleMouseDown = (e: React.MouseEvent) => {
         if (e.buttons === 1 && !(e.target as HTMLElement).closest('.no-drag')) {
-            appWindow.startDragging();
+            appWindow?.startDragging();
         }
     };
 
@@ -34,7 +48,10 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
         <div
             id="titlebar"
             onMouseDown={handleMouseDown}
-            className="h-10 min-h-[40px] flex items-center justify-between bg-gray-50 dark:bg-gray-950 select-none relative z-[9999]"
+            className={clsx(
+                "pt-[var(--safe-top,0vh)] flex items-center justify-between bg-gray-50 dark:bg-gray-950 select-none relative z-[9999] box-content",
+                isIOS ? "h-6 min-h-[24px]" : "h-10 min-h-[40px]"
+            )}
         >
             {/* Sidebar / Back Button Area */}
             <div
@@ -70,8 +87,8 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                     }}
                     className={clsx(
                         "no-drag p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all active:scale-95",
-                        // Hide on very small screens if we are in editor view (Back button takes over)
-                        activeView === 'editor' ? "hidden md:flex" : "flex",
+                        // Show on iOS (mobile), hide on other small screens unless md+
+                        isIOS ? "flex" : "hidden md:flex",
                         isMac && isSidebarCollapsed ? "absolute left-[84px]" : "ml-auto"
                     )}
                     title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
@@ -80,29 +97,35 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                 </button>
             </div>
 
-            {/* Centered Title */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">
-                    NotizApp
-                </span>
-            </div>
+            {/* Centered Title — hidden on iOS (overlaps Dynamic Island) */}
+            {!isIOS && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">
+                        NotizApp
+                    </span>
+                </div>
+            )}
 
-            {/* Window Controls (Windows/Linux) */}
-            {!isMac && platform && (
+            {/* Window Controls (Windows/Linux only — not iOS/Android) */}
+            {!isMac && (platform === 'windows' || platform === 'linux') && (
                 <div className="flex h-full items-stretch relative z-10 no-drag" onMouseDown={e => e.stopPropagation()}>
                     <button
-                        onClick={() => appWindow.minimize()}
+                        type="button"
+                        title="Minimize"
+                        onClick={() => appWindow?.minimize()}
                         className="flex items-center justify-center w-11 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors no-drag"
                     >
                         <Minus size={14} />
                     </button>
                     <button
+                        type="button"
+                        title="Maximize"
                         onClick={async () => {
-                            const isMax = await appWindow.isMaximized();
+                            const isMax = await appWindow?.isMaximized();
                             if (isMax) {
-                                await appWindow.unmaximize();
+                                await appWindow?.unmaximize();
                             } else {
-                                await appWindow.maximize();
+                                await appWindow?.maximize();
                             }
                         }}
                         className="flex items-center justify-center w-11 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors no-drag"
@@ -110,7 +133,9 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                         <Square size={12} />
                     </button>
                     <button
-                        onClick={() => appWindow.close()}
+                        type="button"
+                        title="Close"
+                        onClick={() => appWindow?.close()}
                         className="flex items-center justify-center w-12 hover:bg-red-500 hover:text-white text-gray-500 dark:text-gray-400 transition-colors no-drag"
                     >
                         <X size={14} />

@@ -6,9 +6,11 @@ type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline' | 'error' | 'conflic
 
 interface SyncStatusBadgeProps {
     syncStatus: SyncStatus;
+    syncError?: string | null;
     lastSyncedAt: Date | null;
     conflictFiles?: ConflictPair[];
     onSync?: () => void;
+    onOpenSettings?: () => void;
 }
 
 function formatRelativeTime(date: Date): string {
@@ -20,7 +22,14 @@ function formatRelativeTime(date: Date): string {
     return `${hours}h ago`;
 }
 
-export function SyncStatusBadge({ syncStatus, lastSyncedAt, conflictFiles = [], onSync }: SyncStatusBadgeProps) {
+export function SyncStatusBadge({ syncStatus, syncError, lastSyncedAt, conflictFiles = [], onSync, onOpenSettings }: SyncStatusBadgeProps) {
+    const isAuthError = syncStatus === 'error' && !!syncError && (
+        syncError.includes('class=Http') ||
+        syncError.includes('401') ||
+        syncError.includes('authentication') ||
+        syncError.includes('unexpected EOF')
+    );
+
     const config = {
         idle: {
             icon: <Cloud size={18} />,
@@ -48,7 +57,7 @@ export function SyncStatusBadge({ syncStatus, lastSyncedAt, conflictFiles = [], 
         },
         error: {
             icon: <XCircle size={18} />,
-            label: 'Sync failed',
+            label: isAuthError ? 'Token abgelaufen' : 'Sync failed',
             color: 'text-red-500 dark:text-red-400',
             clickable: true,
         },
@@ -62,8 +71,9 @@ export function SyncStatusBadge({ syncStatus, lastSyncedAt, conflictFiles = [], 
 
     return (
         <button
-            onClick={config.clickable && onSync ? onSync : undefined}
-            disabled={!config.clickable || !onSync}
+            type="button"
+            onClick={isAuthError && onOpenSettings ? onOpenSettings : (config.clickable && onSync ? onSync : undefined)}
+            disabled={!config.clickable || (!onSync && !(isAuthError && onOpenSettings))}
             title={
                 syncStatus === 'conflict'
                     ? `Conflict in: ${conflictFiles.join(', ')}`
@@ -71,7 +81,9 @@ export function SyncStatusBadge({ syncStatus, lastSyncedAt, conflictFiles = [], 
                         ? `Last synced ${formatRelativeTime(lastSyncedAt)}`
                         : syncStatus === 'offline'
                             ? 'No internet connection'
-                            : 'Sync with GitHub'
+                            : isAuthError
+                                ? 'GitHub-Token abgelaufen. GitHub in den Einstellungen neu verbinden.'
+                                : 'Sync with GitHub'
             }
             className={clsx(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors select-none',

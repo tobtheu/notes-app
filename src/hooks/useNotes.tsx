@@ -46,7 +46,25 @@ export function useNotes() {
      */
     useEffect(() => {
         const initFolder = async () => {
-            const savedFolder = localStorage.getItem('notes-folder');
+            let savedFolder = localStorage.getItem('notes-folder');
+            
+            // CRITICAL FIX: iOS changes the app container UUID on updates/reinstalls.
+            // If we blindly trust the absolute path in localStorage, we get OS Sandbox EPERM errors.
+            // On mobile, force-resolve the current Document Dir instead of relying on saved absolute paths.
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            if (isMobile) {
+                try {
+                    const docDir = await window.tauriAPI.getDocumentDir();
+                    const newPath = `${docDir}/NotizApp`.replace(/\\/g, '/');
+                    // Ensure the folder exists in the new sandbox path
+                    await window.tauriAPI.createFolder(docDir, newPath);
+                    savedFolder = newPath;
+                    localStorage.setItem('notes-folder', savedFolder);
+                } catch (e) {
+                    console.error("Failed to resolve dynamic mobile path:", e);
+                }
+            }
+
             if (savedFolder && !savedFolder.startsWith('null')) {
                 setBaseFolder(savedFolder);
             } else {
@@ -66,6 +84,7 @@ export function useNotes() {
     );
     const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
     const [conflictPairs, setConflictPairs] = useState<{ original: string; conflictCopy: string }[]>([]);
+    const [syncError, setSyncError] = useState<string | null>(null);
 
     const loadNotes = useCallback(async (showLoader: boolean = true) => {
         if (!baseFolder || isRepairing.current) return;
@@ -155,6 +174,7 @@ export function useNotes() {
         if (!baseFolder || !navigator.onLine) return;
         setIsSyncing(true);
         setSyncStatus('syncing');
+        setSyncError(null);
         try {
             const result = await window.tauriAPI.syncNow(baseFolder);
             if (result.hadConflicts) {
@@ -171,6 +191,7 @@ export function useNotes() {
             }
         } catch (e) {
             console.error("Sync failed:", e);
+            setSyncError(String(e));
             setSyncStatus('error');
         } finally {
             setIsSyncing(false);
@@ -761,6 +782,7 @@ export function useNotes() {
         clearGithubCredentials: window.tauriAPI.clearGithubCredentials,
         isSyncing,
         syncStatus,
+        syncError,
         lastSyncedAt,
         conflictPairs,
         resetSyncStatus,

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Component } from 'react';
+import type { ReactNode } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
@@ -15,15 +16,38 @@ import { useTheme } from './hooks/useTheme';
 import type { Note } from './types';
 import { Loader2, Book } from 'lucide-react';
 import clsx from 'clsx';
-import { check } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
-// import { getCurrentWindow } from '@tauri-apps/api/window';
+import { platform } from '@tauri-apps/plugin-os';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import logo from './assets/logo.png';
 
-// const appWindow = getCurrentWindow();
+const appWindow = getCurrentWindow();
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+    constructor(props: { children: ReactNode }) {
+        super(props);
+        this.state = { error: null };
+    }
+    static getDerivedStateFromError(error: Error) {
+        return { error };
+    }
+    render() {
+        if (this.state.error) {
+            return (
+                <div className="fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 p-8 text-center gap-4">
+                    <p className="font-bold text-lg">Etwas ist schiefgelaufen</p>
+                    <p className="text-sm text-gray-500 font-mono max-w-sm break-all">{this.state.error.message}</p>
+                    <button type="button" className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm" onClick={() => window.location.reload()}>
+                        App neu laden
+                    </button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
 
 function App() {
-  // const isQuickNote = appWindow.label === 'quick-note';
+  const isQuickNote = appWindow.label === 'quick-note';
   const {
     allNotes,
     folders,
@@ -53,6 +77,7 @@ function App() {
     setSearchTerm,
     triggerSync,
     syncStatus,
+    syncError,
     lastSyncedAt,
     conflictPairs,
     resetSyncStatus,
@@ -63,11 +88,11 @@ function App() {
     clearGithubCredentials
   } = useNotes();
 
-  /* 
+  // If this Webview is the Quick Note window, display only the QuickNote component rather than the full app.
+  // This prevents hooks like `useNotes` from trying to run full filesystem syncs across two windows.
   if (isQuickNote) {
-    return <QuickNote />;
+    return <div className="h-screen w-screen bg-transparent flex items-center justify-center text-white"><p>Quick Note</p></div>;
   }
-  */
 
   const {
     markdownEnabled,
@@ -111,6 +136,7 @@ function App() {
 
 
   // Mobile View Management
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('notelist');
   const [selectionCount, setSelectionCount] = useState(0);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -131,6 +157,7 @@ function App() {
         setIsSidebarCollapsed(false);
       }
 
+      setIsMobile(width < 768);
       lastWidth.current = width;
     };
 
@@ -152,6 +179,9 @@ function App() {
   useEffect(() => {
     const checkForUpdates = async () => {
       try {
+        const p = await platform();
+        if (p === 'ios' || p === 'android') return;
+        const { check } = await import('@tauri-apps/plugin-updater');
         const update = await check();
         if (update) {
           setUpdateVersion(update.version);
@@ -168,6 +198,7 @@ function App() {
   const handleUpdate = async () => {
     try {
       setUpdateStatus({ type: 'downloading' });
+      const { check } = await import('@tauri-apps/plugin-updater');
       const update = await check();
       if (update) {
         await update.downloadAndInstall();
@@ -180,6 +211,7 @@ function App() {
   };
 
   const handleInstallUpdate = async () => {
+    const { relaunch } = await import('@tauri-apps/plugin-process');
     await relaunch();
   };
 
@@ -368,7 +400,7 @@ function App() {
 
   return (
     <div
-      className="h-screen flex flex-col bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 overflow-hidden"
+      className="absolute inset-0 flex flex-col bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 overflow-hidden"
       style={{
         fontFamily: fontFamily === 'inter' ? "'Inter', sans-serif" : fontFamily === 'roboto' ? "'Roboto', sans-serif" : "ui-sans-serif, system-ui, sans-serif",
       }}
@@ -402,6 +434,7 @@ function App() {
             onReorderFolders={reorderFolders}
             onOpenSettings={() => setIsSettingsOpen(true)}
             syncStatus={syncStatus}
+            syncError={syncError}
             lastSyncedAt={lastSyncedAt}
             conflictFiles={conflictPairs}
             onSync={triggerSync}
@@ -412,7 +445,7 @@ function App() {
         {!isFocusMode && (
           <NoteList
             className={clsx(
-              "flex-1 md:flex-none md:w-80 shrink-0",
+              "flex-1 md:flex-none md:w-80 shrink-0 transition-all duration-300 ease-in-out max-md:min-w-[calc(100vw-72px)]",
               activeView === 'editor' ? "hidden md:flex" :
                 activeView === 'sidebar' ? "hidden md:flex" : "flex"
             )}
@@ -539,4 +572,10 @@ function App() {
   );
 }
 
-export default App;
+export default function AppWithErrorBoundary() {
+    return (
+        <AppErrorBoundary>
+            <App />
+        </AppErrorBoundary>
+    );
+}

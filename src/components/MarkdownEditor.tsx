@@ -1038,7 +1038,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
 
             {/* Footer Toolbar - stays fixed at bottom of MarkdownEditor */}
             {toolbarVisible && (
-                <div className="shrink-0 p-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex items-center justify-center w-full min-h-[57px]">
+                <div className="shrink-0 px-2 pt-2 pb-[calc(8px+var(--safe-bottom,0vh))] bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex items-center justify-center w-full min-h-[57px] box-content">
                     <EditorToolbar
                         editor={editor}
                         onLinkClick={() => openLinkModal()}

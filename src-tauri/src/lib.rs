@@ -730,19 +730,26 @@ pub fn run() {
     #[cfg(target_os = "ios")]
     let _ = rustls::crypto::ring::default_provider().install_default();
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            let _ = app.get_webview_window("main").expect("no main window").set_focus();
-        }))
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    {
+        builder = builder
+            .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+                let _ = app.get_webview_window("main").expect("no main window").set_focus();
+            }))
+            .plugin(tauri_plugin_positioner::init())
+            .plugin(tauri_plugin_shell::init())
+            .plugin(tauri_plugin_updater::Builder::new().build());
+    }
+
+    builder
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_log::Builder::default()
             .level(log::LevelFilter::Info)
             .build())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_positioner::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
@@ -755,60 +762,38 @@ pub fn run() {
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {
-            use tauri::tray::TrayIconBuilder; // TrayIconEvent, MouseButtonState
-            use tauri::menu::{Menu, MenuItem};
+            #[cfg(desktop)]
+            {
+                use tauri::tray::TrayIconBuilder; // TrayIconEvent, MouseButtonState
+                use tauri::menu::{Menu, MenuItem};
 
-            let show_main = MenuItem::with_id(app, "show_main", "Hauptfenster zeigen", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_main, &quit])?;
+                let show_main = MenuItem::with_id(app, "show_main", "Hauptfenster zeigen", true, None::<&str>)?;
+                let quit = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
+                let menu = Menu::with_items(app, &[&show_main, &quit])?;
 
-            let _tray = TrayIconBuilder::with_id("main-tray")
-                .icon(app.default_window_icon().unwrap().clone())
-                .menu(&menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| {
-                    match event.id.as_ref() {
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        "show_main" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
+                let _tray = TrayIconBuilder::with_id("main-tray")
+                    .icon(app.default_window_icon().unwrap().clone())
+                    .menu(&menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(|app, event| {
+                        match event.id.as_ref() {
+                            "quit" => {
+                                app.exit(0);
                             }
-                        }
-                        _ => {}
-                    }
-                })
-                .on_tray_icon_event(|_tray, event| {
-                    tauri_plugin_positioner::on_tray_event(_tray.app_handle(), &event);
-                    /*
-                    if let TrayIconEvent::Click {
-                        button: tauri::tray::MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        let app = _tray.app_handle();
-                        if let Some(window) = app.get_webview_window("quick-note") {
-                            let is_visible = window.is_visible().unwrap_or(false);
-                            if is_visible {
-                                let _ = window.hide();
-                                #[cfg(target_os = "macos")]
-                                {
-                                    // Release focus back to the previous application
-                                    let _ = app.hide();
+                            "show_main" => {
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
                                 }
-                            } else {
-                                let _ = window.as_ref().window().move_window(Position::TrayBottomCenter);
-                                let _ = window.show();
-                                let _ = window.set_focus();
                             }
+                            _ => {}
                         }
-                    }
-                    */
-                })
-                .build(app)?;
+                    })
+                    .on_tray_icon_event(|_tray, event| {
+                        tauri_plugin_positioner::on_tray_event(_tray.app_handle(), &event);
+                    })
+                    .build(app)?;
+            }
 
             let window = app.get_webview_window("main").unwrap();
             
@@ -818,7 +803,7 @@ pub fn run() {
                 let _ = window.set_title_bar_style(TitleBarStyle::Overlay);
             }
 
-            #[cfg(not(target_os = "macos"))]
+            #[cfg(all(desktop, not(target_os = "macos")))]
             {
                 let _ = window.set_decorations(false);
             }

@@ -67,6 +67,7 @@ interface SidebarProps {
     onReorderFolders?: (newOrder: string[]) => void;
     onOpenSettings?: () => void;
     syncStatus?: 'idle' | 'syncing' | 'synced' | 'offline' | 'error' | 'conflict';
+    syncError?: string | null;
     lastSyncedAt?: Date | null;
     conflictFiles?: ConflictPair[];
     onSync?: () => void;
@@ -111,9 +112,13 @@ const FolderItem = ({
     setNodeRef, attributes, listeners, style
 }: FolderItemProps) => {
     const longPressTimer = useRef<any>(null);
+    const [isLongPressing, setIsLongPressing] = useState(false);
 
-    const handleTouchStart = () => {
+    const handleTouchStart = (e: React.TouchEvent) => {
+        e.preventDefault(); // prevent text selection on iOS
+        setIsLongPressing(false);
         longPressTimer.current = setTimeout(() => {
+            setIsLongPressing(true);
             if (onEditCategory) onEditCategory(folder);
         }, 500);
     };
@@ -123,6 +128,11 @@ const FolderItem = ({
             clearTimeout(longPressTimer.current);
             longPressTimer.current = null;
         }
+        // If it was a normal short tap (not long-press), select the category
+        if (!isLongPressing && onSelectCategory) {
+            onSelectCategory(folder);
+        }
+        setIsLongPressing(false);
     };
 
     // Normalization ensures "Folder" and "folder" match correctly
@@ -135,10 +145,9 @@ const FolderItem = ({
     return (
         <div
             ref={setNodeRef}
-            style={style}
+            style={{ ...style, WebkitTouchCallout: 'none', userSelect: 'none' } as React.CSSProperties}
             className={clsx(
                 "group relative flex items-center transition-all rounded-lg cursor-pointer mb-0.5 outline-none",
-                // Configuration Point: Sidebar item padding and height
                 isCollapsed ? "justify-center py-2.5" : "px-1 py-2.5 gap-2 text-sm font-medium",
                 isSelected
                     ? "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100"
@@ -147,7 +156,9 @@ const FolderItem = ({
                 isOverlay && "shadow-lg scale-105 opacity-90 cursor-grabbing bg-white dark:bg-gray-800"
             )}
             title={isCollapsed ? folder : undefined}
-            onClick={() => onSelectCategory && onSelectCategory(folder)}
+            onClick={() => {
+                if (!('ontouchstart' in window) && onSelectCategory) onSelectCategory(folder);
+            }}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
             onTouchMove={handleTouchEnd}
@@ -257,6 +268,7 @@ export function Sidebar({
     onReorderFolders = undefined,
     onOpenSettings,
     syncStatus = 'idle',
+    syncError = null,
     lastSyncedAt = null,
     conflictFiles = [],
     onSync,
@@ -442,7 +454,7 @@ export function Sidebar({
             </div>
 
             {/* --- FOOTER / SETTINGS & SYNC --- */}
-            <div className="p-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between shrink-0 gap-1">
+            <div className="pt-2 pb-[calc(8px+var(--safe-bottom,0vh))] px-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between shrink-0 gap-1 box-content">
                 <button
                     onClick={onOpenSettings}
                     className={clsx(
@@ -459,9 +471,11 @@ export function Sidebar({
                     <div className="shrink-0">
                         <SyncStatusBadge
                             syncStatus={syncStatus}
+                            syncError={syncError}
                             lastSyncedAt={lastSyncedAt}
                             conflictFiles={conflictFiles}
                             onSync={onSync}
+                            onOpenSettings={onOpenSettings}
                         />
                     </div>
                 )}

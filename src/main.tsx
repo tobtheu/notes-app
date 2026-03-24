@@ -6,7 +6,7 @@ import { attachConsole } from '@tauri-apps/plugin-log'
 
 // Forward browser console to Tauri logs
 if (window.__TAURI_INTERNALS__) {
-  attachConsole();
+  attachConsole().catch(console.warn);
 }
 
 createRoot(document.getElementById('root')!).render(

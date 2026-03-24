@@ -21,19 +21,6 @@
         "decorations": true,
         "transparent": true,
         "dragDropEnabled": false
-      },
-      {
-        "label": "quick-note",
-        "title": "Quick Note",
-        "width": 400,
-        "height": 300,
-        "resizable": false,
-        "fullscreen": false,
-        "decorations": false,
-        "transparent": true,
-        "visible": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true
       }
     ],
     "security": {

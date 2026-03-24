@@ -1,8 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
-import { check } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
 import { load } from '@tauri-apps/plugin-store';
 import type { Note, AppMetadata, TauriAPI } from '../types';
 
@@ -135,6 +133,7 @@ export const tauriAPI: TauriAPI = {
     getAppVersion: () => invoke<string>('get_app_version'),
     checkForUpdates: async () => {
         try {
+            const { check } = await import('@tauri-apps/plugin-updater');
             const update = await check();
             if (update) {
                 updateInstance = update;
@@ -180,6 +179,7 @@ export const tauriAPI: TauriAPI = {
         }
     },
     quitAndInstall: async () => {
+        const { relaunch } = await import('@tauri-apps/plugin-process');
         await relaunch();
     },
     onUpdateStatus: (callback) => {
