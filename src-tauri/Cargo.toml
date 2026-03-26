@@ -31,11 +31,17 @@ tauri-plugin-process = "2"
 notify = "8.0.0"
 chrono = "0.4"
 rustls = { version = "0.23", features = ["ring"] }
-git2 = { version = "0.19", features = ["vendored-libgit2", "https", "vendored-openssl"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-native-roots"] }
+
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots"] }
 tauri-plugin-store = "2"
 tauri-plugin-os = "2"
 tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
 tokio = { version = "1", features = ["time"] }
 base64 = "0.22.1"
+
+[target.'cfg(not(windows))'.dependencies]
+git2 = { version = "0.19", features = ["vendored-libgit2", "https", "vendored-openssl"] }
+
+[target.'cfg(windows)'.dependencies]
+git2 = { version = "0.19", features = ["vendored-libgit2", "https"] }

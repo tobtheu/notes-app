@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, Github, LogOut, Download, Rocket } from 'lucide-react';
+import { open } from '@tauri-apps/plugin-shell';
 import clsx from 'clsx';
 
 interface SettingsModalProps {
@@ -109,6 +110,8 @@ export function SettingsModal({
             const flow = await window.tauriAPI.startGithubOAuth();
             setDeviceFlow(flow);
             setSyncStatus('polling');
+            // Open verification URL in the system browser (works on iOS, macOS, Windows, Linux)
+            try { await open(flow.verificationUri); } catch (e) { console.warn('Could not open browser:', e); }
             // Poll in the background — complete_github_oauth blocks until approved
             const username = await window.tauriAPI.completeGithubOAuth(flow.deviceCode, flow.interval, currentPath);
             setSyncUsername(username);

@@ -551,10 +551,16 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
 
         // CRITICAL: Commit local changes BEFORE pulling to prevent data loss.
         // Without this, pull would overwrite uncommitted local edits.
-        let _ = git::commit_changes(root, "Auto-save");
+        // BUT: Only do this if the repo already has a HEAD (existing history).
+        // On a FRESH repo (no HEAD), committing creates a divergent empty commit
+        // that causes pull to treat ALL remote files as conflicts, deleting them.
+        if repo.head().is_ok() {
+            let _ = git::commit_changes(root, "Auto-save");
+        }
 
         let pull_result = git::pull_changes(root, &creds.token, &creds.username)
             .map_err(|e| format!("Pull failed: {}", e))?;
+
         
         // 1. Recover physical folders from metadata that might be missing after a pull
         // (This addresses the "missing empty folder" issue since Git doesn't track them without .gitkeep)
@@ -566,7 +572,6 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
                     if !full_path.exists() {
                         let _ = fs::create_dir_all(&full_path);
                         let _ = fs::write(full_path.join(".gitkeep"), "");
-                        println!("[lib.rs] Recovered missing folder from metadata: {}", folder_name);
                     }
                 }
             }
