@@ -714,11 +714,18 @@ export function useNotes() {
      * is temporarily empty (polling/sync), the editor doesn't unmount.
      */
     const lastValidSelectedNote = useRef<Note | null>(null);
-    const selectedNote = notes.find(n => getNoteId(n) === selectedNoteId) || lastValidSelectedNote.current;
+    // Only fall back to lastValidSelectedNote when selectedNoteId is set (prevents deleted note from lingering)
+    const selectedNote = selectedNoteId
+        ? (notes.find(n => getNoteId(n) === selectedNoteId) || lastValidSelectedNote.current)
+        : null;
 
     // Update the sticky ref whenever we find the selected note in the actual list
     if (selectedNote && (!lastValidSelectedNote.current || getNoteId(selectedNote) !== getNoteId(lastValidSelectedNote.current) || selectedNote.content !== lastValidSelectedNote.current.content)) {
         lastValidSelectedNote.current = selectedNote;
+    }
+    // Clear sticky ref when selection is explicitly cleared
+    if (!selectedNoteId) {
+        lastValidSelectedNote.current = null;
     }
 
     const filteredNotes = notes
