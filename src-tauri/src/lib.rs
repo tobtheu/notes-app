@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use log::info;
 use std::fs;
 use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
@@ -243,11 +244,11 @@ async fn delete_note(app: tauri::AppHandle, root_path: String, folder_path: Stri
     if let Ok(_) = git::ensure_repo(root) {
         let msg = format!("Delete: {}", filename);
         if let Ok(_) = git::commit_changes(root, &msg) {
-            println!("[lib.rs] Commited deletion: {}", filename);
+            info!("[lib.rs] Commited deletion: {}", filename);
             if let Some(creds) = store::get_github_credentials(&app) {
                 match git::push_changes(root, &creds.token, &creds.username) {
-                    Ok(success) => println!("[lib.rs] Push deletion success: {}", success),
-                    Err(e) => println!("[lib.rs] Push deletion FAILED: {}", e),
+                    Ok(success) => info!("[lib.rs] Push deletion success: {}", success),
+                    Err(e) => info!("[lib.rs] Push deletion FAILED: {}", e),
                 }
             }
         }
@@ -536,6 +537,10 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
         fs::create_dir_all(root).map_err(|e| format!("Could not create folder: {}", e))?;
     }
 
+    // RECOVERY: If iOS killed the app during a previous checkout, the working tree
+    // may be empty while HEAD still has our notes. Restore before doing anything else.
+    git::recover_notes_if_missing(root);
+
     // Ensure repo exists
     let repo = git::ensure_repo(root).map_err(|e| format!("Repo init failed: {}", e))?;
 
@@ -549,17 +554,39 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
             git::add_remote(root, &auth_url).map_err(|e| format!("Remote link failed: {}", e))?;
         }
 
-        // CRITICAL: Commit local changes BEFORE pulling to prevent data loss.
-        // Without this, pull would overwrite uncommitted local edits.
-        // BUT: Only do this if the repo already has a HEAD (existing history).
-        // On a FRESH repo (no HEAD), committing creates a divergent empty commit
-        // that causes pull to treat ALL remote files as conflicts, deleting them.
-        if repo.head().is_ok() {
-            let _ = git::commit_changes(root, "Auto-save");
-        }
+        // CRITICAL: ALWAYS commit local changes BEFORE pulling, even on a fresh repo.
+        // If we skip this on a "fresh" repo (no HEAD), pull's force-checkout will
+        // overwrite any local file that shares a name with a remote file, destroying
+        // the user's local edits. git2 handles divergent histories via a virtual
+        // empty ancestor, so committing first and then merging is safe: local files
+        // that conflict with remote become conflict copies (local wins), and files
+        // unique to either side are kept.
+        git::commit_changes(root, "Auto-save")
+            .map_err(|e| format!("Auto-save commit failed: {}", e))?;
+
+        // Remember pre-pull state so we can restore if pull deletes all notes.
+        let had_notes_before_pull = get_files_recursively(root)
+            .iter().any(|p| p.extension().map_or(false, |e| e == "md"));
+        let pre_pull_head_oid = git::get_head_oid(root);
+        info!("[lib.rs] pre-pull: had_notes={} head={:?}", had_notes_before_pull, pre_pull_head_oid.as_deref().map(|s| &s[..8]));
 
         let pull_result = git::pull_changes(root, &creds.token, &creds.username)
             .map_err(|e| format!("Pull failed: {}", e))?;
+
+        // SAFETY: if pull removed all notes (checkout to empty/wrong remote state),
+        // restore the working tree from the commit we made just before pulling.
+        // This prevents a corrupted remote from destroying local notes.
+        // We do NOT reset HEAD — the subsequent commit_changes will re-add the notes
+        // on top of whatever HEAD pull left us at, which fixes the remote too.
+        let has_notes_after_pull = get_files_recursively(root)
+            .iter().any(|p| p.extension().map_or(false, |e| e == "md"));
+        info!("[lib.rs] post-pull: has_notes={}", has_notes_after_pull);
+        if had_notes_before_pull && !has_notes_after_pull {
+            info!("[lib.rs] SAFETY RESTORE: pull deleted all notes — restoring from pre-pull commit");
+            if let Some(ref oid) = pre_pull_head_oid {
+                git::restore_tree_from_oid(root, oid);
+            }
+        }
 
         
         // 1. Recover physical folders from metadata that might be missing after a pull
@@ -625,7 +652,7 @@ fn detect_ongoing_conflicts(root: &Path) -> Vec<git::ConflictPair> {
     for file in files {
         let filename = file.file_name().unwrap_or_default().to_string_lossy();
         if filename.contains(" (Konflikt ") {
-            println!("[lib.rs] Detected ongoing conflict file: {}", filename);
+            info!("[lib.rs] Detected ongoing conflict file: {}", filename);
             // Reconstruct the potential original filename: "Note (Konflikt 2024-01-01).md" -> "Note.md"
             if let Some(pos) = filename.find(" (Konflikt ") {
                 let stem = &filename[..pos];

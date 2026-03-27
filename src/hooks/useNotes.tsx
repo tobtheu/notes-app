@@ -31,6 +31,7 @@ export function useNotes() {
     const lastSaveTime = useRef<number>(0);
     const lastLoadTime = useRef<number>(0);
     const savingNotes = useRef<Record<string, Promise<any> | undefined>>({}); // Serialize saves for same note ID
+    const isSyncingRef = useRef(false); // Synchronous guard — prevents concurrent sync calls
 
     /**
      * Unique Identifier Generation
@@ -172,6 +173,11 @@ export function useNotes() {
 
     const triggerSync = useCallback(async () => {
         if (!baseFolder || !navigator.onLine) return;
+        // isSyncingRef is a synchronous guard. React state (isSyncing) updates
+        // asynchronously, so it cannot reliably prevent two concurrent invocations
+        // (e.g. app-start + 60-second timer firing before the first await resolves).
+        if (isSyncingRef.current) return;
+        isSyncingRef.current = true;
         setIsSyncing(true);
         setSyncStatus('syncing');
         setSyncError(null);
@@ -194,6 +200,7 @@ export function useNotes() {
             setSyncError(String(e));
             setSyncStatus('error');
         } finally {
+            isSyncingRef.current = false;
             setIsSyncing(false);
         }
     }, [baseFolder, loadNotes]);
@@ -225,7 +232,7 @@ export function useNotes() {
             if (!navigator.onLine) return;
             const timeSinceLastSave = Date.now() - lastSaveTime.current;
             // Only pull if user hasn't typed in the last 30 seconds to avoid interruptions
-            if (timeSinceLastSave > 30000 && !isSyncing) {
+            if (timeSinceLastSave > 30000 && !isSyncing && document.visibilityState === 'visible') {
                 triggerSync();
             }
         }, 60000); // 60 seconds
