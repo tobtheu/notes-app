@@ -52,13 +52,20 @@ pub struct RemoteNote {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncState {
-    pub last_sync_at: String, // ISO 8601 — fetch changes newer than this
+    pub last_sync_at: String,        // ISO 8601 — fetch remote changes newer than this
+    #[serde(default)]
+    pub known_ids: Vec<String>,      // note IDs present after the last successful sync
 }
 
 impl Default for SyncState {
     fn default() -> Self {
-        Self { last_sync_at: "1970-01-01T00:00:00.000Z".to_string() }
+        Self { last_sync_at: "1970-01-01T00:00:00.000Z".to_string(), known_ids: Vec::new() }
     }
+}
+
+/// Returns true if the path looks like a conflict copy ("Note (Konflikt 2026-03-27).md").
+fn is_conflict_copy(id: &str) -> bool {
+    id.contains(" (Konflikt ")
 }
 
 pub fn load_sync_state(folder_path: &Path) -> SyncState {
@@ -374,9 +381,29 @@ pub async fn sync(
     let mut conflicts = 0usize;
 
     // ------------------------------------------------------------------
-    // 1. PUSH: local notes changed since last sync
+    // 1a. PUSH DELETIONS: notes that existed at last sync but are now gone
+    // ------------------------------------------------------------------
+    if !state.known_ids.is_empty() {
+        for known_id in &state.known_ids {
+            if !local_notes.contains_key(known_id.as_str()) {
+                // Note was deleted locally — push deletion to Supabase
+                let ts = chrono::Utc::now().to_rfc3339();
+                match upsert_note(&creds.access_token, &creds.user_id, known_id, "", &ts, true).await {
+                    Ok(_) => info!("[supabase] pushed deletion: {}", known_id),
+                    Err(e) => info!("[supabase] push deletion failed for {}: {}", known_id, e),
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 1b. PUSH: local notes changed since last sync (skip conflict copies)
     // ------------------------------------------------------------------
     for (rel_path, (content, updated_at)) in &local_notes {
+        // Conflict copies are local resolution artifacts — never sync them
+        if is_conflict_copy(rel_path) {
+            continue;
+        }
         if is_newer(updated_at.as_str(), since.as_str()) || since == SyncState::default().last_sync_at {
             match upsert_note(&creds.access_token, &creds.user_id, rel_path, content, updated_at, false).await {
                 Ok(_) => {
@@ -394,6 +421,22 @@ pub async fn sync(
     let remote_notes = fetch_notes_since(&creds.access_token, &since).await?;
 
     for remote in &remote_notes {
+        // Conflict copies should never live on the server.
+        // If one somehow exists (from an older build), mark it deleted and skip.
+        if is_conflict_copy(&remote.id) {
+            if !remote.deleted {
+                let ts = chrono::Utc::now().to_rfc3339();
+                let _ = upsert_note(&creds.access_token, &creds.user_id, &remote.id, "", &ts, true).await;
+                info!("[supabase] cleaned up stale conflict copy from server: {}", remote.id);
+            }
+            // Also remove it locally if it somehow ended up on disk
+            let local_path = folder_path.join(&remote.id);
+            if local_path.exists() {
+                let _ = std::fs::remove_file(&local_path);
+            }
+            continue;
+        }
+
         let local_path = folder_path.join(&remote.id);
 
         if remote.deleted {
@@ -467,6 +510,12 @@ pub async fn sync(
     // 3. Update sync state
     // ------------------------------------------------------------------
     state.last_sync_at = sync_started_at;
+    // Snapshot current local IDs (excluding conflict copies) so next sync
+    // can detect deletions and push them to Supabase.
+    state.known_ids = local_notes.keys()
+        .filter(|id| !is_conflict_copy(id))
+        .cloned()
+        .collect();
     save_sync_state(folder_path, &state);
 
     let had_changes = pulled > 0 || deleted > 0 || conflicts > 0;
