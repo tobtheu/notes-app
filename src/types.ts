@@ -81,6 +81,7 @@ export interface TauriAPI {
     supabaseSignUp: (email: string, password: string) => Promise<{ userId: string; email: string }>;
     supabaseSignOut: () => Promise<void>;
     getSupabaseUser: () => Promise<{ userId: string; email: string } | null>;
+    resetSyncState: (folderPath: string) => Promise<void>;
 }
 
 declare global {

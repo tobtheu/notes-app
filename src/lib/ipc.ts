@@ -241,7 +241,8 @@ export const tauriAPI: TauriAPI = {
     supabaseSignUp: (email: string, password: string) =>
         invoke<{ userId: string; email: string }>('supabase_sign_up', { email, password }),
     supabaseSignOut: () => invoke<void>('supabase_sign_out'),
-    getSupabaseUser: () => invoke<{ userId: string; email: string } | null>('get_supabase_user')
+    getSupabaseUser: () => invoke<{ userId: string; email: string } | null>('get_supabase_user'),
+    resetSyncState: (folderPath: string) => invoke<void>('reset_sync_state', { folderPath })
 };
 
 // Attach to window globally

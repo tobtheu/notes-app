@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, LogOut, Download, Rocket } from 'lucide-react';
+import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, LogOut, Download, Rocket, RotateCcw } from 'lucide-react';
 import clsx from 'clsx';
 
 interface SettingsModalProps {
@@ -60,7 +60,7 @@ export function SettingsModal({
 
     // Supabase Sync State
     const [syncEmail, setSyncEmail] = useState<string | null>(null);
-    const [syncStatus, setSyncStatus] = useState<'idle' | 'signing-in' | 'error'>('idle');
+    const [syncStatus, setSyncStatus] = useState<'idle' | 'signing-in' | 'resetting' | 'error'>('idle');
     const [syncError, setSyncError] = useState<string | null>(null);
     const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
     const [authEmail, setAuthEmail] = useState('');
@@ -128,6 +128,17 @@ export function SettingsModal({
         setSyncError(null);
     };
 
+    const handleForceFullSync = async () => {
+        if (!currentPath) return;
+        setSyncStatus('resetting');
+        try {
+            await window.tauriAPI.resetSyncState(currentPath);
+            onTriggerSync?.();
+        } finally {
+            setSyncStatus('idle');
+        }
+    };
+
     const handleCheckForUpdates = () => {
         setUpdateStatus({ type: 'checking' });
         window.tauriAPI.checkForUpdates();
@@ -176,8 +187,18 @@ export function SettingsModal({
                                         <CheckCircle2 className="text-green-500 shrink-0" size={18} />
                                     </div>
                                     <button
+                                        type="button"
+                                        onClick={handleForceFullSync}
+                                        disabled={syncStatus === 'resetting'}
+                                        className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-50"
+                                    >
+                                        <RotateCcw size={14} className={syncStatus === 'resetting' ? 'animate-spin' : ''} />
+                                        {syncStatus === 'resetting' ? 'Wird synchronisiert...' : 'Alle Notizen synchronisieren'}
+                                    </button>
+                                    <button
+                                        type="button"
                                         onClick={handleSupabaseSignOut}
-                                        className="flex items-center justify-center gap-2 mt-1 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                        className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
                                     >
                                         <LogOut size={14} />
                                         Abmelden
