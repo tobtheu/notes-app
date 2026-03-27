@@ -19,6 +19,7 @@ interface SettingsModalProps {
     setFontSize: (fontSize: 'small' | 'medium' | 'large') => void;
     spellcheckEnabled: boolean;
     onToggleSpellcheck: (enabled: boolean) => void;
+    onTriggerSync?: () => void;
 }
 
 /**
@@ -42,7 +43,8 @@ export function SettingsModal({
     fontSize,
     setFontSize,
     spellcheckEnabled,
-    onToggleSpellcheck
+    onToggleSpellcheck,
+    onTriggerSync,
 }: SettingsModalProps) {
     /**
      * --- LOCAL STATE ---
@@ -111,6 +113,8 @@ export function SettingsModal({
             setAuthEmail('');
             setAuthPassword('');
             setSyncStatus('idle');
+            // Immediately pull notes from server after signing in
+            onTriggerSync?.();
         } catch (e: any) {
             setSyncError(e?.toString() || 'Fehler beim Anmelden');
             setSyncStatus('error');

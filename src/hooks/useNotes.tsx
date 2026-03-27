@@ -191,10 +191,8 @@ export function useNotes() {
                 setLastSyncedAt(new Date());
                 setConflictPairs([]);
             }
-            // Reload notes if we pulled any remote changes
-            if (result.hadChanges) {
-                await loadNotes();
-            }
+            // Always reload — remote changes may have been written to disk
+            await loadNotes(false);
         } catch (e) {
             console.error("Sync failed:", e);
             setSyncError(String(e));
