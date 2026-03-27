@@ -186,21 +186,25 @@ pub async fn refresh_session(refresh_token: &str) -> Result<SupabaseCredentials,
 // Notes CRUD
 // ---------------------------------------------------------------------------
 
-/// Fetch all notes (including deletions) modified after `since`.
-pub async fn fetch_notes_since(access_token: &str, since: &str) -> Result<Vec<RemoteNote>, String> {
+/// Fetch ALL notes for the current user (no date filter).
+/// Used during the pull phase so new devices always receive every note,
+/// regardless of when the note was originally written or pushed.
+pub async fn fetch_all_notes(access_token: &str) -> Result<Vec<RemoteNote>, String> {
+    // Supabase REST: no row limit by default; set a generous ceiling via Range header.
     let url = format!(
-        "{}/rest/v1/notes?select=id,content,updated_at,deleted&updated_at=gt.{}&order=updated_at.asc",
-        SUPABASE_URL,
-        urlencoding(since)
+        "{}/rest/v1/notes?select=id,content,updated_at,deleted&order=updated_at.asc",
+        SUPABASE_URL
     );
     let res = make_client()
         .get(&url)
         .headers(auth_headers(access_token))
+        .header("Range-Unit", "items")
+        .header("Range", "0-9999")
         .send().await.map_err(|e| e.to_string())?;
 
     if res.status().is_success() {
         let notes: Vec<RemoteNote> = res.json().await.map_err(|e| e.to_string())?;
-        info!("[supabase] fetch_notes_since({}): {} notes", &since[..10], notes.len());
+        info!("[supabase] fetch_all_notes: {} notes", notes.len());
         Ok(notes)
     } else {
         let err = res.text().await.unwrap_or_default();
@@ -416,9 +420,10 @@ pub async fn sync(
     }
 
     // ------------------------------------------------------------------
-    // 2. PULL: remote notes changed since last sync
+    // 2. PULL: all remote notes (full pull ensures no note is ever missed
+    //    due to timestamp mismatches between devices)
     // ------------------------------------------------------------------
-    let remote_notes = fetch_notes_since(&creds.access_token, &since).await?;
+    let remote_notes = fetch_all_notes(&creds.access_token).await?;
 
     for remote in &remote_notes {
         // Conflict copies should never live on the server.
