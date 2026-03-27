@@ -354,10 +354,18 @@ pub async fn sync(
     folder_path: &Path,
 ) -> Result<SupabaseSyncResult, String> {
     let mut state = load_sync_state(folder_path);
+
+    // If there are no local .md files but the sync state is non-default,
+    // this is a fresh device that somehow has a stale sync-state file.
+    // Reset to epoch so we pull all notes from the server.
+    let local_notes = collect_local_notes(folder_path);
+    if local_notes.is_empty() && state.last_sync_at != SyncState::default().last_sync_at {
+        info!("[supabase] fresh device detected (no local notes, stale sync state) — resetting last_sync_at to pull all");
+        state.last_sync_at = SyncState::default().last_sync_at.clone();
+    }
+
     let since = state.last_sync_at.clone();
     info!("[supabase] sync start, last_sync_at={}", &since[..10.min(since.len())]);
-
-    let local_notes = collect_local_notes(folder_path);
     let sync_started_at = chrono::Utc::now().to_rfc3339();
 
     let mut pushed = 0usize;

@@ -179,7 +179,7 @@ async fn list_folders(folder_path: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-async fn save_note(app: tauri::AppHandle, root_path: String, folder_path: String, filename: String, content: String) -> Result<(), String> {
+async fn save_note(_app: tauri::AppHandle, root_path: String, folder_path: String, filename: String, content: String) -> Result<(), String> {
     let root = Path::new(&root_path);
     let target_dir = Path::new(&folder_path);
     let file_path = target_dir.join(&filename);
@@ -193,14 +193,6 @@ async fn save_note(app: tauri::AppHandle, root_path: String, folder_path: String
     let final_content = inject_frontmatter(&content, &now);
     
     fs::write(&file_path, final_content).map_err(|e| e.to_string())?;
-    
-    if let Ok(_) = git::ensure_repo(root) {
-        let msg = format!("Update: {}", filename);
-        if let Ok(_) = git::commit_changes(root, &msg) {
-            spawn_sync(app, root_path);
-        }
-    }
-    
     Ok(())
 }
 
@@ -234,7 +226,7 @@ fn inject_frontmatter(content: &str, timestamp: &str) -> String {
 }
 
 #[tauri::command]
-async fn delete_note(app: tauri::AppHandle, root_path: String, folder_path: String, filename: String) -> Result<(), String> {
+async fn delete_note(_app: tauri::AppHandle, root_path: String, folder_path: String, filename: String) -> Result<(), String> {
     let root = Path::new(&root_path);
     let target_dir = Path::new(&folder_path);
     let path = target_dir.join(&filename);
@@ -242,38 +234,15 @@ async fn delete_note(app: tauri::AppHandle, root_path: String, folder_path: Stri
         fs::remove_file(path).map_err(|e| e.to_string())?;
     }
 
-    if let Ok(_) = git::ensure_repo(root) {
-        let msg = format!("Delete: {}", filename);
-        if let Ok(_) = git::commit_changes(root, &msg) {
-            info!("[lib.rs] Commited deletion: {}", filename);
-            if let Some(creds) = store::get_github_credentials(&app) {
-                match git::push_changes(root, &creds.token, &creds.username) {
-                    Ok(success) => info!("[lib.rs] Push deletion success: {}", success),
-                    Err(e) => info!("[lib.rs] Push deletion FAILED: {}", e),
-                }
-            }
-        }
-    }
-
     Ok(())
 }
 
 #[tauri::command]
-async fn rename_note(app: tauri::AppHandle, root_path: String, old_filename: String, new_filename: String) -> Result<(), String> {
+async fn rename_note(_app: tauri::AppHandle, root_path: String, old_filename: String, new_filename: String) -> Result<(), String> {
     let root = Path::new(&root_path);
     let old_path = root.join(&old_filename);
     let new_path = root.join(&new_filename);
     fs::rename(old_path, new_path).map_err(|e| e.to_string())?;
-
-    if let Ok(_) = git::ensure_repo(root) {
-        let msg = format!("Rename: {} -> {}", old_filename, new_filename);
-        if let Ok(_) = git::commit_changes(root, &msg) {
-            if let Some(creds) = store::get_github_credentials(&app) {
-                let _ = git::push_changes(root, &creds.token, &creds.username);
-            }
-        }
-    }
-
     Ok(())
 }
 
@@ -330,68 +299,29 @@ async fn save_metadata(root_path: String, metadata: AppMetadata) -> Result<(), S
 }
 
 #[tauri::command]
-async fn rename_folder(app: tauri::AppHandle, root_path: String, old_name: String, new_name: String) -> Result<(), String> {
+async fn rename_folder(_app: tauri::AppHandle, root_path: String, old_name: String, new_name: String) -> Result<(), String> {
     let root = Path::new(&root_path);
     let old_path = root.join(&old_name);
     let new_path = root.join(&new_name);
     fs::rename(old_path, new_path).map_err(|e| e.to_string())?;
-
-    if let Ok(_) = git::ensure_repo(root) {
-        let msg = format!("Rename folder: {} -> {}", old_name, new_name);
-        if let Ok(_) = git::commit_changes(root, &msg) {
-            if let Some(creds) = store::get_github_credentials(&app) {
-                let _ = git::push_changes(root, &creds.token, &creds.username);
-            }
-        }
-    }
-
     Ok(())
 }
 
 #[tauri::command]
-async fn create_folder(app: tauri::AppHandle, root_path: String, folder_path: String) -> Result<(), String> {
-    let root = Path::new(&root_path);
+async fn create_folder(_app: tauri::AppHandle, root_path: String, folder_path: String) -> Result<(), String> {
+    let _root = Path::new(&root_path);
     fs::create_dir_all(&folder_path).map_err(|e| e.to_string())?;
-    
-    // Create .gitkeep to ensure Git tracks the empty folder
-    let gitkeep_path = Path::new(&folder_path).join(".gitkeep");
-    if !gitkeep_path.exists() {
-        let _ = fs::write(gitkeep_path, "");
-    }
-
-    if let Ok(_) = git::ensure_repo(root) {
-        let folder_name = Path::new(&folder_path).file_name().unwrap_or_default().to_string_lossy();
-        let msg = format!("Created folder: {}", folder_name);
-        if let Ok(_) = git::commit_changes(root, &msg) {
-            if let Some(creds) = store::get_github_credentials(&app) {
-                let _ = git::push_changes(root, &creds.token, &creds.username);
-            }
-        }
-    }
-
     Ok(())
 }
 
 #[tauri::command]
-async fn delete_folder_recursive(app: tauri::AppHandle, root_path: String, folder_path: String) -> Result<(), String> {
-    let root = Path::new(&root_path);
+async fn delete_folder_recursive(_app: tauri::AppHandle, _root_path: String, folder_path: String) -> Result<(), String> {
     fs::remove_dir_all(&folder_path).map_err(|e| e.to_string())?;
-
-    if let Ok(_) = git::ensure_repo(root) {
-        let folder_name = Path::new(&folder_path).file_name().unwrap_or_default().to_string_lossy();
-        let msg = format!("Deleted folder (recursive): {}", folder_name);
-        if let Ok(_) = git::commit_changes(root, &msg) {
-            if let Some(creds) = store::get_github_credentials(&app) {
-                let _ = git::push_changes(root, &creds.token, &creds.username);
-            }
-        }
-    }
-
     Ok(())
 }
 
 #[tauri::command]
-async fn delete_folder_move_contents(app: tauri::AppHandle, folder_path: String, root_path: String) -> Result<(), String> {
+async fn delete_folder_move_contents(_app: tauri::AppHandle, folder_path: String, root_path: String) -> Result<(), String> {
     let folder = Path::new(&folder_path);
     let root = Path::new(&root_path);
     
@@ -412,17 +342,6 @@ async fn delete_folder_move_contents(app: tauri::AppHandle, folder_path: String,
         }
     }
     fs::remove_dir_all(folder).map_err(|e| e.to_string())?;
-
-    if let Ok(_) = git::ensure_repo(root) {
-        let folder_name = folder.file_name().unwrap_or_default().to_string_lossy();
-        let msg = format!("Deleted folder (moved contents): {}", folder_name);
-        if let Ok(_) = git::commit_changes(root, &msg) {
-            if let Some(creds) = store::get_github_credentials(&app) {
-                let _ = git::push_changes(root, &creds.token, &creds.username);
-            }
-        }
-    }
-
     Ok(())
 }
 
@@ -605,14 +524,6 @@ async fn save_asset(app: tauri::AppHandle, root_path: String, filename: String, 
     let file_path = assets_dir.join(&filename);
     
     fs::write(&file_path, decoded).map_err(|e| e.to_string())?;
-    
-    if let Ok(_) = git::ensure_repo(root) {
-        let msg = format!("Added asset: {}", filename);
-        if let Ok(_) = git::commit_changes(root, &msg) {
-            spawn_sync(app, root_path);
-        }
-    }
-    
     Ok(SaveAssetResponse {
         success: true,
         path: Some(format!(".assets/{}", filename).replace("\\", "/")),
