@@ -189,7 +189,7 @@ export const tauriAPI: TauriAPI = {
     },
 
     /**
-     * GitHub Synchronization Setup (via Store and Rust Command)
+     * GitHub Synchronization Setup (legacy — kept for reference)
      */
     connectGithub: (token, folderPath) => invoke<string>('connect_github', { token, folderPath })
         .then((username) => ({ success: true, username }))
@@ -231,7 +231,17 @@ export const tauriAPI: TauriAPI = {
             return true;
         } catch { return false; }
     },
-    clearGithubCredentials: () => invoke<void>('clear_github_credentials')
+    clearGithubCredentials: () => invoke<void>('clear_github_credentials'),
+
+    /**
+     * Supabase Authentication + Sync
+     */
+    supabaseSignIn: (email: string, password: string) =>
+        invoke<{ userId: string; email: string }>('supabase_sign_in', { email, password }),
+    supabaseSignUp: (email: string, password: string) =>
+        invoke<{ userId: string; email: string }>('supabase_sign_up', { email, password }),
+    supabaseSignOut: () => invoke<void>('supabase_sign_out'),
+    getSupabaseUser: () => invoke<{ userId: string; email: string } | null>('get_supabase_user')
 };
 
 // Attach to window globally

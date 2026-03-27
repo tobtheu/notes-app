@@ -136,7 +136,7 @@ function App() {
 
 
   // Mobile View Management
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [_isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('notelist');
   const [selectionCount, setSelectionCount] = useState(0);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);

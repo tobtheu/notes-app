@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, Github, LogOut, Download, Rocket } from 'lucide-react';
-import { open } from '@tauri-apps/plugin-shell';
+import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, LogOut, Download, Rocket } from 'lucide-react';
 import clsx from 'clsx';
 
 interface SettingsModalProps {
@@ -57,16 +56,13 @@ export function SettingsModal({
     }>({ type: 'idle' });
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    // GitHub Sync State
-    const [syncUsername, setSyncUsername] = useState<string | null>(null);
-    const [syncStatus, setSyncStatus] = useState<'idle' | 'waiting-code' | 'polling' | 'error'>('idle');
+    // Supabase Sync State
+    const [syncEmail, setSyncEmail] = useState<string | null>(null);
+    const [syncStatus, setSyncStatus] = useState<'idle' | 'signing-in' | 'error'>('idle');
     const [syncError, setSyncError] = useState<string | null>(null);
-    const [deviceFlow, setDeviceFlow] = useState<{
-        deviceCode: string;
-        userCode: string;
-        verificationUri: string;
-        interval: number;
-    } | null>(null);
+    const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+    const [authEmail, setAuthEmail] = useState('');
+    const [authPassword, setAuthPassword] = useState('');
 
     // Auto-scroll to update status box when it appears
     useEffect(() => {
@@ -89,9 +85,9 @@ export function SettingsModal({
         // Fetch current app version from the backend
         window.tauriAPI.getAppVersion().then(setVersion);
 
-        // Fetch connected GitHub account
-        window.tauriAPI.getGithubToken().then(data => {
-            if (data) setSyncUsername(data.username);
+        // Fetch connected Supabase account
+        window.tauriAPI.getSupabaseUser().then(data => {
+            if (data) setSyncEmail(data.email);
         });
 
         // Subscribe to real-time update events from the Tauri updater
@@ -102,31 +98,28 @@ export function SettingsModal({
         return () => unsubscribe();
     }, [isOpen]);
 
-    const handleConnectGithub = async () => {
-        if (!currentPath) return;
-        setSyncStatus('waiting-code');
+    const handleSupabaseAuth = async () => {
+        if (!authEmail || !authPassword) return;
+        setSyncStatus('signing-in');
         setSyncError(null);
         try {
-            const flow = await window.tauriAPI.startGithubOAuth();
-            setDeviceFlow(flow);
-            setSyncStatus('polling');
-            // Open verification URL in the system browser (works on iOS, macOS, Windows, Linux)
-            try { await open(flow.verificationUri); } catch (e) { console.warn('Could not open browser:', e); }
-            // Poll in the background — complete_github_oauth blocks until approved
-            const username = await window.tauriAPI.completeGithubOAuth(flow.deviceCode, flow.interval, currentPath);
-            setSyncUsername(username);
-            setDeviceFlow(null);
+            const fn = authMode === 'signin'
+                ? window.tauriAPI.supabaseSignIn
+                : window.tauriAPI.supabaseSignUp;
+            const result = await fn(authEmail, authPassword);
+            setSyncEmail(result.email);
+            setAuthEmail('');
+            setAuthPassword('');
             setSyncStatus('idle');
         } catch (e: any) {
-            setSyncError(e?.toString() || 'Login failed');
-            setDeviceFlow(null);
+            setSyncError(e?.toString() || 'Fehler beim Anmelden');
             setSyncStatus('error');
         }
     };
 
-    const handleDisconnectGithub = async () => {
-        await window.tauriAPI.disconnectGithub();
-        setSyncUsername(null);
+    const handleSupabaseSignOut = async () => {
+        await window.tauriAPI.supabaseSignOut();
+        setSyncEmail(null);
         setSyncStatus('idle');
         setSyncError(null);
     };
@@ -166,85 +159,84 @@ export function SettingsModal({
                     <div className="mb-8">
                         <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Cloud Sync</h3>
                         <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                            {syncUsername ? (
+                            {syncEmail ? (
                                 <div className="flex flex-col gap-3">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
                                             <Cloud className="text-blue-600 dark:text-blue-400" size={20} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">Connected to GitHub</p>
-                                            <p className="text-xs text-gray-500 truncate">@{syncUsername}</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">Cloud Sync aktiv</p>
+                                            <p className="text-xs text-gray-500 truncate">{syncEmail}</p>
                                         </div>
                                         <CheckCircle2 className="text-green-500 shrink-0" size={18} />
                                     </div>
                                     <button
-                                        onClick={handleDisconnectGithub}
+                                        onClick={handleSupabaseSignOut}
                                         className="flex items-center justify-center gap-2 mt-1 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
                                     >
                                         <LogOut size={14} />
-                                        Disconnect
+                                        Abmelden
                                     </button>
                                 </div>
                             ) : (
                                 <div className="flex flex-col gap-3">
-                                    <div className="flex items-start gap-3 mb-2">
-                                        <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center mt-0.5 shrink-0">
-                                            <Github className="text-gray-600 dark:text-gray-400" size={16} />
+                                    <div className="flex items-start gap-3 mb-1">
+                                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mt-0.5 shrink-0">
+                                            <Cloud className="text-blue-600 dark:text-blue-400" size={16} />
                                         </div>
                                         <div>
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">GitHub Sync</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">Cloud Sync</p>
                                             <p className="text-xs text-gray-500">
-                                                Verbinde dein GitHub-Konto, um deine Notizen automatisch zu synchronisieren.
+                                                Melde dich an, um deine Notizen geräteübergreifend zu synchronisieren.
                                             </p>
                                         </div>
                                     </div>
 
-                                    {/* Device Flow: show code when waiting */}
-                                    {deviceFlow && (syncStatus === 'polling' || syncStatus === 'waiting-code') && (
-                                        <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center border border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs text-gray-500 mb-2">Gib diesen Code auf GitHub ein:</p>
-                                            <p className="text-2xl font-mono font-bold tracking-widest text-gray-900 dark:text-white mb-3 select-all">
-                                                {deviceFlow.userCode}
-                                            </p>
-                                            <p className="text-xs text-gray-400">
-                                                Browser wurde geöffnet →{' '}
-                                                <a
-                                                    href={deviceFlow.verificationUri}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="text-blue-500 hover:underline"
-                                                >
-                                                    {deviceFlow.verificationUri}
-                                                </a>
-                                            </p>
-                                            <div className="mt-3 flex items-center justify-center gap-2 text-xs text-gray-400">
-                                                <RefreshCw size={12} className="animate-spin" />
-                                                Warte auf Bestätigung…
-                                            </div>
-                                        </div>
-                                    )}
+                                    {/* Toggle sign-in / sign-up */}
+                                    <div className="flex rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 text-xs font-semibold">
+                                        <button
+                                            type="button"
+                                            onClick={() => setAuthMode('signin')}
+                                            className={`flex-1 py-1.5 transition-colors ${authMode === 'signin' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
+                                        >Anmelden</button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setAuthMode('signup')}
+                                            className={`flex-1 py-1.5 transition-colors ${authMode === 'signup' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
+                                        >Registrieren</button>
+                                    </div>
+
+                                    <input
+                                        type="email"
+                                        placeholder="E-Mail"
+                                        value={authEmail}
+                                        onChange={e => setAuthEmail(e.target.value)}
+                                        className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="password"
+                                        placeholder="Passwort"
+                                        value={authPassword}
+                                        onChange={e => setAuthPassword(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleSupabaseAuth()}
+                                        className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
 
                                     {syncStatus === 'error' && syncError && (
                                         <p className="text-xs text-red-500 text-center break-words">{syncError}</p>
                                     )}
 
-                                    {!deviceFlow && (
-                                        <button
-                                            onClick={handleConnectGithub}
-                                            disabled={syncStatus === 'polling' || syncStatus === 'waiting-code' || !currentPath}
-                                            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
-                                        >
-                                            <Github size={15} />
-                                            Mit GitHub verbinden
-                                        </button>
-                                    )}
-
-                                    {!currentPath && (
-                                        <p className="text-xs text-red-500 text-center mt-1">
-                                            Bitte zuerst einen Ordner auswählen.
-                                        </p>
-                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={handleSupabaseAuth}
+                                        disabled={syncStatus === 'signing-in' || !authEmail || !authPassword}
+                                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
+                                    >
+                                        {syncStatus === 'signing-in' ? (
+                                            <><RefreshCw size={14} className="animate-spin" /> Bitte warten…</>
+                                        ) : authMode === 'signin' ? 'Anmelden' : 'Konto erstellen'}
+                                    </button>
                                 </div>
                             )}
                         </div>

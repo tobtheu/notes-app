@@ -11,6 +11,7 @@ use base64::{engine::general_purpose, Engine as _};
 mod git;
 mod github;
 mod store;
+mod supabase_sync;
 
 // use tauri_plugin_positioner::{WindowExt, Position};
 
@@ -528,123 +529,6 @@ async fn start_watch(app: tauri::AppHandle, folder_path: String, state: tauri::S
     Ok(())
 }
 
-#[tauri::command]
-async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResultPayload, String> {
-    let root = Path::new(&folder_path);
-    
-    // Ensure the folder exists
-    if !root.exists() {
-        fs::create_dir_all(root).map_err(|e| format!("Could not create folder: {}", e))?;
-    }
-
-    // RECOVERY: If iOS killed the app during a previous checkout, the working tree
-    // may be empty while HEAD still has our notes. Restore before doing anything else.
-    git::recover_notes_if_missing(root);
-
-    // Ensure repo exists
-    let repo = git::ensure_repo(root).map_err(|e| format!("Repo init failed: {}", e))?;
-
-    if let Some(creds) = store::get_github_credentials(&app) {
-        // Automatically add remote if missing
-        if repo.find_remote("origin").is_err() {
-            let repo_url = github::ensure_remote_repo(&creds.token, &creds.username).await
-                .map_err(|e| format!("Remote lookup failed: {}", e))?;
-            
-            let auth_url = repo_url.replace("https://", &format!("https://{}:{}@", creds.username, creds.token));
-            git::add_remote(root, &auth_url).map_err(|e| format!("Remote link failed: {}", e))?;
-        }
-
-        // CRITICAL: ALWAYS commit local changes BEFORE pulling, even on a fresh repo.
-        // If we skip this on a "fresh" repo (no HEAD), pull's force-checkout will
-        // overwrite any local file that shares a name with a remote file, destroying
-        // the user's local edits. git2 handles divergent histories via a virtual
-        // empty ancestor, so committing first and then merging is safe: local files
-        // that conflict with remote become conflict copies (local wins), and files
-        // unique to either side are kept.
-        git::commit_changes(root, "Auto-save")
-            .map_err(|e| format!("Auto-save commit failed: {}", e))?;
-
-        // Remember pre-pull state so we can restore if pull deletes all notes.
-        let had_notes_before_pull = get_files_recursively(root)
-            .iter().any(|p| p.extension().map_or(false, |e| e == "md"));
-        let pre_pull_head_oid = git::get_head_oid(root);
-        info!("[lib.rs] pre-pull: had_notes={} head={:?}", had_notes_before_pull, pre_pull_head_oid.as_deref().map(|s| &s[..8]));
-
-        let pull_result = git::pull_changes(root, &creds.token, &creds.username)
-            .map_err(|e| format!("Pull failed: {}", e))?;
-
-        // SAFETY: if pull removed all notes (checkout to empty/wrong remote state),
-        // restore the working tree from the commit we made just before pulling.
-        // This prevents a corrupted remote from destroying local notes.
-        // We do NOT reset HEAD — the subsequent commit_changes will re-add the notes
-        // on top of whatever HEAD pull left us at, which fixes the remote too.
-        let has_notes_after_pull = get_files_recursively(root)
-            .iter().any(|p| p.extension().map_or(false, |e| e == "md"));
-        info!("[lib.rs] post-pull: has_notes={}", has_notes_after_pull);
-        if had_notes_before_pull && !has_notes_after_pull {
-            info!("[lib.rs] SAFETY RESTORE: pull deleted all notes — restoring from pre-pull commit");
-            if let Some(ref oid) = pre_pull_head_oid {
-                git::restore_tree_from_oid(root, oid);
-            }
-        }
-
-        
-        // 1. Recover physical folders from metadata that might be missing after a pull
-        // (This addresses the "missing empty folder" issue since Git doesn't track them without .gitkeep)
-        if let Ok(meta) = read_metadata(folder_path.clone()).await {
-            if let Some(folder_order) = meta.folder_order {
-                for folder_name in folder_order {
-                    if folder_name.starts_with('.') { continue; }
-                    let full_path = root.join(&folder_name);
-                    if !full_path.exists() {
-                        let _ = fs::create_dir_all(&full_path);
-                        let _ = fs::write(full_path.join(".gitkeep"), "");
-                    }
-                }
-            }
-        }
-
-        // Commit any merge results before pushing
-        let _ = git::commit_changes(root, "Merge remote changes");
-
-        let push_succeeded = git::push_changes(root, &creds.token, &creds.username).unwrap_or(false);
-
-        let mut conflict_pairs = pull_result.conflict_pairs;
-        let mut had_conflicts = pull_result.had_conflicts;
-
-        // If no new conflicts, still check for "ongoing" conflicts on disk
-        if !had_conflicts {
-            let disk_conflicts = detect_ongoing_conflicts(root);
-            if !disk_conflicts.is_empty() {
-                conflict_pairs = disk_conflicts;
-                had_conflicts = true;
-            }
-        }
-
-        let payload = SyncResultPayload {
-            had_changes: pull_result.had_changes,
-            had_conflicts,
-            conflict_pairs,
-            push_succeeded,
-        };
-        app.emit("sync-complete", &payload).ok();
-        Ok(payload)
-    } else {
-        // No GitHub credentials, but we still check for local conflict files (e.g. from iCloud or offline sync)
-        let disk_conflicts = detect_ongoing_conflicts(root);
-        let had_conflicts = !disk_conflicts.is_empty();
-        
-        let payload = SyncResultPayload {
-            had_changes: false,
-            had_conflicts,
-            conflict_pairs: disk_conflicts,
-            push_succeeded: false,
-        };
-        app.emit("sync-complete", &payload).ok();
-        Ok(payload)
-    }
-}
-
 /// Scans the directory for files containing " (Konflikt " and returns them as ConflictPairs.
 fn detect_ongoing_conflicts(root: &Path) -> Vec<git::ConflictPair> {
     let mut pairs = Vec::new();
@@ -736,6 +620,151 @@ async fn save_asset(app: tauri::AppHandle, root_path: String, filename: String, 
     })
 }
 
+// ---------------------------------------------------------------------------
+// Supabase Auth + Sync commands
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SupabaseAuthResult {
+    pub user_id: String,
+    pub email: String,
+}
+
+#[tauri::command]
+async fn supabase_sign_in(app: tauri::AppHandle, email: String, password: String) -> Result<SupabaseAuthResult, String> {
+    let creds = supabase_sync::sign_in(&email, &password).await?;
+    let stored = store::SupabaseStoredCredentials {
+        access_token: creds.access_token.clone(),
+        refresh_token: creds.refresh_token.clone(),
+        user_id: creds.user_id.clone(),
+        email: creds.email.clone(),
+    };
+    store::save_supabase_credentials(&app, &stored);
+    info!("[lib.rs] supabase sign in: {}", creds.email);
+    Ok(SupabaseAuthResult { user_id: creds.user_id, email: creds.email })
+}
+
+#[tauri::command]
+async fn supabase_sign_up(app: tauri::AppHandle, email: String, password: String) -> Result<SupabaseAuthResult, String> {
+    let creds = supabase_sync::sign_up(&email, &password).await?;
+    let stored = store::SupabaseStoredCredentials {
+        access_token: creds.access_token.clone(),
+        refresh_token: creds.refresh_token.clone(),
+        user_id: creds.user_id.clone(),
+        email: creds.email.clone(),
+    };
+    store::save_supabase_credentials(&app, &stored);
+    info!("[lib.rs] supabase sign up: {}", creds.email);
+    Ok(SupabaseAuthResult { user_id: creds.user_id, email: creds.email })
+}
+
+#[tauri::command]
+async fn supabase_sign_out(app: tauri::AppHandle) {
+    store::clear_supabase_credentials(&app);
+    info!("[lib.rs] supabase signed out");
+}
+
+#[tauri::command]
+async fn get_supabase_user(app: tauri::AppHandle) -> Option<SupabaseAuthResult> {
+    store::get_supabase_credentials(&app).map(|c| SupabaseAuthResult {
+        user_id: c.user_id,
+        email: c.email,
+    })
+}
+
+/// Attempts to refresh the access token. Updates stored credentials on success.
+async fn refresh_supabase_token(app: &tauri::AppHandle, refresh_token: &str) -> Option<store::SupabaseStoredCredentials> {
+    match supabase_sync::refresh_session(refresh_token).await {
+        Ok(new_creds) => {
+            let stored = store::SupabaseStoredCredentials {
+                access_token: new_creds.access_token,
+                refresh_token: new_creds.refresh_token,
+                user_id: new_creds.user_id,
+                email: new_creds.email,
+            };
+            store::save_supabase_credentials(app, &stored);
+            Some(stored)
+        }
+        Err(e) => {
+            info!("[lib.rs] token refresh failed: {}", e);
+            None
+        }
+    }
+}
+
+/// New sync_now using Supabase. Falls back gracefully if not connected.
+#[tauri::command]
+async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResultPayload, String> {
+    let root = Path::new(&folder_path);
+
+    if !root.exists() {
+        fs::create_dir_all(root).map_err(|e| format!("Could not create folder: {}", e))?;
+    }
+
+    // Check for Supabase credentials
+    let mut stored_creds = match store::get_supabase_credentials(&app) {
+        Some(c) => c,
+        None => {
+            // Not connected to Supabase yet — check for ongoing conflicts on disk only
+            let disk_conflicts = detect_ongoing_conflicts(root);
+            let had_conflicts = !disk_conflicts.is_empty();
+            let payload = SyncResultPayload {
+                had_changes: false,
+                had_conflicts,
+                conflict_pairs: disk_conflicts,
+                push_succeeded: false,
+            };
+            app.emit("sync-complete", &payload).ok();
+            return Ok(payload);
+        }
+    };
+
+    // Try to refresh token if needed (Supabase tokens expire after 1 hour)
+    // We attempt sync first; if we get an auth error, refresh and retry once.
+    let supabase_creds = supabase_sync::SupabaseCredentials {
+        access_token: stored_creds.access_token.clone(),
+        refresh_token: stored_creds.refresh_token.clone(),
+        user_id: stored_creds.user_id.clone(),
+        email: stored_creds.email.clone(),
+    };
+
+    let result = match supabase_sync::sync(&supabase_creds, root).await {
+        Ok(r) => r,
+        Err(e) if e.contains("401") || e.contains("403") || e.contains("JWT") => {
+            info!("[lib.rs] auth error, attempting token refresh: {}", e);
+            // Try refreshing token
+            if let Some(refreshed) = refresh_supabase_token(&app, &stored_creds.refresh_token).await {
+                stored_creds = refreshed;
+                let new_creds = supabase_sync::SupabaseCredentials {
+                    access_token: stored_creds.access_token.clone(),
+                    refresh_token: stored_creds.refresh_token.clone(),
+                    user_id: stored_creds.user_id.clone(),
+                    email: stored_creds.email.clone(),
+                };
+                supabase_sync::sync(&new_creds, root).await
+                    .map_err(|e2| format!("Sync after refresh failed: {}", e2))?
+            } else {
+                return Err("Sitzung abgelaufen. Bitte erneut anmelden.".to_string());
+            }
+        }
+        Err(e) => return Err(format!("Sync fehlgeschlagen: {}", e)),
+    };
+
+    // Convert conflict count to ConflictPairs for the existing UI
+    let disk_conflicts = detect_ongoing_conflicts(root);
+    let had_conflicts = !disk_conflicts.is_empty();
+
+    let payload = SyncResultPayload {
+        had_changes: result.had_changes,
+        had_conflicts,
+        conflict_pairs: disk_conflicts,
+        push_succeeded: result.pushed_count > 0,
+    };
+    app.emit("sync-complete", &payload).ok();
+    Ok(payload)
+}
+
 /*
 #[tauri::command]
 async fn hide_quick_note(app: tauri::AppHandle) {
@@ -790,7 +819,8 @@ pub fn run() {
             delete_folder_recursive, delete_folder_move_contents,
             get_app_version, get_document_dir, connect_github,
             start_github_oauth, complete_github_oauth, sync_now, start_watch,
-            clear_github_credentials, save_asset, /* hide_quick_note, open_quick_note_devtools */
+            clear_github_credentials, save_asset,
+            supabase_sign_in, supabase_sign_up, supabase_sign_out, get_supabase_user,
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {
