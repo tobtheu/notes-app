@@ -604,6 +604,18 @@ async fn refresh_supabase_token(app: &tauri::AppHandle, refresh_token: &str) -> 
     }
 }
 
+/// Deletes the local sync-state checkpoint, forcing the next sync to push ALL
+/// local notes and pull ALL remote notes. Used when the sync state is stale.
+#[tauri::command]
+async fn reset_sync_state(folder_path: String) -> Result<(), String> {
+    let path = Path::new(&folder_path).join("notizapp-sync-state.json");
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| format!("Could not reset sync state: {}", e))?;
+        info!("[lib.rs] sync state reset: {:?}", path);
+    }
+    Ok(())
+}
+
 /// New sync_now using Supabase. Falls back gracefully if not connected.
 #[tauri::command]
 async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResultPayload, String> {
@@ -732,6 +744,7 @@ pub fn run() {
             start_github_oauth, complete_github_oauth, sync_now, start_watch,
             clear_github_credentials, save_asset,
             supabase_sign_in, supabase_sign_up, supabase_sign_out, get_supabase_user,
+            reset_sync_state,
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {
