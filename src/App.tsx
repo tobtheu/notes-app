@@ -391,6 +391,7 @@ function App() {
           setFontSize={setFontSize}
           spellcheckEnabled={spellcheckEnabled}
           onToggleSpellcheck={setSpellcheckEnabled}
+          onTriggerSync={triggerSync}
         />
       )}
 

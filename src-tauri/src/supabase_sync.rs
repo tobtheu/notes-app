@@ -417,23 +417,33 @@ pub async fn sync(
                 let _ = std::fs::write(&local_path, &remote.content);
                 pulled += 1;
                 info!("[supabase] pulled (remote newer): {}", remote.id);
-            } else if is_newer(local_updated.as_str(), since.as_str()) && is_newer(remote.updated_at.as_str(), since.as_str()) {
-                // Conflict: both changed since last sync
-                // Local wins, remote version saved as conflict copy
-                let stem = local_path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-                let ext = local_path.extension().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "md".to_string());
-                let parent = local_path.parent().unwrap_or(folder_path);
-                let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-                let conflict_path = parent.join(format!("{} (Konflikt {}).{}", stem, date, ext));
-                if !conflict_path.exists() {
-                    let _ = std::fs::write(&conflict_path, &remote.content);
-                    conflicts += 1;
-                    info!("[supabase] conflict copy created: {}", remote.id);
+            } else {
+                // Conflict check: only when BOTH sides changed AFTER a real previous sync.
+                // Skip on first-ever sync (since == epoch) — that would flag every note as a conflict
+                // just because both timestamps are newer than 1970.
+                let is_first_sync = since == SyncState::default().last_sync_at;
+                let both_changed = !is_first_sync
+                    && is_newer(local_updated.as_str(), since.as_str())
+                    && is_newer(remote.updated_at.as_str(), since.as_str());
+
+                if both_changed {
+                    // Conflict: both changed since last sync
+                    // Local wins, remote version saved as conflict copy
+                    let stem = local_path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                    let ext = local_path.extension().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "md".to_string());
+                    let parent = local_path.parent().unwrap_or(folder_path);
+                    let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+                    let conflict_path = parent.join(format!("{} (Konflikt {}).{}", stem, date, ext));
+                    if !conflict_path.exists() {
+                        let _ = std::fs::write(&conflict_path, &remote.content);
+                        conflicts += 1;
+                        info!("[supabase] conflict copy created: {}", remote.id);
+                    }
+                    // Push local version again to make sure remote has it
+                    let _ = upsert_note(&creds.access_token, &creds.user_id, &remote.id, local_content, local_updated, false).await;
                 }
-                // Push local version again to make sure remote has it
-                let _ = upsert_note(&creds.access_token, &creds.user_id, &remote.id, local_content, local_updated, false).await;
+                // else: local is newer or same, or first-sync → no action needed (already pushed above)
             }
-            // else: local is newer or same, already pushed above
         } else {
             // New note from remote → write locally
             if let Some(parent) = local_path.parent() {
