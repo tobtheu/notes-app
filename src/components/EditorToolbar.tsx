@@ -10,9 +10,11 @@ interface ToolbarButtonProps {
     label: string;
     action: () => void;
     isActive?: boolean;
+    iconSize?: number;
+    btnPadding?: string;
 }
 
-const ToolbarButton: React.FC<ToolbarButtonProps> = ({ icon: Icon, label, action, isActive }) => (
+const ToolbarButton: React.FC<ToolbarButtonProps> = ({ icon: Icon, label, action, isActive, iconSize = 16, btnPadding = "p-1.5" }) => (
     <button
         onClick={(e) => {
             e.preventDefault();
@@ -20,14 +22,15 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = ({ icon: Icon, label, action
             action();
         }}
         className={clsx(
-            "p-1.5 rounded-md transition-colors flex items-center justify-center",
+            "rounded-md transition-colors flex items-center justify-center",
+            btnPadding,
             isActive
                 ? "bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400"
                 : "text-gray-500 dark:text-gray-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 dark:hover:text-primary-400"
         )}
         title={label}
     >
-        <Icon size={16} strokeWidth={2.5} />
+        <Icon size={iconSize} strokeWidth={2.5} />
     </button>
 );
 
@@ -36,6 +39,7 @@ interface EditorToolbarProps {
     mode?: 'full' | 'compact';
     onLinkClick?: () => void;
     onImageClick?: () => void;
+    mobile?: boolean;
 }
 
 /**
@@ -48,7 +52,7 @@ interface EditorToolbarProps {
  * - Custom Modal integration for Links and Images
  * - Responsive "Compact" vs "Full" modes
  */
-export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'full', onLinkClick, onImageClick }) => {
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'full', onLinkClick, onImageClick, mobile = false }) => {
     /**
      * --- FORCED UPDATES ---
      * Tiptap's internal state (selection, isActive) doesn't always trigger React re-renders.
@@ -73,6 +77,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
     if (!editor) return null;
 
     const isCompact = mode === 'compact';
+    const iconSize = mobile ? 20 : 16;
+    const btnPadding = mobile ? "p-2.5" : "p-1.5";
+
+    const Btn: React.FC<Omit<ToolbarButtonProps, 'iconSize' | 'btnPadding'>> = (props) => (
+        <ToolbarButton {...props} iconSize={iconSize} btnPadding={btnPadding} />
+    );
 
     return (
         <div className={clsx(
@@ -80,19 +90,19 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
             isCompact ? "bg-opacity-90 backdrop-blur-sm" : ""
         )}>
             {/* --- BASIC FORMATTING --- */}
-            <ToolbarButton
+            <Btn
                 icon={Bold}
                 label="Bold"
                 action={() => toggleSmartMark(editor, 'bold')}
                 isActive={editor.isActive('bold')}
             />
-            <ToolbarButton
+            <Btn
                 icon={Italic}
                 label="Italic"
                 action={() => toggleSmartMark(editor, 'italic')}
                 isActive={editor.isActive('italic')}
             />
-            <ToolbarButton
+            <Btn
                 icon={Highlighter}
                 label="Highlight"
                 action={() => toggleSmartMark(editor, 'highlight')}
@@ -104,19 +114,19 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                     <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
 
                     {/* --- HEADINGS --- */}
-                    <ToolbarButton
+                    <Btn
                         icon={Heading1}
                         label="Heading 1"
                         action={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
                         isActive={editor.isActive('heading', { level: 1 })}
                     />
-                    <ToolbarButton
+                    <Btn
                         icon={Heading2}
                         label="Heading 2"
                         action={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
                         isActive={editor.isActive('heading', { level: 2 })}
                     />
-                    <ToolbarButton
+                    <Btn
                         icon={Heading3}
                         label="Heading 3"
                         action={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
@@ -126,13 +136,13 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                     <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
 
                     {/* --- LISTS --- */}
-                    <ToolbarButton
+                    <Btn
                         icon={List}
                         label="Bullet List"
                         action={() => editor.chain().focus().toggleBulletList().run()}
                         isActive={editor.isActive('bulletList')}
                     />
-                    <ToolbarButton
+                    <Btn
                         icon={CheckSquare}
                         label="Task List"
                         action={() => editor.chain().focus().toggleTaskList().run()}
@@ -142,13 +152,13 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                     <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
 
                     {/* --- ADVANCED BLOCKS --- */}
-                    <ToolbarButton
+                    <Btn
                         icon={Quote}
                         label="Quote"
                         action={() => editor.chain().focus().toggleBlockquote().run()}
                         isActive={editor.isActive('blockquote')}
                     />
-                    <ToolbarButton
+                    <Btn
                         icon={Code}
                         label="Code Block"
                         action={() => editor.chain().focus().toggleCodeBlock().run()}
@@ -157,7 +167,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
 
                     <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
 
-                    <ToolbarButton
+                    <Btn
                         icon={Table}
                         label="Insert Table"
                         action={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
@@ -169,7 +179,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
             <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5" />
 
             {/* --- MEDIA & LINKS --- */}
-            <ToolbarButton
+            <Btn
                 icon={LinkIcon}
                 label="Link"
                 action={() => {
@@ -190,7 +200,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                 }}
                 isActive={editor.isActive('link')}
             />
-            <ToolbarButton
+            <Btn
                 icon={ImageIcon}
                 label="Image"
                 action={() => {

@@ -222,20 +222,32 @@ export function useNotes() {
         };
     }, [triggerSync]);
 
-    // 60-second background auto-pull (only when online and idle)
+    // Background auto-sync (only when online and idle)
     useEffect(() => {
         if (!baseFolder) return;
 
         const intervalId = setInterval(() => {
             if (!navigator.onLine) return;
             const timeSinceLastSave = Date.now() - lastSaveTime.current;
-            // Only pull if user hasn't typed in the last 30 seconds to avoid interruptions
-            if (timeSinceLastSave > 30000 && !isSyncing && document.visibilityState === 'visible') {
+            // Only sync if user hasn't typed in the last 5 seconds to avoid interruptions
+            if (timeSinceLastSave > 5000 && !isSyncing && document.visibilityState === 'visible') {
                 triggerSync();
             }
-        }, 60000); // 60 seconds
+        }, 15000); // 15 seconds
 
         return () => clearInterval(intervalId);
+    }, [baseFolder, isSyncing, triggerSync]);
+
+    // Sync immediately when the app comes back into focus (e.g. switching tabs/apps)
+    useEffect(() => {
+        if (!baseFolder) return;
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && navigator.onLine && !isSyncing) {
+                triggerSync();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [baseFolder, isSyncing, triggerSync]);
 
     /**

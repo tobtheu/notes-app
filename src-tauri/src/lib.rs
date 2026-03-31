@@ -188,8 +188,9 @@ async fn save_note(_app: tauri::AppHandle, root_path: String, folder_path: Strin
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     
-    // Inject/update frontmatter with current timestamp (ISO 8601 with timezone)
-    let now = chrono::Local::now().to_rfc3339();
+    // Inject/update frontmatter with current UTC timestamp.
+    // UTC ensures timestamps sort correctly across devices with different timezones.
+    let now = chrono::Utc::now().to_rfc3339();
     let final_content = inject_frontmatter(&content, &now);
     
     fs::write(&file_path, final_content).map_err(|e| e.to_string())?;

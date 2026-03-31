@@ -57,6 +57,7 @@ interface MarkdownEditorProps {
     header?: React.ReactNode;
     isFocusMode?: boolean;
     onArrowUpAtStart?: () => void;
+    onBlur?: () => void;
 }
 
 // suggestion items definition
@@ -521,7 +522,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     workspacePath,
     header,
     isFocusMode = false,
-    onArrowUpAtStart
+    onArrowUpAtStart,
+    onBlur
 }, ref) => {
     /**
      * --- LOCAL STATE ---
@@ -536,6 +538,22 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
 
     const [lightboxImage, setLightboxImage] = useState<{ src: string, caption?: string } | null>(null);
     const [isScrolling, setIsScrolling] = useState(false);
+
+    // Track keyboard height via visualViewport so toolbar floats above keyboard on mobile
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+    useEffect(() => {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        const update = () => {
+            // Only react to resize (keyboard open/close), not scroll bouncing
+            const kbHeight = window.innerHeight - vv.height;
+            setKeyboardHeight(Math.max(0, Math.round(kbHeight)));
+        };
+        vv.addEventListener('resize', update);
+        return () => {
+            vv.removeEventListener('resize', update);
+        };
+    }, []);
     const [isDragging, setIsDragging] = useState(false); // Visual feedback for file drop
 
     const hideTimeoutRef = useRef<any>(null);
@@ -623,6 +641,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     onNavigateRef.current = onNavigate;
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
+    const onBlurRef = useRef(onBlur);
+    onBlurRef.current = onBlur;
 
     const editor = useEditor({
         extensions,
@@ -693,6 +713,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             const markdown = (editor.storage as any).markdown.getMarkdown();
             editorMarkdownRef.current = markdown; // Track what the editor generated
             onChangeRef.current(markdown);
+        },
+        onBlur: () => {
+            onBlurRef.current?.();
         },
     }, []); // Empty dependency array ensures stability
 
@@ -1036,15 +1059,26 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                 </div>
             </div>
 
-            {/* Footer Toolbar - stays fixed at bottom of MarkdownEditor */}
+            {/* Footer Toolbar - floats above keyboard on mobile, in-flow on desktop */}
             {toolbarVisible && (
-                <div className="shrink-0 px-2 pt-2 pb-[calc(8px+var(--safe-bottom,0vh))] bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex items-center justify-center w-full min-h-[57px] box-content">
-                    <EditorToolbar
-                        editor={editor}
-                        onLinkClick={() => openLinkModal()}
-                        onImageClick={openImageModal}
-                    />
-                </div>
+                <>
+                    {/* Spacer to reserve in-flow space when toolbar is fixed (keyboard open) */}
+                    {keyboardHeight > 0 && <div className="shrink-0 min-h-[48px]" />}
+                    <div
+                        className="px-2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex items-center justify-center w-full box-content"
+                        style={keyboardHeight > 0
+                            ? { position: 'fixed', bottom: keyboardHeight, left: 0, right: 0, zIndex: 9998, paddingTop: 4, paddingBottom: 4 }
+                            : { paddingTop: 8, paddingBottom: 'calc(8px + var(--safe-bottom, 0vh))' }
+                        }
+                    >
+                        <EditorToolbar
+                            editor={editor}
+                            onLinkClick={() => openLinkModal()}
+                            onImageClick={openImageModal}
+                            mobile={keyboardHeight > 0}
+                        />
+                    </div>
+                </>
             )}
         </div>
     );
