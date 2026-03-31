@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import {
     Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
     Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart,
-    Plus, Settings, Trash2, Pencil, GripVertical
+    Plus, Settings, Settings2, Trash2, Pencil, GripVertical, Check
 } from 'lucide-react';
 import clsx from 'clsx';
 import { SyncStatusBadge } from './SyncStatusBadge';
@@ -12,6 +12,7 @@ import {
     closestCenter,
     KeyboardSensor,
     PointerSensor,
+    TouchSensor,
     useSensor,
     useSensors,
     DragOverlay,
@@ -78,9 +79,11 @@ interface FolderItemProps {
     metadata: AppMetadata;
     selectedCategory: string | null;
     isCollapsed: boolean;
+    isReorderMode?: boolean;
     onSelectCategory?: (name: string | null) => void;
     onEditCategory?: (name: string) => void;
     onDeleteCategory?: (name: string) => void;
+    onActivateReorderMode?: () => void;
     isDragging?: boolean;
     isOverlay?: boolean;
     setNodeRef?: (node: HTMLElement | null) => void;
@@ -95,9 +98,11 @@ interface SortableFolderItemProps {
     metadata: AppMetadata;
     selectedCategory: string | null;
     isCollapsed: boolean;
+    isReorderMode: boolean;
     onSelectCategory: (name: string | null) => void;
     onEditCategory: (name: string) => void;
     onDeleteCategory: (name: string) => void;
+    onActivateReorderMode: () => void;
 }
 
 const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
@@ -107,35 +112,51 @@ const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
  * Individual folder row inside the sidebar. Handles selection, hover actions (edit/delete), and DnD visual states.
  */
 const FolderItem = ({
-    folder, metadata, selectedCategory, isCollapsed, onSelectCategory,
-    onEditCategory, onDeleteCategory, isDragging, isOverlay,
-    setNodeRef, attributes, listeners, style
+    folder, metadata, selectedCategory, isCollapsed, isReorderMode = false,
+    onSelectCategory, onEditCategory, onDeleteCategory, onActivateReorderMode,
+    isDragging, isOverlay, setNodeRef, attributes, listeners, style
 }: FolderItemProps) => {
     const longPressTimer = useRef<any>(null);
     const [isLongPressing, setIsLongPressing] = useState(false);
+    const [isPressing, setIsPressing] = useState(false);
+
+    const cancelPress = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+        setIsPressing(false);
+    };
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        e.preventDefault(); // prevent text selection on iOS
+        // In reorder mode touches go straight to dnd-kit via the drag handle
+        if (isReorderMode) return;
+        // Prevent iOS text-selection callout and default long-press context menu
+        e.preventDefault();
         setIsLongPressing(false);
+        setIsPressing(true);
         longPressTimer.current = setTimeout(() => {
+            setIsPressing(false);
             setIsLongPressing(true);
             if (onEditCategory) onEditCategory(folder);
         }, 500);
     };
 
     const handleTouchEnd = () => {
-        if (longPressTimer.current) {
-            clearTimeout(longPressTimer.current);
-            longPressTimer.current = null;
-        }
-        // If it was a normal short tap (not long-press), select the category
-        if (!isLongPressing && onSelectCategory) {
+        const wasLongPress = isLongPressing;
+        cancelPress();
+        if (!wasLongPress && onSelectCategory) {
             onSelectCategory(folder);
         }
         setIsLongPressing(false);
     };
 
-    // Normalization ensures "Folder" and "folder" match correctly
+    const handleTouchMove = () => {
+        // Finger moved — user is scrolling, cancel the long-press timer
+        cancelPress();
+        setIsLongPressing(false);
+    };
+
     const folderKey = Object.keys(metadata.folders).find(k => normalizeStr(k) === normalizeStr(folder)) || folder;
     const folderMeta = metadata.folders[folderKey] || {};
     const IconComponent = ICON_MAP[folderMeta.icon || 'Folder'] || Folder;
@@ -145,7 +166,7 @@ const FolderItem = ({
     return (
         <div
             ref={setNodeRef}
-            style={{ ...style, WebkitTouchCallout: 'none', userSelect: 'none' } as React.CSSProperties}
+            style={{ ...style, WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' } as React.CSSProperties}
             className={clsx(
                 "group relative flex items-center transition-all rounded-lg cursor-pointer mb-0.5 outline-none",
                 isCollapsed ? "justify-center py-2.5" : "px-1 py-2.5 gap-2 text-sm font-medium",
@@ -161,22 +182,28 @@ const FolderItem = ({
             }}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            onTouchMove={handleTouchEnd}
+            onTouchMove={handleTouchMove}
         >
-            <div
-                className={clsx("flex items-center gap-2 shrink-0 min-w-0", isCollapsed ? "justify-center" : "flex-1 pr-1")}
-            >
+            {/* Long-press ripple animation overlay */}
+            {isPressing && (
+                <span className="absolute inset-0 rounded-lg bg-primary-500/25 animate-longpress pointer-events-none" />
+            )}
+
+            <div className={clsx("flex items-center gap-2 shrink-0 min-w-0", isCollapsed ? "justify-center" : "flex-1 pr-1")}>
                 {!isCollapsed && (
-                    // Drag Handle - Visible only on hover
                     <div
                         {...attributes}
-                        {...listeners}
-                        className="text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity shrink-0 outline-none"
+                        {...(isReorderMode ? listeners : {})}
+                        className={clsx(
+                            "shrink-0 outline-none transition-all",
+                            isReorderMode
+                                ? "text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing opacity-100"
+                                : "text-gray-300 dark:text-gray-600 cursor-grab opacity-0 lg:group-hover:opacity-100"
+                        )}
                     >
                         <GripVertical size={14} />
                     </div>
                 )}
-                {/* Folder Icon Container */}
                 <div className={clsx(
                     "p-1 rounded-md transition-colors shrink-0",
                     isSelected ? colorStyles.bg + " " + colorStyles.darkBg : "bg-transparent"
@@ -186,32 +213,49 @@ const FolderItem = ({
                         className={clsx(colorStyles.text, colorStyles.darkText)}
                     />
                 </div>
-                {/* Folder Label */}
                 {!isCollapsed && <span className="truncate flex-1 py-0.5">{folder}</span>}
             </div>
 
-            {/* Inline Action Buttons (Edit/Delete) - Absolute positioned to right */}
-            {!isCollapsed && onEditCategory && onDeleteCategory && (
-                <div className="absolute right-1.5 px-1 py-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-md shadow-sm border border-gray-100/50 dark:border-gray-700/50 z-20 lg:flex hidden">
+            {/* Desktop hover actions */}
+            {!isCollapsed && !isReorderMode && onEditCategory && onDeleteCategory && (
+                <div className="absolute right-1.5 px-1 py-1 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-md shadow-sm border border-gray-100/50 dark:border-gray-700/50 z-20 hidden lg:flex">
                     <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onEditCategory(folder);
-                        }}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onEditCategory(folder); }}
                         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary-500 rounded transition-all outline-none"
                         title="Edit Category"
                     >
                         <Pencil size={12} />
                     </button>
                     <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteCategory(folder);
-                        }}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onDeleteCategory(folder); }}
                         className="p-1 hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-500 hover:text-red-500 rounded transition-all outline-none"
                         title="Delete Category"
                     >
                         <Trash2 size={12} />
+                    </button>
+                </div>
+            )}
+
+            {/* Reorder mode: edit/delete buttons visible on mobile */}
+            {!isCollapsed && isReorderMode && onEditCategory && onDeleteCategory && (
+                <div className="flex items-center gap-0.5 shrink-0 ml-1">
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onEditCategory(folder); }}
+                        className="p-1.5 text-gray-400 hover:text-primary-500 active:text-primary-500 rounded-md transition-all"
+                        title="Edit"
+                    >
+                        <Pencil size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onDeleteCategory(folder); }}
+                        className="p-1.5 text-gray-400 hover:text-red-500 active:text-red-500 rounded-md transition-all"
+                        title="Delete"
+                    >
+                        <Trash2 size={13} />
                     </button>
                 </div>
             )}
@@ -246,6 +290,8 @@ const SortableFolderItem = (props: SortableFolderItemProps) => {
             attributes={attributes}
             listeners={listeners}
             isDragging={isDragging}
+            isReorderMode={props.isReorderMode}
+            onActivateReorderMode={props.onActivateReorderMode}
         />
     );
 };
@@ -276,19 +322,15 @@ export function Sidebar({
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
     const [activeId, setActiveId] = useState<string | null>(null);
+    const [isReorderMode, setIsReorderMode] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Configuration Point: DnD Sensors
-    // distance: 5 ensures a click is not mistaken for a drag
     const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 5,
-            },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        // TouchSensor: only active when isReorderMode (listeners are only applied to
+        // the drag handle in reorder mode, so this is effectively a no-op otherwise)
+        useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 6 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
     const handleCreateFolder = (e: React.FormEvent) => {
@@ -354,13 +396,39 @@ export function Sidebar({
                         <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                             Categories
                         </span>
-                        <button
-                            onClick={() => setIsCreatingFolder(true)}
-                            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-400 transition-opacity hidden lg:block lg:opacity-0 lg:group-hover:opacity-100"
-                            title="New Folder"
-                        >
-                            <Plus size={14} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            {isReorderMode ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsReorderMode(false)}
+                                    className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-500 text-white active:bg-primary-600 transition-colors"
+                                >
+                                    <Check size={11} />
+                                    Fertig
+                                </button>
+                            ) : (
+                                <>
+                                    {/* Desktop: new folder on hover */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCreatingFolder(true)}
+                                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-400 transition-opacity hidden lg:block lg:opacity-0 lg:group-hover:opacity-100"
+                                        title="New Folder"
+                                    >
+                                        <Plus size={14} />
+                                    </button>
+                                    {/* Mobile: reorder mode toggle */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsReorderMode(true)}
+                                        className="p-1 rounded text-gray-400 active:text-primary-500 transition-colors lg:hidden"
+                                        title="Reorder"
+                                    >
+                                        <Settings2 size={14} />
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
@@ -402,9 +470,11 @@ export function Sidebar({
                                     metadata={metadata}
                                     selectedCategory={selectedCategory}
                                     isCollapsed={isCollapsed}
+                                    isReorderMode={isReorderMode}
                                     onSelectCategory={onSelectCategory}
                                     onEditCategory={onEditCategory}
                                     onDeleteCategory={onDeleteCategory}
+                                    onActivateReorderMode={() => setIsReorderMode(true)}
                                 />
                             ))}
                         </SortableContext>

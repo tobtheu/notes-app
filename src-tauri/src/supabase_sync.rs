@@ -49,18 +49,17 @@ pub struct RemoteNote {
 // Sync state (stored per-device in notizapp-sync-state.json)
 // ---------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug)]
+/// Per-device sync state. Stores the last-synced `updated_at` timestamp for
+/// every note. This replaces the old GitHub-era `last_sync_at` + `known_ids`
+/// approach: with a real database we compare per-note timestamps directly.
+///
+/// `known[id] = ts` means: "after the last sync, both local and remote agreed
+/// on this note at timestamp `ts`."  Missing entry = never synced on this device.
+#[derive(Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncState {
-    pub last_sync_at: String,        // ISO 8601 — fetch remote changes newer than this
     #[serde(default)]
-    pub known_ids: Vec<String>,      // note IDs present after the last successful sync
-}
-
-impl Default for SyncState {
-    fn default() -> Self {
-        Self { last_sync_at: "1970-01-01T00:00:00.000Z".to_string(), known_ids: Vec::new() }
-    }
+    pub known: HashMap<String, String>,
 }
 
 /// Returns true if the path looks like a conflict copy ("Note (Konflikt 2026-03-27).md").
@@ -71,6 +70,7 @@ fn is_conflict_copy(id: &str) -> bool {
 pub fn load_sync_state(folder_path: &Path) -> SyncState {
     let path = folder_path.join("notizapp-sync-state.json");
     if let Ok(content) = std::fs::read_to_string(&path) {
+        // Deserialise; gracefully falls back to empty state if format changed.
         serde_json::from_str(&content).unwrap_or_default()
     } else {
         SyncState::default()
@@ -246,15 +246,21 @@ pub async fn upsert_note(
 // App config (folder order, pins, settings)
 // ---------------------------------------------------------------------------
 
-pub async fn fetch_config(access_token: &str) -> Result<Option<serde_json::Value>, String> {
+pub async fn fetch_config(access_token: &str) -> Result<Option<(serde_json::Value, String)>, String> {
     let res = make_client()
-        .get(format!("{}/rest/v1/app_config?select=metadata&limit=1", SUPABASE_URL))
+        .get(format!("{}/rest/v1/app_config?select=metadata,updated_at&limit=1", SUPABASE_URL))
         .headers(auth_headers(access_token))
         .send().await.map_err(|e| e.to_string())?;
 
     if res.status().is_success() {
         let rows: Vec<serde_json::Value> = res.json().await.map_err(|e| e.to_string())?;
-        Ok(rows.into_iter().next().and_then(|r| r.get("metadata").cloned()))
+        if let Some(row) = rows.into_iter().next() {
+            let meta = row.get("metadata").cloned().unwrap_or(serde_json::json!({}));
+            let updated_at = row.get("updated_at").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            Ok(Some((meta, updated_at)))
+        } else {
+            Ok(None)
+        }
     } else {
         let err = res.text().await.unwrap_or_default();
         Err(format!("Konfiguration abrufen fehlgeschlagen: {}", err))
@@ -354,183 +360,303 @@ fn extract_updated_at(content: &str, path: &Path) -> String {
 }
 
 fn is_newer(a: &str, b: &str) -> bool {
-    // Returns true if timestamp a is strictly after b.
-    // Falls back to string comparison (ISO 8601 is lexicographically sortable).
-    a > b
+    // Parse RFC 3339 for correct timezone-aware comparison.
+    // "+01:00" and "Z" are handled correctly; falls back to string compare.
+    use chrono::DateTime;
+    match (DateTime::parse_from_rfc3339(a), DateTime::parse_from_rfc3339(b)) {
+        (Ok(ta), Ok(tb)) => ta > tb,
+        _ => a > b,
+    }
 }
 
-/// Full sync: push local changes, pull remote changes, handle conflicts.
+/// Sync app config (folder icons/colors, pinned notes, folder order, settings).
+///
+/// Order: pull → merge → save locally → push merged.
+/// Pulling first ensures changes from other devices are applied before we push.
+/// Pushing AFTER merge ensures the server always has the latest merged state.
+///
+/// Per-device fields (fontSize, fontFamily) are never sent to Supabase and
+/// are always preserved from the local file regardless of what remote says.
+async fn sync_config(access_token: &str, user_id: &str, config_path: &Path) {
+    // Step 1: pull remote config first
+    let remote_data = match fetch_config(access_token).await {
+        Ok(r) => r,
+        Err(e) => { info!("[supabase] config: fetch failed: {}", e); None }
+    };
+
+    // Step 2: read local config (or start from an empty base)
+    let local_raw = std::fs::read_to_string(config_path).unwrap_or_default();
+    let mut local: serde_json::Value = serde_json::from_str(&local_raw)
+        .unwrap_or_else(|_| serde_json::json!({ "folders": {}, "pinnedNotes": [], "settings": {} }));
+
+    // Get local modification time
+    let local_mtime = std::fs::metadata(config_path)
+        .and_then(|m| m.modified())
+        .map(|t| {
+            let dt: chrono::DateTime<chrono::Utc> = t.into();
+            dt.to_rfc3339()
+        })
+        .unwrap_or_default();
+
+    // Preserve per-device settings before any merge overwrites them
+    let per_device: HashMap<String, serde_json::Value> = {
+        let mut m = HashMap::new();
+        if let Some(ls) = local.get("settings").and_then(|s| s.as_object()) {
+            for key in &["fontSize", "fontFamily"] {
+                if let Some(v) = ls.get(*key) {
+                    m.insert(key.to_string(), v.clone());
+                }
+            }
+        }
+        m
+    };
+
+    let mut local_was_newer = false;
+
+    // Step 3: merge remote into local (only if remote is actually newer)
+    if let Some((remote_meta, remote_updated_at)) = remote_data {
+        if !local_mtime.is_empty() && is_newer(&local_mtime, &remote_updated_at) {
+            info!("[supabase] config: local is newer ({} > {}), will push local instead of pulling", local_mtime, remote_updated_at);
+            local_was_newer = true;
+        } else {
+            // Remote is newer or same age -> merge remote into local
+            info!("[supabase] config: remote is newer/same ({} >= {}), merging remote into local", remote_updated_at, local_mtime);
+            
+            // folders: deep merge — remote values win per key, local-only keys kept
+            if let Some(remote_folders) = remote_meta.get("folders").and_then(|f| f.as_object()) {
+                let base = local["folders"]
+                    .as_object()
+                    .cloned()
+                    .unwrap_or_default();
+                let mut merged = base;
+                for (k, v) in remote_folders {
+                    merged.insert(k.clone(), v.clone());
+                }
+                local["folders"] = serde_json::Value::Object(merged);
+            }
+
+            if let Some(pinned) = remote_meta.get("pinnedNotes") {
+                local["pinnedNotes"] = pinned.clone();
+            }
+            if let Some(order) = remote_meta.get("folderOrder") {
+                if !order.is_null() {
+                    local["folderOrder"] = order.clone();
+                }
+            }
+
+            // settings: remote wins, then restore per-device fields on top
+            if let Some(remote_settings) = remote_meta.get("settings").and_then(|s| s.as_object()) {
+                let mut merged = remote_settings.clone();
+                for (k, v) in &per_device {
+                    merged.insert(k.clone(), v.clone());
+                }
+                local["settings"] = serde_json::Value::Object(merged);
+            }
+        }
+    }
+
+    // Ensure per-device fields are present even when there was no remote settings block
+    if let Some(settings) = local.get_mut("settings").and_then(|s| s.as_object_mut()) {
+        for (k, v) in &per_device {
+            settings.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+    }
+
+    // Step 4: save merged config locally (if remote was newer)
+    if !local_was_newer {
+        if let Ok(merged_str) = serde_json::to_string_pretty(&local) {
+            let _ = std::fs::write(config_path, &merged_str);
+            info!("[supabase] config: merged and saved locally");
+        }
+    }
+
+    // Step 5: push config if it's local was newer OR if we just pulled/merged (to ensure server is up to date)
+    // Actually, always push the current state to the server to ensure synchronization.
+    let mut push_payload = local.clone();
+    if let Some(settings) = push_payload.get_mut("settings").and_then(|s| s.as_object_mut()) {
+        settings.remove("fontSize");
+        settings.remove("fontFamily");
+    }
+    match upsert_config(access_token, user_id, &push_payload).await {
+        Ok(_) => info!("[supabase] config: pushed"),
+        Err(e) => info!("[supabase] config: push failed: {}", e),
+    }
+}
+
+/// Full sync: pull remote → push local changes → sync config.
+///
+/// Uses per-note timestamp tracking (`state.known`) instead of a global
+/// `last_sync_at`.  This is database-native: we compare each note's local
+/// timestamp against the last-synced timestamp and the current remote
+/// timestamp independently, so there is no ambiguity about "what changed".
+///
+/// Decision table (known = last synced state):
+/// ┌─────────────────┬─────────────────┬─────────────────────────────┐
+/// │ local changed?  │ remote changed? │ action                      │
+/// ├─────────────────┼─────────────────┼─────────────────────────────┤
+/// │ no              │ no              │ nothing                     │
+/// │ yes             │ no              │ push local → server         │
+/// │ no              │ yes             │ pull remote → local         │
+/// │ yes             │ yes             │ newest timestamp wins       │
+/// │ yes (deleted)   │ –               │ push deleted=true           │
+/// │ –               │ yes (deleted)   │ delete local (if unchanged) │
+/// └─────────────────┴─────────────────┴─────────────────────────────┘
 pub async fn sync(
     creds: &SupabaseCredentials,
     folder_path: &Path,
 ) -> Result<SupabaseSyncResult, String> {
     let mut state = load_sync_state(folder_path);
-
-    // If there are no local .md files but the sync state is non-default,
-    // this is a fresh device that somehow has a stale sync-state file.
-    // Reset to epoch so we pull all notes from the server.
     let local_notes = collect_local_notes(folder_path);
-    if local_notes.is_empty() && state.last_sync_at != SyncState::default().last_sync_at {
-        info!("[supabase] fresh device detected (no local notes, stale sync state) — resetting last_sync_at to pull all");
-        state.last_sync_at = SyncState::default().last_sync_at.clone();
-    }
 
-    let since = state.last_sync_at.clone();
-    info!("[supabase] sync start, last_sync_at={}", &since[..10.min(since.len())]);
-    let sync_started_at = chrono::Utc::now().to_rfc3339();
+    info!("[supabase] sync start — {} local notes, {} known", local_notes.len(), state.known.len());
 
     let mut pushed = 0usize;
     let mut pulled = 0usize;
     let mut deleted = 0usize;
-    let mut conflicts = 0usize;
 
     // ------------------------------------------------------------------
-    // 1a. PUSH DELETIONS: notes that existed at last sync but are now gone
-    // ------------------------------------------------------------------
-    if !state.known_ids.is_empty() {
-        for known_id in &state.known_ids {
-            if !local_notes.contains_key(known_id.as_str()) {
-                // Note was deleted locally — push deletion to Supabase
-                let ts = chrono::Utc::now().to_rfc3339();
-                match upsert_note(&creds.access_token, &creds.user_id, known_id, "", &ts, true).await {
-                    Ok(_) => info!("[supabase] pushed deletion: {}", known_id),
-                    Err(e) => info!("[supabase] push deletion failed for {}: {}", known_id, e),
-                }
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // 1b. PUSH: local notes changed since last sync (skip conflict copies)
-    // ------------------------------------------------------------------
-    for (rel_path, (content, updated_at)) in &local_notes {
-        // Conflict copies are local resolution artifacts — never sync them
-        if is_conflict_copy(rel_path) {
-            continue;
-        }
-        if is_newer(updated_at.as_str(), since.as_str()) || since == SyncState::default().last_sync_at {
-            match upsert_note(&creds.access_token, &creds.user_id, rel_path, content, updated_at, false).await {
-                Ok(_) => {
-                    pushed += 1;
-                    info!("[supabase] pushed: {}", rel_path);
-                }
-                Err(e) => info!("[supabase] push failed for {}: {}", rel_path, e),
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // 2. PULL: all remote notes (full pull ensures no note is ever missed
-    //    due to timestamp mismatches between devices)
+    // 1. PULL: fetch all remote notes, apply changes to local filesystem
     // ------------------------------------------------------------------
     let remote_notes = fetch_all_notes(&creds.access_token).await?;
+    let mut remote_map: HashMap<String, RemoteNote> = HashMap::new();
+    for note in remote_notes {
+        remote_map.insert(note.id.clone(), note);
+    }
 
-    for remote in &remote_notes {
-        // Conflict copies should never live on the server.
-        // If one somehow exists (from an older build), mark it deleted and skip.
-        if is_conflict_copy(&remote.id) {
+    for (id, remote) in &remote_map {
+        // Conflict copies should never exist on the server — clean up any legacy ones.
+        if is_conflict_copy(id) {
             if !remote.deleted {
                 let ts = chrono::Utc::now().to_rfc3339();
-                let _ = upsert_note(&creds.access_token, &creds.user_id, &remote.id, "", &ts, true).await;
-                info!("[supabase] cleaned up stale conflict copy from server: {}", remote.id);
+                let _ = upsert_note(&creds.access_token, &creds.user_id, id, "", &ts, true).await;
+                info!("[supabase] cleaned up stale conflict copy from server: {}", id);
             }
-            // Also remove it locally if it somehow ended up on disk
-            let local_path = folder_path.join(&remote.id);
-            if local_path.exists() {
-                let _ = std::fs::remove_file(&local_path);
-            }
+            let p = folder_path.join(id);
+            if p.exists() { let _ = std::fs::remove_file(&p); }
             continue;
         }
 
-        let local_path = folder_path.join(&remote.id);
+        let local_path = folder_path.join(id);
+        let known_ts = state.known.get(id.as_str()); // last agreed-upon timestamp, if any
 
         if remote.deleted {
-            // Remote deletion: only delete locally if we haven't modified the note since last sync
-            if let Some((_, local_updated)) = local_notes.get(&remote.id) {
-                if !is_newer(local_updated.as_str(), since.as_str()) {
-                    // Not locally modified — apply remote deletion
-                    if local_path.exists() {
-                        let _ = std::fs::remove_file(&local_path);
-                        deleted += 1;
-                        info!("[supabase] deleted locally: {}", remote.id);
-                    }
-                }
-                // else: locally modified after last sync → keep local, ignore remote deletion
-            } else if local_path.exists() {
+            // Apply remote deletion only when local was not modified since last sync.
+            let local_unchanged = match (local_notes.get(id.as_str()), known_ts) {
+                (Some((_, local_ts)), Some(k)) => local_ts == k,
+                (None, _) => true,  // already gone locally — nothing to do
+                (Some(_), None) => false, // exists locally but never synced → locally new, keep it
+            };
+            if local_unchanged && local_path.exists() {
                 let _ = std::fs::remove_file(&local_path);
                 deleted += 1;
+                info!("[supabase] deleted locally: {}", id);
             }
             continue;
         }
 
-        if let Some((local_content, local_updated)) = local_notes.get(&remote.id) {
-            // Note exists both locally and remotely
-            if is_newer(remote.updated_at.as_str(), local_updated.as_str()) {
-                // Remote is newer → overwrite local
-                if let Some(parent) = local_path.parent() {
-                    let _ = std::fs::create_dir_all(parent);
-                }
+        let remote_changed = known_ts.map_or(true, |k| &remote.updated_at != k);
+
+        match local_notes.get(id.as_str()) {
+            None => {
+                // Note exists remotely but not locally → pull it.
+                if let Some(parent) = local_path.parent() { let _ = std::fs::create_dir_all(parent); }
                 let _ = std::fs::write(&local_path, &remote.content);
                 pulled += 1;
-                info!("[supabase] pulled (remote newer): {}", remote.id);
-            } else {
-                // Conflict check: only when BOTH sides changed AFTER a real previous sync.
-                // Skip on first-ever sync (since == epoch) — that would flag every note as a conflict
-                // just because both timestamps are newer than 1970.
-                let is_first_sync = since == SyncState::default().last_sync_at;
-                let both_changed = !is_first_sync
-                    && is_newer(local_updated.as_str(), since.as_str())
-                    && is_newer(remote.updated_at.as_str(), since.as_str());
+                info!("[supabase] pulled (new): {}", id);
+            }
+            Some((local_content, local_ts)) => {
+                let local_changed = known_ts.map_or(true, |k| local_ts != k);
 
-                if both_changed {
-                    // Conflict: both changed since last sync
-                    // Local wins, remote version saved as conflict copy
-                    let stem = local_path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-                    let ext = local_path.extension().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "md".to_string());
-                    let parent = local_path.parent().unwrap_or(folder_path);
-                    let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-                    let conflict_path = parent.join(format!("{} (Konflikt {}).{}", stem, date, ext));
-                    if !conflict_path.exists() {
-                        let _ = std::fs::write(&conflict_path, &remote.content);
-                        conflicts += 1;
-                        info!("[supabase] conflict copy created: {}", remote.id);
+                if remote_changed && !local_changed {
+                    // Only remote changed → overwrite local if content differs.
+                    if remote.content.trim() != local_content.trim() {
+                        if let Some(parent) = local_path.parent() { let _ = std::fs::create_dir_all(parent); }
+                        let _ = std::fs::write(&local_path, &remote.content);
+                        pulled += 1;
+                        info!("[supabase] pulled (remote changed): {}", id);
                     }
-                    // Push local version again to make sure remote has it
-                    let _ = upsert_note(&creds.access_token, &creds.user_id, &remote.id, local_content, local_updated, false).await;
+                } else if remote_changed && local_changed {
+                    // Both changed → newest timestamp wins; no conflict copies.
+                    if is_newer(remote.updated_at.as_str(), local_ts.as_str())
+                        && remote.content.trim() != local_content.trim()
+                    {
+                        if let Some(parent) = local_path.parent() { let _ = std::fs::create_dir_all(parent); }
+                        let _ = std::fs::write(&local_path, &remote.content);
+                        pulled += 1;
+                        info!("[supabase] pulled (both changed, remote newer): {}", id);
+                    }
+                    // else: local is newer → will be pushed in step 2
                 }
-                // else: local is newer or same, or first-sync → no action needed (already pushed above)
+                // if only local changed or neither changed → no pull action needed
             }
-        } else {
-            // New note from remote → write locally
-            if let Some(parent) = local_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
+        }
+    }
+
+    // Re-collect after pull so the push phase sees the updated local state.
+    let local_after_pull = collect_local_notes(folder_path);
+
+    // ------------------------------------------------------------------
+    // 2. PUSH: local notes that are new or changed since last sync,
+    //    and local deletions (note was in `known` but is gone now).
+    // ------------------------------------------------------------------
+
+    // 2a. Deletions
+    for (known_id, _) in &state.known {
+        if is_conflict_copy(known_id) { continue; }
+        if !local_after_pull.contains_key(known_id.as_str()) {
+            let ts = chrono::Utc::now().to_rfc3339();
+            match upsert_note(&creds.access_token, &creds.user_id, known_id, "", &ts, true).await {
+                Ok(_) => info!("[supabase] pushed deletion: {}", known_id),
+                Err(e) => info!("[supabase] push deletion failed for {}: {}", known_id, e),
             }
-            let _ = std::fs::write(&local_path, &remote.content);
-            pulled += 1;
-            info!("[supabase] pulled (new): {}", remote.id);
+        }
+    }
+
+    // 2b. New and modified notes
+    for (id, (content, local_ts)) in &local_after_pull {
+        if is_conflict_copy(id) { continue; }
+
+        let local_changed = state.known.get(id.as_str()).map_or(true, |k| local_ts != k);
+        let not_on_server = !remote_map.contains_key(id.as_str())
+            || remote_map.get(id.as_str()).map_or(false, |r| r.deleted);
+
+        if local_changed || not_on_server {
+            // Don't push if we just pulled a newer version of this note.
+            let remote_is_newer = remote_map.get(id.as_str())
+                .map_or(false, |r| is_newer(r.updated_at.as_str(), local_ts.as_str()));
+            if !remote_is_newer {
+                match upsert_note(&creds.access_token, &creds.user_id, id, content, local_ts, false).await {
+                    Ok(_) => { pushed += 1; info!("[supabase] pushed: {}", id); }
+                    Err(e) => info!("[supabase] push failed for {}: {}", id, e),
+                }
+            }
         }
     }
 
     // ------------------------------------------------------------------
-    // 3. Update sync state
+    // 3. CONFIG SYNC
     // ------------------------------------------------------------------
-    state.last_sync_at = sync_started_at;
-    // Snapshot current local IDs (excluding conflict copies) so next sync
-    // can detect deletions and push them to Supabase.
-    state.known_ids = local_notes.keys()
-        .filter(|id| !is_conflict_copy(id))
-        .cloned()
+    let config_path = folder_path.join("notizapp-config.json");
+    sync_config(&creds.access_token, &creds.user_id, &config_path).await;
+
+    // ------------------------------------------------------------------
+    // 4. Save sync state: record the agreed-upon timestamp for every note
+    //    that exists locally after this sync.
+    // ------------------------------------------------------------------
+    state.known = local_after_pull.iter()
+        .filter(|(id, _)| !is_conflict_copy(id))
+        .map(|(id, (_, ts))| (id.clone(), ts.clone()))
         .collect();
     save_sync_state(folder_path, &state);
 
-    let had_changes = pulled > 0 || deleted > 0 || conflicts > 0;
-    info!("[supabase] sync done — pushed={} pulled={} deleted={} conflicts={}", pushed, pulled, deleted, conflicts);
+    let had_changes = pulled > 0 || deleted > 0;
+    info!("[supabase] sync done — pushed={} pulled={} deleted={}", pushed, pulled, deleted);
 
     Ok(SupabaseSyncResult {
         pushed_count: pushed,
         pulled_count: pulled,
         deleted_count: deleted,
-        conflict_count: conflicts,
+        conflict_count: 0,
         had_changes,
     })
 }

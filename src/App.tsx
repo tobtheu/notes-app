@@ -318,7 +318,7 @@ function App() {
         {!isFocusMode && (
           <NoteList
             className={clsx(
-              "flex-1 md:flex-none md:w-80 shrink-0 transition-all duration-300 ease-in-out max-md:min-w-[calc(100vw-72px)]",
+              "flex-1 min-w-0 md:flex-none md:w-80 md:shrink-0 transition-all duration-300 ease-in-out",
               activeView === 'editor' ? "hidden md:flex" :
                 activeView === 'sidebar' ? "hidden md:flex" : "flex"
             )}
@@ -356,6 +356,7 @@ function App() {
             spellcheckEnabled={spellcheckEnabled}
             isFocusMode={isFocusMode}
             onToggleFocus={() => setIsFocusMode(!isFocusMode)}
+            onSync={triggerSync}
             onNavigate={(id, _anchor) => handleNavigate(id)}
           />
         ) : (
