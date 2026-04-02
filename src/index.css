@@ -613,3 +613,13 @@ body {
     transform: translateY(0) scale(1);
   }
 }
+
+/* Long-press radial ripple — plays over 500ms matching the press timer */
+@keyframes longpress-ripple {
+  0%   { transform: scale(0.7);  opacity: 0.55; }
+  60%  { opacity: 0.3; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
+.animate-longpress {
+  animation: longpress-ripple 500ms ease-out forwards;
+}

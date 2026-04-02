@@ -23,6 +23,7 @@ import 'highlight.js/styles/github-dark.css';
 // Image import removed as it is replaced by ImageWithCaption
 import { ImageWithCaption } from '../extensions/ImageWithCaption';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { platform } from '@tauri-apps/plugin-os';
 import Suggestion from '@tiptap/suggestion';
 import tippy, { type Instance } from 'tippy.js';
 import { EditorToolbar } from './EditorToolbar';
@@ -57,6 +58,7 @@ interface MarkdownEditorProps {
     header?: React.ReactNode;
     isFocusMode?: boolean;
     onArrowUpAtStart?: () => void;
+    onBlur?: () => void;
 }
 
 // suggestion items definition
@@ -521,7 +523,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     workspacePath,
     header,
     isFocusMode = false,
-    onArrowUpAtStart
+    onArrowUpAtStart,
+    onBlur
 }, ref) => {
     /**
      * --- LOCAL STATE ---
@@ -536,6 +539,52 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
 
     const [lightboxImage, setLightboxImage] = useState<{ src: string, caption?: string } | null>(null);
     const [isScrolling, setIsScrolling] = useState(false);
+
+    const [isIOS, setIsIOS] = useState(false);
+    useEffect(() => {
+        try {
+            const p = platform();
+            setIsIOS(p === 'ios');
+        } catch (e) {
+            console.error("Failed to detect platform:", e);
+        }
+    }, []);
+
+    // Track keyboard height via visualViewport so toolbar floats above keyboard on mobile
+    // Track keyboard height and toolbar position natively bypassing React state for smoothness
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const toolbarRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        const update = () => {
+            const kbHeight = window.innerHeight - vv.height;
+            
+            // Only use React state to toggle visibility (open/close)
+            // This prevents React from re-rendering 60fps during scroll, which caused the jitter
+            if (kbHeight > 100) {
+                setKeyboardHeight(kbHeight);
+            } else {
+                setKeyboardHeight(0);
+            }
+
+            // Directly update the DOM for 100% synchronous scroll tracking (fixes wandering + jitter)
+            if (toolbarRef.current && kbHeight > 100) {
+                const shift = vv.offsetTop - kbHeight;
+                toolbarRef.current.style.transform = `translateY(${shift}px)`;
+            }
+        };
+        
+        vv.addEventListener('resize', update);
+        vv.addEventListener('scroll', update);
+        // Initial setup
+        update();
+        return () => {
+            vv.removeEventListener('resize', update);
+            vv.removeEventListener('scroll', update);
+        };
+    }, []);
     const [isDragging, setIsDragging] = useState(false); // Visual feedback for file drop
 
     const hideTimeoutRef = useRef<any>(null);
@@ -623,6 +672,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     onNavigateRef.current = onNavigate;
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
+    const onBlurRef = useRef(onBlur);
+    onBlurRef.current = onBlur;
 
     const editor = useEditor({
         extensions,
@@ -693,6 +744,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             const markdown = (editor.storage as any).markdown.getMarkdown();
             editorMarkdownRef.current = markdown; // Track what the editor generated
             onChangeRef.current(markdown);
+        },
+        onBlur: () => {
+            onBlurRef.current?.();
         },
     }, []); // Empty dependency array ensures stability
 
@@ -884,6 +938,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                     editor={editor}
                     updateDelay={0}
                     shouldShow={({ from, to, editor }) => {
+                        if (isIOS) return false;
                         return from !== to || editor.isActive('image');
                     }}
                 >
@@ -1036,14 +1091,24 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                 </div>
             </div>
 
-            {/* Footer Toolbar - stays fixed at bottom of MarkdownEditor */}
+            {/* Footer Toolbar - floats above keyboard on mobile, in-flow on desktop */}
             {toolbarVisible && (
-                <div className="shrink-0 px-2 pt-2 pb-[calc(8px+var(--safe-bottom,0vh))] bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex items-center justify-center w-full min-h-[57px] box-content">
-                    <EditorToolbar
-                        editor={editor}
-                        onLinkClick={() => openLinkModal()}
-                        onImageClick={openImageModal}
-                    />
+                <div
+                    ref={toolbarRef}
+                    className={clsx(
+                        "px-2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 items-center justify-center w-full box-content",
+                        isIOS && keyboardHeight === 0 ? "hidden" : "flex"
+                    )}
+                    style={keyboardHeight > 0
+                        ? { position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9998, paddingTop: 4, paddingBottom: 4 }
+                        : { paddingTop: 8, paddingBottom: 'calc(8px + var(--safe-bottom, 0vh))' }
+                    }
+                >                        <EditorToolbar
+                            editor={editor}
+                            onLinkClick={() => openLinkModal()}
+                            onImageClick={openImageModal}
+                            mobile={keyboardHeight > 0}
+                        />
                 </div>
             )}
         </div>

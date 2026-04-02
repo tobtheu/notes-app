@@ -23,6 +23,7 @@ interface EditorProps {
     workspacePath: string;
     isFocusMode: boolean;
     onToggleFocus: () => void;
+    onSync?: () => void;
     className?: string;
 }
 
@@ -48,6 +49,7 @@ export function Editor({
     workspacePath,
     isFocusMode,
     onToggleFocus,
+    onSync,
     className
 }: EditorProps) {
     /**
@@ -64,6 +66,16 @@ export function Editor({
 
     // Tracks the last version committed to disk to avoid redundant saves
     const lastSavedContent = useRef(note.content);
+
+    // Throttle sync-on-blur: don't trigger more than once per 10s to avoid constant syncing
+    const lastSyncTime = useRef(0);
+    const throttledSync = useCallback(() => {
+        const now = Date.now();
+        if (now - lastSyncTime.current > 10000) {
+            lastSyncTime.current = now;
+            onSync?.();
+        }
+    }, [onSync]);
 
     // Tracks if we have unsaved/unflushed modifications (prevents parent overwriting our typing)
     const isDirty = useRef(false);
@@ -225,6 +237,12 @@ export function Editor({
     const contentRef = useRef(content);
     useEffect(() => { contentRef.current = content; }, [content]);
 
+    const onSyncRef = useRef(onSync);
+    useEffect(() => { onSyncRef.current = onSync; }, [onSync]);
+
+    const onSaveRef = useRef(onSave);
+    useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
+
     useEffect(() => {
         return () => {
             // ONLY flush if we actually have unsaved changes.
@@ -237,11 +255,13 @@ export function Editor({
 
                 if (contentDirty || titleChanged) {
                     // SESSION END: Perform physical rename now
-                    onSave(lastNoteId.current, note.filename, contentRef.current, note.folder, false);
+                    onSaveRef.current(lastNoteId.current, note.filename, contentRef.current, note.folder, false);
                 }
             }
+            // Trigger sync when leaving the note (note switch or back button)
+            onSyncRef.current?.();
         };
-    }, [note.filename, note.folder, onSave]);
+    }, [note.filename, note.folder]);
 
 
 
@@ -397,6 +417,7 @@ export function Editor({
                             value={title}
                             onChange={(e) => handleTitleChange(e.target.value)}
                             onKeyDown={handleTitleKeyDown}
+                            onBlur={() => throttledSync()}
                             spellCheck={spellcheckEnabled}
                             rows={1}
                         />
@@ -492,6 +513,7 @@ export function Editor({
                                 value={title}
                                 onChange={(e) => handleTitleChange(e.target.value)}
                                 onKeyDown={handleTitleKeyDown}
+                                onBlur={() => throttledSync()}
                                 spellCheck={spellcheckEnabled}
                                 rows={1}
                             />
@@ -500,6 +522,7 @@ export function Editor({
                     isFocusMode={isFocusMode}
                     ref={markdownEditorRef}
                     onArrowUpAtStart={() => titleRef.current?.focus()}
+                    onBlur={() => throttledSync()}
                 />
             ) : (
                 /* PLAIN TEXT MODE - Standard Fallback */
@@ -510,6 +533,7 @@ export function Editor({
                         placeholder="Start typing your note here..."
                         value={body}
                         onChange={(e) => handleBodyChange(e.target.value)}
+                        onBlur={() => throttledSync()}
                         spellCheck={spellcheckEnabled}
                     />
                 </div>
