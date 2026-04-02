@@ -5,6 +5,7 @@ import clsx from 'clsx';
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
+    isIOS?: boolean;
     currentPath: string | null;
     onChangePath: () => void;
     theme: 'light' | 'dark' | 'system';
@@ -30,6 +31,7 @@ interface SettingsModalProps {
 export function SettingsModal({
     isOpen,
     onClose,
+    isIOS = false,
     currentPath,
     onChangePath,
     theme,
@@ -155,7 +157,10 @@ export function SettingsModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div
+            className={clsx("fixed inset-0 z-[10001] flex p-4 bg-black/50 backdrop-blur-sm", isIOS ? "items-start" : "items-center justify-center")}
+            style={isIOS ? { paddingTop: 'max(env(safe-area-inset-top, 0px), 24px)' } : undefined}
+        >
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6 relative animate-in fade-in zoom-in duration-200 flex flex-col max-h-[85vh]">
                 <button
                     onClick={onClose}

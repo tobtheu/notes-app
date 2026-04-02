@@ -109,6 +109,8 @@ function App() {
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  useEffect(() => { try { setIsIOS(platform() === 'ios'); } catch {} }, []);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
@@ -378,6 +380,7 @@ function App() {
         <SettingsModal
           isOpen={true}
           onClose={() => setIsSettingsOpen(false)}
+          isIOS={isIOS}
           currentPath={currentFolder}
           onChangePath={selectFolder}
           theme={theme}

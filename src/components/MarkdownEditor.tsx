@@ -973,6 +973,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                 allNotes={allNotes}
                 onClose={() => setIsLinkModalOpen(false)}
                 onSave={saveLink}
+                isIOS={isIOS}
             />
 
             {/* Image Modal */}
@@ -984,6 +985,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                 onClose={() => setIsImageModalOpen(false)}
                 onSave={saveImage}
                 workspacePath={workspacePath}
+                isIOS={isIOS}
             />
 
             {/* Merged Formatting & Link Menu */}
