@@ -182,8 +182,8 @@ export function SettingsModal({
                             {syncEmail ? (
                                 <div className="flex flex-col gap-3">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-                                            <Cloud className="text-blue-600 dark:text-blue-400" size={20} />
+                                        <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center shrink-0">
+                                            <Cloud className="text-primary-600 dark:text-primary-400" size={20} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">Cloud Sync aktiv</p>
@@ -212,8 +212,8 @@ export function SettingsModal({
                             ) : (
                                 <div className="flex flex-col gap-3">
                                     <div className="flex items-start gap-3 mb-1">
-                                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mt-0.5 shrink-0">
-                                            <Cloud className="text-blue-600 dark:text-blue-400" size={16} />
+                                        <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center mt-0.5 shrink-0">
+                                            <Cloud className="text-primary-600 dark:text-primary-400" size={16} />
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">Cloud Sync</p>
@@ -242,7 +242,7 @@ export function SettingsModal({
                                         placeholder="E-Mail"
                                         value={authEmail}
                                         onChange={e => setAuthEmail(e.target.value)}
-                                        className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                     <input
                                         type="password"
@@ -250,7 +250,7 @@ export function SettingsModal({
                                         value={authPassword}
                                         onChange={e => setAuthPassword(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && handleSupabaseAuth()}
-                                        className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
                                     />
 
                                     {syncStatus === 'error' && syncError && (
@@ -261,7 +261,7 @@ export function SettingsModal({
                                         type="button"
                                         onClick={handleSupabaseAuth}
                                         disabled={syncStatus === 'signing-in' || !authEmail || !authPassword}
-                                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
+                                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
                                     >
                                         {syncStatus === 'signing-in' ? (
                                             <><RefreshCw size={14} className="animate-spin" /> Bitte warten…</>
@@ -282,7 +282,7 @@ export function SettingsModal({
                             </p>
                             <button
                                 onClick={onChangePath}
-                                className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                                className="flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
                             >
                                 <FolderOpen size={16} />
                                 Change Location
@@ -452,7 +452,7 @@ export function SettingsModal({
                                 onClick={() => onToggleMarkdown(!markdownEnabled)}
                                 className={clsx(
                                     "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
-                                    markdownEnabled ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-700"
+                                    markdownEnabled ? "bg-primary-600" : "bg-gray-300 dark:bg-gray-700"
                                 )}
                             >
                                 <span
@@ -473,7 +473,7 @@ export function SettingsModal({
                                 onClick={() => onToggleSpellcheck(!spellcheckEnabled)}
                                 className={clsx(
                                     "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
-                                    spellcheckEnabled ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-700"
+                                    spellcheckEnabled ? "bg-primary-600" : "bg-gray-300 dark:bg-gray-700"
                                 )}
                             >
                                 <span
