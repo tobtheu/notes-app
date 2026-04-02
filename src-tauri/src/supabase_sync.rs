@@ -418,8 +418,15 @@ async fn sync_config(access_token: &str, user_id: &str, config_path: &Path) {
             local["folders"] = serde_json::Value::Object(merged);
         }
 
-        if let Some(pinned) = remote_meta.get("pinnedNotes") {
-            local["pinnedNotes"] = pinned.clone();
+        if let Some(pinned) = remote_meta.get("pinnedNotes").and_then(|p| p.as_array()) {
+            let mut merged: Vec<serde_json::Value> = local["pinnedNotes"]
+                .as_array().cloned().unwrap_or_default();
+            for item in pinned {
+                if !merged.contains(item) {
+                    merged.push(item.clone());
+                }
+            }
+            local["pinnedNotes"] = serde_json::Value::Array(merged);
         }
         if let Some(order) = remote_meta.get("folderOrder") {
             if !order.is_null() {
