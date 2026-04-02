@@ -56,7 +56,7 @@ export function useNotes() {
             if (isMobile) {
                 try {
                     const docDir = await window.tauriAPI.getDocumentDir();
-                    const newPath = `${docDir}/NotizApp`.replace(/\\/g, '/');
+                    const newPath = `${docDir}/Lama Notes`.replace(/\\/g, '/');
                     // Ensure the folder exists in the new sandbox path
                     await window.tauriAPI.createFolder(docDir, newPath);
                     savedFolder = newPath;
@@ -315,7 +315,7 @@ export function useNotes() {
     const setupDefaultWorkspace = async (updateState = true) => {
         try {
             const docDir = await window.tauriAPI.getDocumentDir();
-            const defaultPath = `${docDir}/NotizApp`.replace(/\\/g, '/');
+            const defaultPath = `${docDir}/Lama Notes`.replace(/\\/g, '/');
             await window.tauriAPI.createFolder(docDir, defaultPath);
             if (updateState) {
                 setBaseFolder(defaultPath);

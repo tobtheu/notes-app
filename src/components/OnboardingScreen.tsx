@@ -164,7 +164,7 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace }: Props) {
                     </h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 text-left">
                         {authMode === 'signin'
-                            ? 'Melde dich mit deinem NotizApp-Konto an.'
+                            ? 'Melde dich mit deinem Lama Notes-Konto an.'
                             : 'Erstelle ein kostenloses Konto für Cloud-Sync.'}
                     </p>
 

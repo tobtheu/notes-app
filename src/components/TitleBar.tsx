@@ -100,7 +100,7 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
             {!isIOS && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">
-                        NotizApp
+                        Lama Notes
                     </span>
                 </div>
             )}
