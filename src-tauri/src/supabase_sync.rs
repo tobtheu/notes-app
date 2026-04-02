@@ -378,7 +378,7 @@ fn is_newer(a: &str, b: &str) -> bool {
 /// Per-device fields (fontSize, fontFamily) are never sent to Supabase and
 /// are always preserved from the local file regardless of what remote says.
 async fn sync_config(access_token: &str, user_id: &str, config_path: &Path) {
-    // Step 1: pull remote config first
+    // Step 1: pull remote config
     let remote_data = match fetch_config(access_token).await {
         Ok(r) => r,
         Err(e) => { info!("[supabase] config: fetch failed: {}", e); None }
@@ -388,15 +388,6 @@ async fn sync_config(access_token: &str, user_id: &str, config_path: &Path) {
     let local_raw = std::fs::read_to_string(config_path).unwrap_or_default();
     let mut local: serde_json::Value = serde_json::from_str(&local_raw)
         .unwrap_or_else(|_| serde_json::json!({ "folders": {}, "pinnedNotes": [], "settings": {} }));
-
-    // Get local modification time
-    let local_mtime = std::fs::metadata(config_path)
-        .and_then(|m| m.modified())
-        .map(|t| {
-            let dt: chrono::DateTime<chrono::Utc> = t.into();
-            dt.to_rfc3339()
-        })
-        .unwrap_or_default();
 
     // Preserve per-device settings before any merge overwrites them
     let per_device: HashMap<String, serde_json::Value> = {
@@ -411,80 +402,65 @@ async fn sync_config(access_token: &str, user_id: &str, config_path: &Path) {
         m
     };
 
-    let mut local_was_newer = false;
+    // Step 3: always merge remote into local.
+    // File mtime is not a reliable signal (local writes from repair/init skew it).
+    // Strategy: remote wins per-key for folders/settings; local-only keys are kept.
+    if let Some((remote_meta, _)) = &remote_data {
+        info!("[supabase] config: merging remote into local");
 
-    // Step 3: merge remote into local (only if remote is actually newer)
-    if let Some((remote_meta, remote_updated_at)) = &remote_data {
-        if !local_mtime.is_empty() && is_newer(&local_mtime, remote_updated_at) {
-            info!("[supabase] config: local is newer ({} > {}), will push local instead of pulling", local_mtime, remote_updated_at);
-            local_was_newer = true;
-        } else {
-            // Remote is newer or same age -> merge remote into local
-            info!("[supabase] config: remote is newer/same ({} >= {}), merging remote into local", remote_updated_at, local_mtime);
-            
-            // folders: deep merge — remote values win per key, local-only keys kept
-            if let Some(remote_folders) = remote_meta.get("folders").and_then(|f| f.as_object()) {
-                let base = local["folders"]
-                    .as_object()
-                    .cloned()
-                    .unwrap_or_default();
-                let mut merged = base;
-                for (k, v) in remote_folders {
-                    merged.insert(k.clone(), v.clone());
-                }
-                local["folders"] = serde_json::Value::Object(merged);
+        // folders: remote values win per key, local-only keys kept
+        if let Some(remote_folders) = remote_meta.get("folders").and_then(|f| f.as_object()) {
+            let base = local["folders"].as_object().cloned().unwrap_or_default();
+            let mut merged = base;
+            for (k, v) in remote_folders {
+                merged.insert(k.clone(), v.clone());
             }
+            local["folders"] = serde_json::Value::Object(merged);
+        }
 
-            if let Some(pinned) = remote_meta.get("pinnedNotes") {
-                local["pinnedNotes"] = pinned.clone();
+        if let Some(pinned) = remote_meta.get("pinnedNotes") {
+            local["pinnedNotes"] = pinned.clone();
+        }
+        if let Some(order) = remote_meta.get("folderOrder") {
+            if !order.is_null() {
+                local["folderOrder"] = order.clone();
             }
-            if let Some(order) = remote_meta.get("folderOrder") {
-                if !order.is_null() {
-                    local["folderOrder"] = order.clone();
-                }
-            }
+        }
 
-            // settings: remote wins, then restore per-device fields on top
-            if let Some(remote_settings) = remote_meta.get("settings").and_then(|s| s.as_object()) {
-                let mut merged = remote_settings.clone();
-                for (k, v) in &per_device {
-                    merged.insert(k.clone(), v.clone());
-                }
-                local["settings"] = serde_json::Value::Object(merged);
+        // settings: remote wins, then restore per-device fields on top
+        if let Some(remote_settings) = remote_meta.get("settings").and_then(|s| s.as_object()) {
+            let mut merged = remote_settings.clone();
+            for (k, v) in &per_device {
+                merged.insert(k.clone(), v.clone());
             }
+            local["settings"] = serde_json::Value::Object(merged);
         }
     }
 
-    // Ensure per-device fields are present even when there was no remote settings block
+    // Ensure per-device fields are always present
     if let Some(settings) = local.get_mut("settings").and_then(|s| s.as_object_mut()) {
         for (k, v) in &per_device {
             settings.entry(k.clone()).or_insert_with(|| v.clone());
         }
     }
 
-    // Step 4: save merged config locally (if remote was newer)
-    if !local_was_newer {
-        if let Ok(merged_str) = serde_json::to_string_pretty(&local) {
-            let _ = std::fs::write(config_path, &merged_str);
-            info!("[supabase] config: merged and saved locally");
-        }
+    // Step 4: save merged config locally
+    if let Ok(merged_str) = serde_json::to_string_pretty(&local) {
+        let _ = std::fs::write(config_path, &merged_str);
+        info!("[supabase] config: saved locally");
     }
 
-    // Step 5: conditionally push config. Only push if local was deliberately newer, 
-    // or if the stripped local payload differs from what the remote had.
+    // Step 5: push to remote if content differs from what remote has
     let mut push_payload = local.clone();
     if let Some(settings) = push_payload.get_mut("settings").and_then(|s| s.as_object_mut()) {
         settings.remove("fontSize");
         settings.remove("fontFamily");
     }
-    
-    let should_push = if local_was_newer {
-        true
-    } else if let Some((ref remote_m, _)) = remote_data {
-        // Only push if the actual data is different
+
+    let should_push = if let Some((ref remote_m, _)) = remote_data {
         &push_payload != remote_m
     } else {
-        true // No remote data existed, push initial config
+        true // No remote data existed yet
     };
 
     if should_push {
