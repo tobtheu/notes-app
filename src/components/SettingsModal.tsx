@@ -338,7 +338,16 @@ export function SettingsModal({
                         <div>
                             <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Accent Color</h4>
                             <div className="flex items-center gap-3 px-3 py-1 -mx-1">
-                                {['blue', 'purple', 'green', 'red', 'orange'].map((color) => (
+                                {([
+                                    ['blue',        '#3b82f6'],
+                                    ['purple',      '#a855f7'],
+                                    ['green',       '#59FFA0'],
+                                    ['red',         '#ef4444'],
+                                    ['orange',      '#f97316'],
+                                    ['jasmine',     '#FFD972'],
+                                    ['periwinkle',  '#B4ADEA'],
+                                    ['watermelon',  '#E84855'],
+                                ] as [string, string][]).map(([color, hex]) => (
                                     <button
                                         key={color}
                                         onClick={() => setAccentColor(color)}
@@ -347,13 +356,7 @@ export function SettingsModal({
                                             "w-8 h-8 rounded-full flex items-center justify-center transition-all ring-offset-2 dark:ring-offset-gray-800",
                                             accentColor === color ? "ring-2 ring-gray-400 dark:ring-gray-400 scale-110" : "hover:scale-110"
                                         )}
-                                        style={{
-                                            backgroundColor: color === 'blue' ? '#3b82f6' :
-                                                color === 'purple' ? '#a855f7' :
-                                                    color === 'green' ? '#59FFA0' :
-                                                        color === 'red' ? '#ef4444' :
-                                                            '#f97316'
-                                        }}
+                                        style={{ backgroundColor: hex }}
                                         title={color.charAt(0).toUpperCase() + color.slice(1)}
                                     >
                                         {accentColor === color && (
