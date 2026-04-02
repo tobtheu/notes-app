@@ -39,6 +39,7 @@ tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
 tokio = { version = "1", features = ["time"] }
 base64 = "0.22.1"
+filetime = "0.2"
 
 [target.'cfg(not(windows))'.dependencies]
 git2 = { version = "0.19", features = ["vendored-libgit2", "https", "vendored-openssl"] }

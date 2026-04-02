@@ -359,6 +359,17 @@ fn extract_updated_at(content: &str, path: &Path) -> String {
         .unwrap_or_else(|_| chrono::Utc::now().to_rfc3339())
 }
 
+/// Sets the filesystem mtime of a file to match a remote timestamp (RFC 3339).
+/// This ensures notes without `updated:` frontmatter show the correct edit time
+/// rather than the time they were written by sync.
+fn set_file_mtime(path: &Path, ts: &str) {
+    use chrono::DateTime;
+    if let Ok(dt) = DateTime::parse_from_rfc3339(ts) {
+        let mtime = filetime::FileTime::from_unix_time(dt.timestamp(), dt.timestamp_subsec_nanos());
+        let _ = filetime::set_file_mtime(path, mtime);
+    }
+}
+
 fn is_newer(a: &str, b: &str) -> bool {
     // Parse RFC 3339 for correct timezone-aware comparison.
     // "+01:00" and "Z" are handled correctly; falls back to string compare.
@@ -558,6 +569,7 @@ pub async fn sync(
                 // Note exists remotely but not locally → pull it.
                 if let Some(parent) = local_path.parent() { let _ = std::fs::create_dir_all(parent); }
                 let _ = std::fs::write(&local_path, &remote.content);
+                set_file_mtime(&local_path, &remote.updated_at);
                 pulled += 1;
                 info!("[supabase] pulled (new): {}", id);
             }
@@ -569,6 +581,7 @@ pub async fn sync(
                     if remote.content.trim() != local_content.trim() {
                         if let Some(parent) = local_path.parent() { let _ = std::fs::create_dir_all(parent); }
                         let _ = std::fs::write(&local_path, &remote.content);
+                        set_file_mtime(&local_path, &remote.updated_at);
                         pulled += 1;
                         info!("[supabase] pulled (remote changed): {}", id);
                     }
@@ -579,6 +592,7 @@ pub async fn sync(
                     {
                         if let Some(parent) = local_path.parent() { let _ = std::fs::create_dir_all(parent); }
                         let _ = std::fs::write(&local_path, &remote.content);
+                        set_file_mtime(&local_path, &remote.updated_at);
                         pulled += 1;
                         info!("[supabase] pulled (both changed, remote newer): {}", id);
                     }
