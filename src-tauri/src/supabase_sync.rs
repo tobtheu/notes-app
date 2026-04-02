@@ -414,8 +414,8 @@ async fn sync_config(access_token: &str, user_id: &str, config_path: &Path) {
     let mut local_was_newer = false;
 
     // Step 3: merge remote into local (only if remote is actually newer)
-    if let Some((remote_meta, remote_updated_at)) = remote_data {
-        if !local_mtime.is_empty() && is_newer(&local_mtime, &remote_updated_at) {
+    if let Some((remote_meta, remote_updated_at)) = &remote_data {
+        if !local_mtime.is_empty() && is_newer(&local_mtime, remote_updated_at) {
             info!("[supabase] config: local is newer ({} > {}), will push local instead of pulling", local_mtime, remote_updated_at);
             local_was_newer = true;
         } else {
@@ -470,16 +470,30 @@ async fn sync_config(access_token: &str, user_id: &str, config_path: &Path) {
         }
     }
 
-    // Step 5: push config if it's local was newer OR if we just pulled/merged (to ensure server is up to date)
-    // Actually, always push the current state to the server to ensure synchronization.
+    // Step 5: conditionally push config. Only push if local was deliberately newer, 
+    // or if the stripped local payload differs from what the remote had.
     let mut push_payload = local.clone();
     if let Some(settings) = push_payload.get_mut("settings").and_then(|s| s.as_object_mut()) {
         settings.remove("fontSize");
         settings.remove("fontFamily");
     }
-    match upsert_config(access_token, user_id, &push_payload).await {
-        Ok(_) => info!("[supabase] config: pushed"),
-        Err(e) => info!("[supabase] config: push failed: {}", e),
+    
+    let should_push = if local_was_newer {
+        true
+    } else if let Some((ref remote_m, _)) = remote_data {
+        // Only push if the actual data is different
+        &push_payload != remote_m
+    } else {
+        true // No remote data existed, push initial config
+    };
+
+    if should_push {
+        match upsert_config(access_token, user_id, &push_payload).await {
+            Ok(_) => info!("[supabase] config: pushed"),
+            Err(e) => info!("[supabase] config: push failed: {}", e),
+        }
+    } else {
+        info!("[supabase] config: no changes to push");
     }
 }
 
