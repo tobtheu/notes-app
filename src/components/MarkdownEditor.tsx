@@ -556,35 +556,30 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     const toolbarRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        // On iOS the native accessory bar handles keyboard layout — no JS tracking needed.
+        if (isIOS) return;
         const vv = window.visualViewport;
         if (!vv) return;
         const update = () => {
             const kbHeight = window.innerHeight - vv.height;
-            
-            // Only use React state to toggle visibility (open/close)
-            // This prevents React from re-rendering 60fps during scroll, which caused the jitter
             if (kbHeight > 100) {
                 setKeyboardHeight(kbHeight);
             } else {
                 setKeyboardHeight(0);
             }
-
-            // Directly update the DOM for 100% synchronous scroll tracking (fixes wandering + jitter)
             if (toolbarRef.current && kbHeight > 100) {
                 const shift = vv.offsetTop - kbHeight;
                 toolbarRef.current.style.transform = `translateY(${shift}px)`;
             }
         };
-        
         vv.addEventListener('resize', update);
         vv.addEventListener('scroll', update);
-        // Initial setup
         update();
         return () => {
             vv.removeEventListener('resize', update);
             vv.removeEventListener('scroll', update);
         };
-    }, []);
+    }, [isIOS]);
     const [isDragging, setIsDragging] = useState(false); // Visual feedback for file drop
 
     const hideTimeoutRef = useRef<any>(null);
@@ -852,6 +847,64 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
         setIsImageModalOpen(true);
     }, [editor]);
 
+    // ── Native iOS Toolbar Bridge ──────────────────────────────────────────
+    // Registers window.toolbarAction so the native Swift accessory bar can
+    // trigger Tiptap commands, and sends active-state updates back to Swift
+    // via webkit.messageHandlers.toolbarState so buttons highlight correctly.
+    const openLinkModalRef = useRef(openLinkModal);
+    useEffect(() => { openLinkModalRef.current = openLinkModal; }, [openLinkModal]);
+    const openImageModalRef = useRef(openImageModal);
+    useEffect(() => { openImageModalRef.current = openImageModal; }, [openImageModal]);
+
+    useEffect(() => {
+        if (!isIOS || !editor) return;
+
+        (window as any).toolbarAction = (action: string) => {
+            switch (action) {
+                case 'bold':       toggleSmartMark(editor, 'bold'); break;
+                case 'italic':     toggleSmartMark(editor, 'italic'); break;
+                case 'highlight':  toggleSmartMark(editor, 'highlight'); break;
+                case 'h1':         editor.chain().focus().toggleHeading({ level: 1 }).run(); break;
+                case 'h2':         editor.chain().focus().toggleHeading({ level: 2 }).run(); break;
+                case 'h3':         editor.chain().focus().toggleHeading({ level: 3 }).run(); break;
+                case 'bulletList': editor.chain().focus().toggleBulletList().run(); break;
+                case 'taskList':   editor.chain().focus().toggleTaskList().run(); break;
+                case 'blockquote': editor.chain().focus().toggleBlockquote().run(); break;
+                case 'codeBlock':  editor.chain().focus().toggleCodeBlock().run(); break;
+                case 'link':       openLinkModalRef.current(); break;
+                case 'image':      openImageModalRef.current(); break;
+                case 'undo':       editor.chain().focus().undo().run(); break;
+                case 'redo':       editor.chain().focus().redo().run(); break;
+            }
+        };
+
+        const sendState = () => {
+            const state = {
+                bold:       editor.isActive('bold'),
+                italic:     editor.isActive('italic'),
+                highlight:  editor.isActive('highlight'),
+                h1:         editor.isActive('heading', { level: 1 }),
+                h2:         editor.isActive('heading', { level: 2 }),
+                h3:         editor.isActive('heading', { level: 3 }),
+                bulletList: editor.isActive('bulletList'),
+                taskList:   editor.isActive('taskList'),
+                blockquote: editor.isActive('blockquote'),
+                codeBlock:  editor.isActive('codeBlock'),
+                link:       editor.isActive('link'),
+            };
+            (window as any).webkit?.messageHandlers?.toolbarState?.postMessage(state);
+        };
+
+        editor.on('selectionUpdate', sendState);
+        editor.on('transaction', sendState);
+
+        return () => {
+            delete (window as any).toolbarAction;
+            editor.off('selectionUpdate', sendState);
+            editor.off('transaction', sendState);
+        };
+    }, [isIOS, editor]);
+
     const saveLink = (url: string, text?: string) => {
         if (!editor) return;
 
@@ -1091,24 +1144,22 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                 </div>
             </div>
 
-            {/* Footer Toolbar - floats above keyboard on mobile, in-flow on desktop */}
-            {toolbarVisible && (
+            {/* Footer Toolbar - native accessory bar on iOS, floating web bar on desktop */}
+            {toolbarVisible && !isIOS && (
                 <div
                     ref={toolbarRef}
-                    className={clsx(
-                        "px-2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 items-center justify-center w-full box-content",
-                        isIOS && keyboardHeight === 0 ? "hidden" : "flex"
-                    )}
+                    className="px-2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex items-center justify-center w-full box-content"
                     style={keyboardHeight > 0
                         ? { position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9998, paddingTop: 4, paddingBottom: 4 }
                         : { paddingTop: 8, paddingBottom: 'calc(8px + var(--safe-bottom, 0vh))' }
                     }
-                >                        <EditorToolbar
-                            editor={editor}
-                            onLinkClick={() => openLinkModal()}
-                            onImageClick={openImageModal}
-                            mobile={keyboardHeight > 0}
-                        />
+                >
+                    <EditorToolbar
+                        editor={editor}
+                        onLinkClick={() => openLinkModal()}
+                        onImageClick={openImageModal}
+                        mobile={keyboardHeight > 0}
+                    />
                 </div>
             )}
         </div>
