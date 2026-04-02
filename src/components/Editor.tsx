@@ -240,6 +240,9 @@ export function Editor({
     const onSyncRef = useRef(onSync);
     useEffect(() => { onSyncRef.current = onSync; }, [onSync]);
 
+    const onSaveRef = useRef(onSave);
+    useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
+
     useEffect(() => {
         return () => {
             // ONLY flush if we actually have unsaved changes.
@@ -252,13 +255,13 @@ export function Editor({
 
                 if (contentDirty || titleChanged) {
                     // SESSION END: Perform physical rename now
-                    onSave(lastNoteId.current, note.filename, contentRef.current, note.folder, false);
+                    onSaveRef.current(lastNoteId.current, note.filename, contentRef.current, note.folder, false);
                 }
             }
             // Trigger sync when leaving the note (note switch or back button)
             onSyncRef.current?.();
         };
-    }, [note.filename, note.folder, onSave]);
+    }, [note.filename, note.folder]);
 
 
 

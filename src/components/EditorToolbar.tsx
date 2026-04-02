@@ -16,6 +16,9 @@ interface ToolbarButtonProps {
 
 const ToolbarButton: React.FC<ToolbarButtonProps> = ({ icon: Icon, label, action, isActive, iconSize = 16, btnPadding = "p-1.5" }) => (
     <button
+        onMouseDown={(e) => {
+            e.preventDefault();
+        }}
         onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();

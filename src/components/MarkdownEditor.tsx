@@ -23,6 +23,7 @@ import 'highlight.js/styles/github-dark.css';
 // Image import removed as it is replaced by ImageWithCaption
 import { ImageWithCaption } from '../extensions/ImageWithCaption';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { platform } from '@tauri-apps/plugin-os';
 import Suggestion from '@tiptap/suggestion';
 import tippy, { type Instance } from 'tippy.js';
 import { EditorToolbar } from './EditorToolbar';
@@ -539,19 +540,49 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     const [lightboxImage, setLightboxImage] = useState<{ src: string, caption?: string } | null>(null);
     const [isScrolling, setIsScrolling] = useState(false);
 
+    const [isIOS, setIsIOS] = useState(false);
+    useEffect(() => {
+        try {
+            const p = platform();
+            setIsIOS(p === 'ios');
+        } catch (e) {
+            console.error("Failed to detect platform:", e);
+        }
+    }, []);
+
     // Track keyboard height via visualViewport so toolbar floats above keyboard on mobile
+    // Track keyboard height and toolbar position natively bypassing React state for smoothness
     const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const toolbarRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
         const vv = window.visualViewport;
         if (!vv) return;
         const update = () => {
-            // Only react to resize (keyboard open/close), not scroll bouncing
             const kbHeight = window.innerHeight - vv.height;
-            setKeyboardHeight(Math.max(0, Math.round(kbHeight)));
+            
+            // Only use React state to toggle visibility (open/close)
+            // This prevents React from re-rendering 60fps during scroll, which caused the jitter
+            if (kbHeight > 100) {
+                setKeyboardHeight(kbHeight);
+            } else {
+                setKeyboardHeight(0);
+            }
+
+            // Directly update the DOM for 100% synchronous scroll tracking (fixes wandering + jitter)
+            if (toolbarRef.current && kbHeight > 100) {
+                const shift = vv.offsetTop - kbHeight;
+                toolbarRef.current.style.transform = `translateY(${shift}px)`;
+            }
         };
+        
         vv.addEventListener('resize', update);
+        vv.addEventListener('scroll', update);
+        // Initial setup
+        update();
         return () => {
             vv.removeEventListener('resize', update);
+            vv.removeEventListener('scroll', update);
         };
     }, []);
     const [isDragging, setIsDragging] = useState(false); // Visual feedback for file drop
@@ -907,6 +938,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                     editor={editor}
                     updateDelay={0}
                     shouldShow={({ from, to, editor }) => {
+                        if (isIOS) return false;
                         return from !== to || editor.isActive('image');
                     }}
                 >
@@ -1061,24 +1093,23 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
 
             {/* Footer Toolbar - floats above keyboard on mobile, in-flow on desktop */}
             {toolbarVisible && (
-                <>
-                    {/* Spacer to reserve in-flow space when toolbar is fixed (keyboard open) */}
-                    {keyboardHeight > 0 && <div className="shrink-0 min-h-[48px]" />}
-                    <div
-                        className="px-2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex items-center justify-center w-full box-content"
-                        style={keyboardHeight > 0
-                            ? { position: 'fixed', bottom: keyboardHeight, left: 0, right: 0, zIndex: 9998, paddingTop: 4, paddingBottom: 4 }
-                            : { paddingTop: 8, paddingBottom: 'calc(8px + var(--safe-bottom, 0vh))' }
-                        }
-                    >
-                        <EditorToolbar
+                <div
+                    ref={toolbarRef}
+                    className={clsx(
+                        "px-2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 items-center justify-center w-full box-content",
+                        isIOS && keyboardHeight === 0 ? "hidden" : "flex"
+                    )}
+                    style={keyboardHeight > 0
+                        ? { position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9998, paddingTop: 4, paddingBottom: 4 }
+                        : { paddingTop: 8, paddingBottom: 'calc(8px + var(--safe-bottom, 0vh))' }
+                    }
+                >                        <EditorToolbar
                             editor={editor}
                             onLinkClick={() => openLinkModal()}
                             onImageClick={openImageModal}
                             mobile={keyboardHeight > 0}
                         />
-                    </div>
-                </>
+                </div>
             )}
         </div>
     );
