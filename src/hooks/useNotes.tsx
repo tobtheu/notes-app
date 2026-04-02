@@ -191,10 +191,8 @@ export function useNotes() {
                 setLastSyncedAt(new Date());
                 setConflictPairs([]);
             }
-            // Reload notes if we pulled any remote changes
-            if (result.hadChanges) {
-                await loadNotes();
-            }
+            // Always reload — remote changes may have been written to disk
+            await loadNotes(false);
         } catch (e) {
             console.error("Sync failed:", e);
             setSyncError(String(e));
@@ -224,20 +222,32 @@ export function useNotes() {
         };
     }, [triggerSync]);
 
-    // 60-second background auto-pull (only when online and idle)
+    // Background auto-sync (only when online and idle)
     useEffect(() => {
         if (!baseFolder) return;
 
         const intervalId = setInterval(() => {
             if (!navigator.onLine) return;
             const timeSinceLastSave = Date.now() - lastSaveTime.current;
-            // Only pull if user hasn't typed in the last 30 seconds to avoid interruptions
-            if (timeSinceLastSave > 30000 && !isSyncing && document.visibilityState === 'visible') {
+            // Only sync if user hasn't typed in the last 5 seconds to avoid interruptions
+            if (timeSinceLastSave > 5000 && !isSyncing && document.visibilityState === 'visible') {
                 triggerSync();
             }
-        }, 60000); // 60 seconds
+        }, 15000); // 15 seconds
 
         return () => clearInterval(intervalId);
+    }, [baseFolder, isSyncing, triggerSync]);
+
+    // Sync immediately when the app comes back into focus (e.g. switching tabs/apps)
+    useEffect(() => {
+        if (!baseFolder) return;
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && navigator.onLine && !isSyncing) {
+                triggerSync();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [baseFolder, isSyncing, triggerSync]);
 
     /**
@@ -714,11 +724,18 @@ export function useNotes() {
      * is temporarily empty (polling/sync), the editor doesn't unmount.
      */
     const lastValidSelectedNote = useRef<Note | null>(null);
-    const selectedNote = notes.find(n => getNoteId(n) === selectedNoteId) || lastValidSelectedNote.current;
+    // Only fall back to lastValidSelectedNote when selectedNoteId is set (prevents deleted note from lingering)
+    const selectedNote = selectedNoteId
+        ? (notes.find(n => getNoteId(n) === selectedNoteId) || lastValidSelectedNote.current)
+        : null;
 
     // Update the sticky ref whenever we find the selected note in the actual list
     if (selectedNote && (!lastValidSelectedNote.current || getNoteId(selectedNote) !== getNoteId(lastValidSelectedNote.current) || selectedNote.content !== lastValidSelectedNote.current.content)) {
         lastValidSelectedNote.current = selectedNote;
+    }
+    // Clear sticky ref when selection is explicitly cleared
+    if (!selectedNoteId) {
+        lastValidSelectedNote.current = null;
     }
 
     const filteredNotes = notes

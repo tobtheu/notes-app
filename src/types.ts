@@ -77,6 +77,11 @@ export interface TauriAPI {
     getGithubToken: () => Promise<{ token: string, username: string } | null>;
     saveGithubToken: (token: string, username: string) => Promise<boolean>;
     disconnectGithub: () => Promise<boolean>;
+    supabaseSignIn: (email: string, password: string) => Promise<{ userId: string; email: string }>;
+    supabaseSignUp: (email: string, password: string) => Promise<{ userId: string; email: string }>;
+    supabaseSignOut: () => Promise<void>;
+    getSupabaseUser: () => Promise<{ userId: string; email: string } | null>;
+    resetSyncState: (folderPath: string) => Promise<void>;
 }
 
 declare global {

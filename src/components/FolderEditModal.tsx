@@ -93,7 +93,7 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
     const SelectedIconComponent = (ICONS.find(i => i.id === selectedIcon) || ICONS[0]).icon;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-10000 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
 
                 {/* Header with Preview */}

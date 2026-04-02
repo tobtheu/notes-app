@@ -85,6 +85,8 @@ const NoteListItem = memo(({
     }, [note.content, note.filename]);
 
     const [swipeOffset, setSwipeOffset] = useState(0);
+    const [isSnapping, setIsSnapping] = useState(false);
+    const isDraggingRef = useRef(false);
     const [isDragging, setIsDragging] = useState(false);
     const touchStartX = useRef<number | null>(null);
     const touchStartY = useRef<number | null>(null);
@@ -93,23 +95,28 @@ const NoteListItem = memo(({
     const handleTouchStart = (e: React.TouchEvent) => {
         touchStartX.current = e.touches[0].clientX;
         touchStartY.current = e.touches[0].clientY;
+        isDraggingRef.current = false;
         setIsDragging(false);
+        setIsSnapping(false);
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
         if (touchStartX.current === null || touchStartY.current === null) return;
-        
+
         const currentX = e.touches[0].clientX;
         const currentY = e.touches[0].clientY;
         const diffX = currentX - touchStartX.current;
         const diffY = currentY - touchStartY.current;
-        
+
         // If scrolling vertically, ignore swipe
-        if (Math.abs(diffY) > Math.abs(diffX)) return;
-        
+        if (!isDraggingRef.current && Math.abs(diffY) > Math.abs(diffX)) return;
+
         if (Math.abs(diffX) > 5) {
-            setIsDragging(true);
+            isDraggingRef.current = true;
+            if (!isDragging) setIsDragging(true);
         }
+
+        if (!isDraggingRef.current) return;
 
         if (diffX < 0 && !isSwipedRef.current) {
             setSwipeOffset(Math.max(diffX, -160));
@@ -120,6 +127,7 @@ const NoteListItem = memo(({
 
     const handleTouchEnd = () => {
         if (touchStartX.current !== null) {
+            setIsSnapping(true);
             if (swipeOffset < -60) {
                 setSwipeOffset(-160);
                 isSwipedRef.current = true;
@@ -143,7 +151,7 @@ const NoteListItem = memo(({
 
     return (
         <div style={{ contain: 'paint' }}>
-            <div className="relative mb-0.5 rounded-xl border-2 border-transparent overflow-visible">
+            <div className="relative mb-0.5 rounded-xl border-2 border-transparent overflow-hidden">
                 {/* Swipe Actions (Behind) */}
                 <div className="absolute inset-y-0 right-0 flex items-center justify-end px-3 gap-2 bg-gray-100 dark:bg-gray-800/80 w-full z-0 h-full rounded-xl pointer-events-auto">
                     <button
@@ -192,8 +200,8 @@ const NoteListItem = memo(({
                     }}
                     style={{ transform: `translateX(${swipeOffset}px)` }}
                     className={clsx(
-                        "group relative p-2.5 rounded-xl cursor-pointer transition-all z-10 w-full border-2",
-                        !isDragging && "duration-200",
+                        "group relative p-2.5 rounded-xl cursor-pointer z-10 w-full border-2",
+                        isSnapping && "transition-transform duration-200",
                         isSelected
                             ? "bg-primary-50 dark:bg-primary-900/30 border-primary-500 shadow-sm"
                             : "bg-white dark:bg-gray-900 hover:bg-gray-50 border-transparent dark:hover:bg-gray-800"
@@ -207,6 +215,12 @@ const NoteListItem = memo(({
                             )}>
                                 {title}
                             </h3>
+                            {/* Pin indicator (Mobile) */}
+                            {isPinned && (
+                                <div className="sm:hidden shrink-0 text-primary-500">
+                                    <Pin size={13} fill="currentColor" />
+                                </div>
+                            )}
                             {/* Hover Actions (Desktop) */}
                             <div className="hidden sm:flex items-center shrink-0">
                                 <button
@@ -372,9 +386,7 @@ export function NoteList({
 
     return (
         <div className={clsx(
-            "flex flex-col h-full bg-white dark:bg-gray-900 md:border-r border-gray-100 dark:border-gray-800",
-            // Add significant padding on mobile so it doesn't touch the screen edge
-            "pr-6 md:pr-0",
+            "flex flex-col h-full w-full bg-white dark:bg-gray-900 md:border-r border-gray-100 dark:border-gray-800",
             className
         )}>
 

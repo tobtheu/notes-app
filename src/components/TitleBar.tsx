@@ -72,14 +72,14 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                             e.stopPropagation();
                             onBack?.();
                         }}
-                        className="md:hidden no-drag p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-500 hover:text-primary-500 transition-all flex items-center gap-1 active:scale-95"
+                        className="md:hidden no-drag mt-1 p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-500 hover:text-primary-500 transition-all flex items-center gap-1 active:scale-95"
                     >
                         <ChevronLeft size={20} />
                         <span className="text-sm font-semibold">Back</span>
                     </button>
                 )}
 
-                {/* The Toggle Button (Desktop/Tablet) */}
+                {/* The Toggle Button (Desktop/Tablet) — hidden on iOS when editor is open */}
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
@@ -87,9 +87,8 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                     }}
                     className={clsx(
                         "no-drag p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all active:scale-95",
-                        // Show on iOS (mobile), hide on other small screens unless md+
-                        isIOS ? "flex" : "hidden md:flex",
-                        isMac && isSidebarCollapsed ? "absolute left-[84px]" : "ml-auto"
+                        isIOS && activeView !== 'editor' ? "flex" : "hidden md:flex",
+                        isMac && isSidebarCollapsed ? "absolute left-21" : "ml-auto"
                     )}
                     title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                 >
