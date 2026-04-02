@@ -350,7 +350,7 @@ export function SettingsModal({
                                         style={{
                                             backgroundColor: color === 'blue' ? '#3b82f6' :
                                                 color === 'purple' ? '#a855f7' :
-                                                    color === 'green' ? '#22c55e' :
+                                                    color === 'green' ? '#14b8a6' :
                                                         color === 'red' ? '#ef4444' :
                                                             '#f97316'
                                         }}
