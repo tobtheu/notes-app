@@ -14,13 +14,14 @@ interface UrlInputModalProps {
     onClose: () => void;
     onSave: (url: string, text?: string, caption?: string) => void;
     workspacePath?: string;
+    isIOS?: boolean;
 }
 
 /**
  * UrlInputModal
  * A versatile modal used for inserting both hyperlink and image references.
  */
-export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, initialUrl, initialText, initialCaption, allNotes = [], onClose, onSave, workspacePath }) => {
+export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, initialUrl, initialText, initialCaption, allNotes = [], onClose, onSave, workspacePath, isIOS = false }) => {
     /**
      * --- STATE MANAGEMENT ---
      */
@@ -131,8 +132,11 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-4 animate-in zoom-in-95 duration-200">
+        <div className={clsx(
+            "fixed inset-0 z-50 flex p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200",
+            isIOS ? "items-start" : "items-center justify-center",
+        )} style={isIOS ? { paddingTop: 'max(env(safe-area-inset-top, 0px), 24px)' } : undefined}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-4 animate-in zoom-in-95 duration-200 max-h-[80vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-100">
                         {type === 'link' ? 'Insert Link' : 'Insert Image'}
