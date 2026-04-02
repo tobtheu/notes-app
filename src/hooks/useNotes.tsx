@@ -51,13 +51,15 @@ export function useNotes() {
             
             // CRITICAL FIX: iOS changes the app container UUID on updates/reinstalls.
             // If we blindly trust the absolute path in localStorage, we get OS Sandbox EPERM errors.
-            // On mobile, force-resolve the current Document Dir instead of relying on saved absolute paths.
+            // On mobile, re-resolve the Document Dir to get the current sandbox UUID.
+            // BUT only do this if the user already had a workspace (savedFolder is set) —
+            // on a fresh install savedFolder is null, which correctly shows the Onboarding screen.
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            if (isMobile) {
+            if (isMobile && savedFolder) {
                 try {
                     const docDir = await window.tauriAPI.getDocumentDir();
                     const newPath = `${docDir}/Lama Notes`.replace(/\\/g, '/');
-                    // Ensure the folder exists in the new sandbox path
+                    // Ensure the folder exists in the current sandbox path
                     await window.tauriAPI.createFolder(docDir, newPath);
                     savedFolder = newPath;
                     localStorage.setItem('notes-folder', savedFolder);
