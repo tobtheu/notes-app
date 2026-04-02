@@ -860,21 +860,23 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
         if (!isIOS || !editor) return;
 
         (window as any).toolbarAction = (action: string) => {
+            // No .focus() — avoids WKWebView scroll-to-cursor jump on iOS.
+            // The editor is already focused (keyboard is open), so focus is preserved.
             switch (action) {
-                case 'bold':       toggleSmartMark(editor, 'bold'); break;
-                case 'italic':     toggleSmartMark(editor, 'italic'); break;
-                case 'highlight':  toggleSmartMark(editor, 'highlight'); break;
-                case 'h1':         editor.chain().focus().toggleHeading({ level: 1 }).run(); break;
-                case 'h2':         editor.chain().focus().toggleHeading({ level: 2 }).run(); break;
-                case 'h3':         editor.chain().focus().toggleHeading({ level: 3 }).run(); break;
-                case 'bulletList': editor.chain().focus().toggleBulletList().run(); break;
-                case 'taskList':   editor.chain().focus().toggleTaskList().run(); break;
-                case 'blockquote': editor.chain().focus().toggleBlockquote().run(); break;
-                case 'codeBlock':  editor.chain().focus().toggleCodeBlock().run(); break;
+                case 'bold':       toggleSmartMark(editor, 'bold', undefined, false); break;
+                case 'italic':     toggleSmartMark(editor, 'italic', undefined, false); break;
+                case 'highlight':  toggleSmartMark(editor, 'highlight', undefined, false); break;
+                case 'h1':         editor.chain().toggleHeading({ level: 1 }).run(); break;
+                case 'h2':         editor.chain().toggleHeading({ level: 2 }).run(); break;
+                case 'h3':         editor.chain().toggleHeading({ level: 3 }).run(); break;
+                case 'bulletList': editor.chain().toggleBulletList().run(); break;
+                case 'taskList':   editor.chain().toggleTaskList().run(); break;
+                case 'blockquote': editor.chain().toggleBlockquote().run(); break;
+                case 'codeBlock':  editor.chain().toggleCodeBlock().run(); break;
                 case 'link':       openLinkModalRef.current(); break;
                 case 'image':      openImageModalRef.current(); break;
-                case 'undo':       editor.chain().focus().undo().run(); break;
-                case 'redo':       editor.chain().focus().redo().run(); break;
+                case 'undo':       editor.chain().undo().run(); break;
+                case 'redo':       editor.chain().redo().run(); break;
             }
         };
 

@@ -11,17 +11,19 @@ import type { Editor } from '@tiptap/react';
  * 
  * This provides a more fluid typing experience across different devices.
  */
-export const toggleSmartMark = (editor: Editor, markType: string, options?: any) => {
+export const toggleSmartMark = (editor: Editor, markType: string, options?: any, focus = true) => {
     if (!editor) return;
+
+    const chain = () => focus ? editor.chain().focus() : editor.chain();
 
     const { selection, doc } = editor.state;
     const { from, empty } = selection;
 
     if (!empty) {
         // Standard behavior for existing selection
-        if (markType === 'bold') editor.chain().focus().toggleBold().run();
-        else if (markType === 'italic') editor.chain().focus().toggleItalic().run();
-        else if (markType === 'highlight') editor.chain().focus().toggleHighlight(options).run();
+        if (markType === 'bold') chain().toggleBold().run();
+        else if (markType === 'italic') chain().toggleItalic().run();
+        else if (markType === 'highlight') chain().toggleHighlight(options).run();
         return;
     }
 
@@ -55,20 +57,16 @@ export const toggleSmartMark = (editor: Editor, markType: string, options?: any)
         const absoluteStart = from - offset + start;
         const absoluteEnd = from - offset + end;
 
-        editor.chain()
-            .focus()
-            .setTextSelection({ from: absoluteStart, to: absoluteEnd })
-            .run();
+        chain().setTextSelection({ from: absoluteStart, to: absoluteEnd }).run();
 
         // Apply toggling to the newly selected word
-        if (markType === 'bold') editor.chain().focus().toggleBold().run();
-        else if (markType === 'italic') editor.chain().focus().toggleItalic().run();
-        else if (markType === 'highlight') editor.chain().focus().toggleHighlight(options).run();
+        if (markType === 'bold') chain().toggleBold().run();
+        else if (markType === 'italic') chain().toggleItalic().run();
+        else if (markType === 'highlight') chain().toggleHighlight(options).run();
     } else {
-        // Fallback: If cursor is in whitespace or special char, 
-        // fall back to default Tiptap behavior (toggle at cursor for future typing).
-        if (markType === 'bold') editor.chain().focus().toggleBold().run();
-        else if (markType === 'italic') editor.chain().focus().toggleItalic().run();
-        else if (markType === 'highlight') editor.chain().focus().toggleHighlight(options).run();
+        // Fallback: cursor in whitespace/special char — toggle at cursor for future typing.
+        if (markType === 'bold') chain().toggleBold().run();
+        else if (markType === 'italic') chain().toggleItalic().run();
+        else if (markType === 'highlight') chain().toggleHighlight(options).run();
     }
 };
