@@ -10,7 +10,7 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: NotizApp
+      PRODUCT_NAME: Lama Notes
       PRODUCT_BUNDLE_IDENTIFIER: com.tobtheu.notizapp
 targetTemplates:
   app:

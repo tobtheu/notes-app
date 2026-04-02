@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "NotizApp",
+  "productName": "Lama Notes",
   "version": "0.6.1",
   "identifier": "com.tobtheu.notizapp",
   "build": {
