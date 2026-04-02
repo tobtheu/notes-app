@@ -102,7 +102,6 @@ interface SortableFolderItemProps {
     onSelectCategory: (name: string | null) => void;
     onEditCategory: (name: string) => void;
     onDeleteCategory: (name: string) => void;
-    onActivateReorderMode: () => void;
 }
 
 const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
@@ -113,7 +112,7 @@ const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
  */
 const FolderItem = ({
     folder, metadata, selectedCategory, isCollapsed, isReorderMode = false,
-    onSelectCategory, onEditCategory, onDeleteCategory, onActivateReorderMode,
+    onSelectCategory, onEditCategory, onDeleteCategory,
     isDragging, isOverlay, setNodeRef, attributes, listeners, style
 }: FolderItemProps) => {
     const longPressTimer = useRef<any>(null);
@@ -291,7 +290,6 @@ const SortableFolderItem = (props: SortableFolderItemProps) => {
             listeners={listeners}
             isDragging={isDragging}
             isReorderMode={props.isReorderMode}
-            onActivateReorderMode={props.onActivateReorderMode}
         />
     );
 };
@@ -474,7 +472,6 @@ export function Sidebar({
                                     onSelectCategory={onSelectCategory}
                                     onEditCategory={onEditCategory}
                                     onDeleteCategory={onDeleteCategory}
-                                    onActivateReorderMode={() => setIsReorderMode(true)}
                                 />
                             ))}
                         </SortableContext>
