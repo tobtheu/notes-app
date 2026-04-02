@@ -86,13 +86,16 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                         onToggleCollapse();
                     }}
                     className={clsx(
-                        "no-drag p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all active:scale-95",
-                        isIOS && activeView !== 'editor' ? "flex" : "hidden md:flex",
+                        "no-drag items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-all active:scale-95",
+                        isIOS && activeView !== 'editor' ? "flex p-2" : "hidden md:flex p-1.5",
                         isMac && isSidebarCollapsed ? "absolute left-21" : "ml-auto"
                     )}
                     title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                 >
-                    {isSidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+                    {isSidebarCollapsed
+                        ? <PanelLeftOpen size={isIOS && activeView !== 'editor' ? 20 : 18} />
+                        : <PanelLeftClose size={isIOS && activeView !== 'editor' ? 20 : 18} />
+                    }
                 </button>
             </div>
 
