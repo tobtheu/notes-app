@@ -90,17 +90,17 @@
 }
 
 [data-accent="green"] {
-  --primary-50: #f0fdfb;
-  --primary-100: #ccfbf4;
-  --primary-200: #99f6e8;
-  --primary-300: #5eead4;
-  --primary-400: #2dd4bf;
-  --primary-500: #14b8a6;
-  --primary-600: #0d9488;
-  --primary-700: #0f766e;
-  --primary-800: #115e59;
-  --primary-900: #134e4a;
-  --primary-950: #042f2e;
+  --primary-50: #f0fdf5;
+  --primary-100: #dcfce9;
+  --primary-200: #b9f8d2;
+  --primary-300: #84f0ae;
+  --primary-400: #4de089;
+  --primary-500: #24cc69;
+  --primary-600: #18a855;
+  --primary-700: #148643;
+  --primary-800: #126a37;
+  --primary-900: #0f542c;
+  --primary-950: #052715;
 }
 
 [data-accent="red"] {
