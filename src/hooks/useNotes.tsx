@@ -541,6 +541,7 @@ export function useNotes() {
             newFilename
         });
 
+        // renameNote uses fs::rename — atomic move, source is already gone.
         if (renameResult.success) {
             const newPath = newFilename.toLowerCase();
             if (metadata.pinnedNotes?.includes(noteId)) {

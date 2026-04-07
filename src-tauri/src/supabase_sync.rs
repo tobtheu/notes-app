@@ -566,12 +566,19 @@ pub async fn sync(
 
         match local_notes.get(id.as_str()) {
             None => {
-                // Note exists remotely but not locally → pull it.
-                if let Some(parent) = local_path.parent() { let _ = std::fs::create_dir_all(parent); }
-                let _ = std::fs::write(&local_path, &remote.content);
-                set_file_mtime(&local_path, &remote.updated_at);
-                pulled += 1;
-                info!("[supabase] pulled (new): {}", id);
+                if known_ts.is_some() {
+                    // We previously synced this note and it's now gone locally →
+                    // it was intentionally deleted or moved. Do NOT pull it back.
+                    // Step 2a will push the deletion to Supabase.
+                    info!("[supabase] skipping pull for locally deleted/moved note: {}", id);
+                } else {
+                    // Never seen before on this device → genuinely new remote note → pull it.
+                    if let Some(parent) = local_path.parent() { let _ = std::fs::create_dir_all(parent); }
+                    let _ = std::fs::write(&local_path, &remote.content);
+                    set_file_mtime(&local_path, &remote.updated_at);
+                    pulled += 1;
+                    info!("[supabase] pulled (new): {}", id);
+                }
             }
             Some((local_content, local_ts)) => {
                 let local_changed = known_ts.map_or(true, |k| local_ts != k);

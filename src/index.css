@@ -331,7 +331,7 @@ body {
 }
 
 .prose li {
-  @apply !my-0 !py-0;
+  @apply !my-0 !py-0 !text-sm !leading-relaxed;
 }
 
 .prose ul,
@@ -344,8 +344,25 @@ body {
   @apply !my-0;
 }
 
-.prose li p {
-  @apply !mb-0 !m-0;
+.prose li p,
+.prose li > p,
+.prose li > p:first-child,
+.prose li > p:last-child,
+:where(.prose-sm, .prose-base, .prose-lg, .prose-xl, .prose-2xl) :where(li) p {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* Tiptap wraps long list items in <p>.
+   Zero all spacing AND inherit font/line-height from <li> so wrapped items
+   look identical to non-wrapped items (both use the prose-{size} inherited value). */
+.ProseMirror li > p,
+.ProseMirror li > p:first-child,
+.ProseMirror li > p:last-child {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
 }
 
 .prose hr {

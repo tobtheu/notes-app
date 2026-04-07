@@ -203,7 +203,7 @@ const NoteListItem = memo(({
                         "group relative p-2.5 rounded-xl cursor-pointer z-10 w-full border-2",
                         isSnapping && "transition-transform duration-200",
                         isSelected
-                            ? "bg-primary-50 dark:bg-primary-900/30 border-primary-500 shadow-sm"
+                            ? "bg-primary-50 dark:bg-primary-950 border-primary-500 shadow-sm"
                             : "bg-white dark:bg-gray-900 hover:bg-gray-50 border-transparent dark:hover:bg-gray-800"
                     )}
                 >

@@ -49,7 +49,8 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
             id="titlebar"
             onMouseDown={handleMouseDown}
             className={clsx(
-                "pt-[var(--safe-top,0vh)] flex items-center justify-between bg-gray-50 dark:bg-gray-950 select-none relative z-[9999] box-content",
+                "pt-[var(--safe-top,0vh)] flex items-center justify-between select-none relative z-[9999] box-content",
+                isIOS ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-950",
                 isIOS ? "h-6 min-h-[24px]" : "h-10 min-h-[40px]"
             )}
         >

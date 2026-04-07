@@ -136,6 +136,7 @@ function App() {
 
   // Mobile View Management
   const [_isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [isLandscape, setIsLandscape] = useState(() => window.innerWidth > window.innerHeight);
   const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('notelist');
   const [selectionCount, setSelectionCount] = useState(0);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -160,8 +161,15 @@ function App() {
       lastWidth.current = width;
     };
 
+    const handleOrientationChange = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('resize', handleOrientationChange);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', handleOrientationChange);
+    };
   }, [isSidebarCollapsed]);
 
   // Apply font size to <html> so all rem-based Tailwind classes scale with it
@@ -295,7 +303,7 @@ function App() {
           <Sidebar
             className={clsx(
               "md:flex",
-              activeView === 'editor' ? "hidden md:flex" : "flex"
+              activeView === 'editor' ? (isIOS && isLandscape ? "flex" : "hidden md:flex") : "flex"
             )}
             folders={folders}
             metadata={metadata}
@@ -321,11 +329,11 @@ function App() {
           <NoteList
             className={clsx(
               "flex-1 min-w-0 md:flex-none md:w-80 md:shrink-0 transition-all duration-300 ease-in-out",
-              activeView === 'editor' ? "hidden md:flex" :
+              activeView === 'editor' ? (isIOS && isLandscape ? "flex" : "hidden md:flex") :
                 activeView === 'sidebar' ? "hidden md:flex" : "flex"
             )}
             notes={notes}
-            selectedNote={selectedNote}
+            selectedNote={activeView === 'editor' ? selectedNote : null}
             onSelectNote={handleSelectNote}
             onDeleteNote={deleteNote}
             onMoveNote={moveNote}
@@ -360,6 +368,7 @@ function App() {
             onToggleFocus={() => setIsFocusMode(!isFocusMode)}
             onSync={triggerSync}
             onNavigate={(id, _anchor) => handleNavigate(id)}
+            isIOS={isIOS}
           />
         ) : (
           <div className={clsx(
