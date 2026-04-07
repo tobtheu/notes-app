@@ -553,13 +553,34 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     // Track keyboard height via visualViewport so toolbar floats above keyboard on mobile
     // Track keyboard height and toolbar position natively bypassing React state for smoothness
     const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const keyboardHeightRef = useRef(0);
     const toolbarRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        // On iOS the native accessory bar handles keyboard layout — no JS tracking needed.
-        if (isIOS) return;
         const vv = window.visualViewport;
         if (!vv) return;
+
+        if (isIOS) {
+            // On iOS, WKWebView scrolls `window` when the keyboard opens to bring
+            // the cursor into view. This shifts the entire scroll container upward,
+            // clipping the title. Fix: reset window scroll and track keyboard height
+            // so we can add bottom padding to keep content reachable.
+            const update = () => {
+                window.scrollTo(0, 0);
+                const kbHeight = window.innerHeight - vv.height - vv.offsetTop;
+                const h = kbHeight > 50 ? kbHeight : 0;
+                keyboardHeightRef.current = h;
+                setKeyboardHeight(h);
+            };
+            vv.addEventListener('resize', update);
+            vv.addEventListener('scroll', update);
+            return () => {
+                vv.removeEventListener('resize', update);
+                vv.removeEventListener('scroll', update);
+            };
+        }
+
         const update = () => {
             const kbHeight = window.innerHeight - vv.height;
             if (kbHeight > 100) {
@@ -739,6 +760,18 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             const markdown = (editor.storage as any).markdown.getMarkdown();
             editorMarkdownRef.current = markdown; // Track what the editor generated
             onChangeRef.current(markdown);
+            // On iOS: scroll our container so the cursor stays above the keyboard
+            if (keyboardHeightRef.current > 0 && scrollContainerRef.current) {
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0) {
+                    const range = sel.getRangeAt(0);
+                    const rect = range.getBoundingClientRect();
+                    const visibleBottom = window.innerHeight - keyboardHeightRef.current - 16;
+                    if (rect.bottom > visibleBottom) {
+                        scrollContainerRef.current.scrollTop += rect.bottom - visibleBottom;
+                    }
+                }
+            }
         },
         onBlur: () => {
             onBlurRef.current?.();
@@ -877,6 +910,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                 case 'image':      openImageModalRef.current(); break;
                 case 'undo':       editor.chain().undo().run(); break;
                 case 'redo':       editor.chain().redo().run(); break;
+                case 'indent':     editor.chain().sinkListItem('listItem').run(); break;
+                case 'outdent':    editor.chain().liftListItem('listItem').run(); break;
+                case 'table':      editor.chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); break;
             }
         };
 
@@ -1079,10 +1115,12 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
 
             {/* Content area - isolated scroll area */}
             <div
+                ref={scrollContainerRef}
                 className={clsx(
                     "flex-1 overflow-y-auto custom-scrollbar min-h-0 cursor-text group/editor",
                     isFocusMode && "focus-mode-active"
                 )}
+                style={isIOS && keyboardHeight > 0 ? { paddingBottom: keyboardHeight } : undefined}
                 onScroll={handleScroll}
                 onDragEnter={(e) => {
                     e.preventDefault();
@@ -1142,7 +1180,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                     }
                 }}
             >
-                <div className="max-w-4xl mx-auto pt-0 pb-8 px-8 min-h-full flex flex-col w-full">
+                <div className="max-w-4xl mx-auto pt-0 pb-8 px-4 md:px-8 min-h-full flex flex-col w-full">
                     {header}
                     <EditorContent editor={editor} className="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl flex-1 flex flex-col break-words [overflow-wrap:anywhere]" />
                 </div>

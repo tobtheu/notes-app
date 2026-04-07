@@ -90,6 +90,11 @@ static EditorAccessoryView *gToolbarView = nil;
         @[@"|"],
         @[@"link",        @"link"],
         @[@"image",       @"photo"],
+        @[@"|"],
+        @[@"indent",      @"increase.indent"],
+        @[@"outdent",     @"decrease.indent"],
+        @[@"|"],
+        @[@"table",       @"tablecells"],
     ];
 
     NSMutableDictionary *actionBtns = [NSMutableDictionary new];

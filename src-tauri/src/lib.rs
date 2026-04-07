@@ -8,7 +8,9 @@ use notify::{Watcher, RecursiveMode};
 use tauri::{Emitter, Manager};
 use base64::{engine::general_purpose, Engine as _};
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 mod git;
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 mod github;
 mod store;
 mod supabase_sync;
@@ -20,7 +22,10 @@ mod supabase_sync;
 pub struct SyncResultPayload {
     pub had_changes: bool,
     pub had_conflicts: bool,
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     pub conflict_pairs: Vec<git::ConflictPair>,
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    pub conflict_pairs: Vec<String>,
     pub push_succeeded: bool,
 }
 
@@ -363,6 +368,7 @@ async fn clear_github_credentials(app: tauri::AppHandle) {
     store::clear_github_credentials(&app);
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 #[tauri::command]
 async fn connect_github(token: String, folder_path: String) -> Result<String, String> {
     let username = github::verify_token(&token).await?;
@@ -374,6 +380,7 @@ async fn connect_github(token: String, folder_path: String) -> Result<String, St
     Ok(username)
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 #[tauri::command]
 async fn start_github_oauth() -> Result<serde_json::Value, String> {
     let flow = github::start_device_flow().await?;
@@ -400,6 +407,7 @@ async fn start_github_oauth() -> Result<serde_json::Value, String> {
     }))
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 #[tauri::command]
 async fn complete_github_oauth(app: tauri::AppHandle, device_code: String, interval: u64, folder_path: String) -> Result<String, String> {
     let token = github::poll_device_flow(&device_code, interval).await?;
@@ -450,6 +458,7 @@ async fn start_watch(app: tauri::AppHandle, folder_path: String, state: tauri::S
 }
 
 /// Scans the directory for files containing " (Konflikt " and returns them as ConflictPairs.
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn detect_ongoing_conflicts(root: &Path) -> Vec<git::ConflictPair> {
     let mut pairs = Vec::new();
     let files = get_files_recursively(root);
@@ -481,6 +490,7 @@ fn detect_ongoing_conflicts(root: &Path) -> Vec<git::ConflictPair> {
     pairs
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 fn spawn_sync(app: tauri::AppHandle, folder_path: String) {
     tauri::async_runtime::spawn(async move {
         if let Some(creds) = store::get_github_credentials(&app) {
@@ -631,7 +641,10 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
         Some(c) => c,
         None => {
             // Not connected to Supabase yet — check for ongoing conflicts on disk only
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
             let disk_conflicts = detect_ongoing_conflicts(root);
+            #[cfg(any(target_os = "ios", target_os = "android"))]
+            let disk_conflicts: Vec<String> = Vec::new();
             let had_conflicts = !disk_conflicts.is_empty();
             let payload = SyncResultPayload {
                 had_changes: false,
@@ -676,7 +689,10 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
     };
 
     // Convert conflict count to ConflictPairs for the existing UI
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
     let disk_conflicts = detect_ongoing_conflicts(root);
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    let disk_conflicts: Vec<String> = Vec::new();
     let had_conflicts = !disk_conflicts.is_empty();
 
     let payload = SyncResultPayload {
@@ -741,11 +757,16 @@ pub fn run() {
             list_notes, list_folders, save_note, delete_note, rename_note,
             read_metadata, save_metadata, rename_folder, create_folder,
             delete_folder_recursive, delete_folder_move_contents,
-            get_app_version, get_document_dir, connect_github,
-            start_github_oauth, complete_github_oauth, sync_now, start_watch,
+            get_app_version, get_document_dir, sync_now, start_watch,
             clear_github_credentials, save_asset,
             supabase_sign_in, supabase_sign_up, supabase_sign_out, get_supabase_user,
             reset_sync_state,
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            connect_github,
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            start_github_oauth,
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
+            complete_github_oauth,
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {

@@ -192,7 +192,7 @@ const FolderItem = ({
                 {!isCollapsed && (
                     <div
                         {...attributes}
-                        {...(isReorderMode ? listeners : {})}
+                        {...listeners}
                         className={clsx(
                             "shrink-0 outline-none transition-all",
                             isReorderMode
