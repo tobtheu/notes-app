@@ -1,106 +1,115 @@
-import { RefreshCw, Cloud, CloudOff, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { RefreshCw, Cloud, CloudOff, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import clsx from 'clsx';
-import type { ConflictPair } from '../types';
-
-type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline' | 'error' | 'conflict';
+import type { SyncStatus } from '../hooks/useNotes';
 
 interface SyncStatusBadgeProps {
     syncStatus: SyncStatus;
     syncError?: string | null;
-    lastSyncedAt: Date | null;
-    conflictFiles?: ConflictPair[];
+    hasPending?: boolean;
     onSync?: () => void;
     onOpenSettings?: () => void;
 }
 
-function formatRelativeTime(date: Date): string {
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (seconds < 60) return 'just now';
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ago`;
-}
+export function SyncStatusBadge({
+    syncStatus,
+    syncError,
+    hasPending = false,
+    onSync,
+    onOpenSettings,
+}: SyncStatusBadgeProps) {
 
-export function SyncStatusBadge({ syncStatus, syncError, lastSyncedAt, conflictFiles = [], onSync, onOpenSettings }: SyncStatusBadgeProps) {
-    const isAuthError = syncStatus === 'error' && !!syncError && (
-        syncError.includes('class=Http') ||
-        syncError.includes('401') ||
-        syncError.includes('authentication') ||
-        syncError.includes('unexpected EOF')
-    );
+    type Config = {
+        icon: React.ReactNode;
+        label: string;
+        color: string;
+        clickable: boolean;
+    };
 
-    const config = {
-        idle: {
-            icon: <Cloud size={18} />,
-            label: 'Sync',
-            color: 'text-gray-400 dark:text-gray-500',
-            clickable: true,
-        },
-        syncing: {
-            icon: <RefreshCw size={18} className="animate-spin" />,
-            label: 'Syncing…',
-            color: 'text-blue-500 dark:text-blue-400',
-            clickable: false,
-        },
-        synced: {
-            icon: <CheckCircle2 size={18} />,
-            label: lastSyncedAt ? formatRelativeTime(lastSyncedAt) : 'Synced',
-            color: 'text-emerald-500 dark:text-emerald-400',
-            clickable: true,
-        },
-        offline: {
-            icon: <CloudOff size={18} />,
-            label: 'Offline',
-            color: 'text-gray-400 dark:text-gray-500',
-            clickable: false,
-        },
-        error: {
-            icon: <XCircle size={18} />,
-            label: isAuthError ? 'Token abgelaufen' : 'Sync failed',
-            color: 'text-red-500 dark:text-red-400',
-            clickable: true,
-        },
-        conflict: {
-            icon: <AlertTriangle size={18} />,
-            label: conflictFiles && conflictFiles.length > 0 ? `Konflikt in ${conflictFiles.length} Datei(en)` : 'Konflikt',
-            color: 'text-orange-500 dark:text-orange-400',
-            clickable: true,
-        },
-    }[syncStatus];
+    const config: Config = (() => {
+        switch (syncStatus) {
+            case 'initialising':
+                return {
+                    icon: <RefreshCw size={18} className="animate-spin" />,
+                    label: 'Wird geladen…',
+                    color: 'text-blue-500 dark:text-blue-400',
+                    clickable: false,
+                };
+            case 'synced':
+                return {
+                    icon: <CheckCircle2 size={18} />,
+                    label: hasPending ? 'Synchronisiert (ausstehend)' : 'Synchronisiert',
+                    color: hasPending
+                        ? 'text-amber-500 dark:text-amber-400'
+                        : 'text-emerald-500 dark:text-emerald-400',
+                    clickable: true,
+                };
+            case 'pending':
+                return {
+                    icon: <Clock size={18} />,
+                    label: 'Ausstehende Änderungen',
+                    color: 'text-amber-500 dark:text-amber-400',
+                    clickable: true,
+                };
+            case 'offline':
+                return {
+                    icon: <CloudOff size={18} />,
+                    label: 'Offline',
+                    color: 'text-gray-400 dark:text-gray-500',
+                    clickable: false,
+                };
+            case 'error':
+                return {
+                    icon: <XCircle size={18} />,
+                    label: 'Sync-Fehler',
+                    color: 'text-red-500 dark:text-red-400',
+                    clickable: true,
+                };
+            case 'unauthenticated':
+                return {
+                    icon: <Cloud size={18} />,
+                    label: 'Nicht angemeldet',
+                    color: 'text-gray-400 dark:text-gray-500',
+                    clickable: true,
+                };
+        }
+    })();
+
+    const handleClick = () => {
+        if (syncStatus === 'error' && syncError) {
+            alert(`Sync-Fehler:\n\n${syncError}`);
+            return;
+        }
+        if (syncStatus === 'unauthenticated' && onOpenSettings) {
+            onOpenSettings();
+            return;
+        }
+        if (config.clickable && onSync) {
+            onSync();
+        }
+    };
 
     return (
         <button
             type="button"
-            onClick={
-                syncStatus === 'error' && syncError && !isAuthError
-                    ? () => alert(`Sync error:\n\n${syncError}`)
-                    : isAuthError && onOpenSettings
-                        ? onOpenSettings
-                        : config.clickable && onSync
-                            ? onSync
-                            : undefined
-            }
-            disabled={!config.clickable || (!onSync && !(isAuthError && onOpenSettings))}
+            onClick={config.clickable ? handleClick : undefined}
+            disabled={!config.clickable}
             title={
-                syncStatus === 'conflict'
-                    ? `Conflict in: ${conflictFiles.join(', ')}`
-                    : syncStatus === 'synced' && lastSyncedAt
-                        ? `Last synced ${formatRelativeTime(lastSyncedAt)}`
-                        : syncStatus === 'offline'
-                            ? 'No internet connection'
-                            : syncStatus === 'error' && syncError
-                                ? syncError
-                                : isAuthError
-                                    ? 'GitHub-Token abgelaufen. GitHub in den Einstellungen neu verbinden.'
-                                    : 'Sync with GitHub'
+                syncStatus === 'error' && syncError
+                    ? syncError
+                    : syncStatus === 'unauthenticated'
+                        ? 'In den Einstellungen anmelden um zu synchronisieren'
+                        : syncStatus === 'pending'
+                            ? 'Lokale Änderungen werden synchronisiert sobald online'
+                            : syncStatus === 'offline'
+                                ? 'Keine Internetverbindung'
+                                : 'Sync-Status'
             }
             className={clsx(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors select-none',
                 config.color,
-                config.clickable && onSync
+                config.clickable
                     ? 'hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer'
-                    : 'cursor-default opacity-75'
+                    : 'cursor-default opacity-75',
             )}
         >
             {config.icon}

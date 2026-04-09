@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, LogOut, Download, Rocket, RotateCcw } from 'lucide-react';
+import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, CloudOff, Clock, LogOut, Download, Rocket } from 'lucide-react';
 import clsx from 'clsx';
+import type { SyncStatus } from '../hooks/useNotes';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -22,7 +23,13 @@ interface SettingsModalProps {
     onToggleSpellcheck: (enabled: boolean) => void;
     landscapeFullscreen?: boolean;
     onToggleLandscapeFullscreen?: (enabled: boolean) => void;
-    onTriggerSync?: () => void;
+    // ElectricSQL sync props
+    syncStatus?: SyncStatus;
+    hasPending?: boolean;
+    userEmail?: string | null;
+    onSignIn?: (email: string, password: string) => Promise<{ userId: string; email: string }>;
+    onSignUp?: (email: string, password: string) => Promise<{ userId: string; email: string }>;
+    onSignOut?: () => Promise<void>;
 }
 
 /**
@@ -50,7 +57,12 @@ export function SettingsModal({
     onToggleSpellcheck,
     landscapeFullscreen = false,
     onToggleLandscapeFullscreen,
-    onTriggerSync,
+    syncStatus,
+    hasPending = false,
+    userEmail,
+    onSignIn,
+    onSignUp,
+    onSignOut,
 }: SettingsModalProps) {
     /**
      * --- LOCAL STATE ---
@@ -64,13 +76,12 @@ export function SettingsModal({
     }>({ type: 'idle' });
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    // Supabase Sync State
-    const [syncEmail, setSyncEmail] = useState<string | null>(null);
-    const [syncStatus, setSyncStatus] = useState<'idle' | 'signing-in' | 'resetting' | 'error'>('idle');
-    const [syncError, setSyncError] = useState<string | null>(null);
+    // Auth form state
     const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
     const [authEmail, setAuthEmail] = useState('');
     const [authPassword, setAuthPassword] = useState('');
+    const [authLoading, setAuthLoading] = useState(false);
+    const [authError, setAuthError] = useState<string | null>(null);
 
     // Auto-scroll to update status box when it appears
     useEffect(() => {
@@ -89,60 +100,34 @@ export function SettingsModal({
      */
     useEffect(() => {
         if (!isOpen) return;
-
-        // Fetch current app version from the backend
         window.tauriAPI.getAppVersion().then(setVersion);
-
-        // Fetch connected Supabase account
-        window.tauriAPI.getSupabaseUser().then(data => {
-            if (data) setSyncEmail(data.email);
-        });
-
-        // Subscribe to real-time update events from the Tauri updater
         const unsubscribe = window.tauriAPI.onUpdateStatus((status) => {
             setUpdateStatus(status);
         });
-
         return () => unsubscribe();
     }, [isOpen]);
 
-    const handleSupabaseAuth = async () => {
-        if (!authEmail || !authPassword) return;
-        setSyncStatus('signing-in');
-        setSyncError(null);
+    const handleAuth = async () => {
+        if (!authEmail || !authPassword || !onSignIn || !onSignUp) return;
+        setAuthLoading(true);
+        setAuthError(null);
         try {
-            const fn = authMode === 'signin'
-                ? window.tauriAPI.supabaseSignIn
-                : window.tauriAPI.supabaseSignUp;
-            const result = await fn(authEmail, authPassword);
-            setSyncEmail(result.email);
+            if (authMode === 'signin') {
+                await onSignIn(authEmail, authPassword);
+            } else {
+                await onSignUp(authEmail, authPassword);
+            }
             setAuthEmail('');
             setAuthPassword('');
-            setSyncStatus('idle');
-            // Immediately pull notes from server after signing in
-            onTriggerSync?.();
         } catch (e: any) {
-            setSyncError(e?.toString() || 'Fehler beim Anmelden');
-            setSyncStatus('error');
-        }
-    };
-
-    const handleSupabaseSignOut = async () => {
-        await window.tauriAPI.supabaseSignOut();
-        setSyncEmail(null);
-        setSyncStatus('idle');
-        setSyncError(null);
-    };
-
-    const handleForceFullSync = async () => {
-        if (!currentPath) return;
-        setSyncStatus('resetting');
-        try {
-            await window.tauriAPI.resetSyncState(currentPath);
-            onTriggerSync?.();
+            setAuthError(e?.toString() ?? 'Fehler beim Anmelden');
         } finally {
-            setSyncStatus('idle');
+            setAuthLoading(false);
         }
+    };
+
+    const handleSignOut = async () => {
+        await onSignOut?.();
     };
 
     const handleCheckForUpdates = () => {
@@ -179,34 +164,33 @@ export function SettingsModal({
                     ref={scrollContainerRef}
                     className="overflow-y-auto flex-1 pr-2 -mr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700"
                 >
-                    {/* --- SYNC SECTION --- */}
+                    {/* --- SYNC SECTION (ElectricSQL) --- */}
                     <div className="mb-8">
                         <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Cloud Sync</h3>
                         <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                            {syncEmail ? (
+                            {userEmail ? (
                                 <div className="flex flex-col gap-3">
+                                    {/* Connected state */}
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center shrink-0">
                                             <Cloud className="text-primary-600 dark:text-primary-400" size={20} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">Cloud Sync aktiv</p>
-                                            <p className="text-xs text-gray-500 truncate">{syncEmail}</p>
+                                            <p className="text-xs text-gray-500 truncate">{userEmail}</p>
                                         </div>
-                                        <CheckCircle2 className="text-green-500 shrink-0" size={18} />
+                                        {syncStatus === 'synced' && !hasPending && <CheckCircle2 className="text-green-500 shrink-0" size={18} />}
+                                        {syncStatus === 'pending' && <Clock className="text-amber-500 shrink-0" size={18} />}
+                                        {syncStatus === 'offline' && <CloudOff className="text-gray-400 shrink-0" size={18} />}
                                     </div>
+                                    {syncStatus === 'pending' && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                                            Ausstehende Änderungen werden synchronisiert, sobald du online bist.
+                                        </p>
+                                    )}
                                     <button
                                         type="button"
-                                        onClick={handleForceFullSync}
-                                        disabled={syncStatus === 'resetting'}
-                                        className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-50"
-                                    >
-                                        <RotateCcw size={14} className={syncStatus === 'resetting' ? 'animate-spin' : ''} />
-                                        {syncStatus === 'resetting' ? 'Wird synchronisiert...' : 'Alle Notizen synchronisieren'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleSupabaseSignOut}
+                                        onClick={handleSignOut}
                                         className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
                                     >
                                         <LogOut size={14} />
@@ -227,7 +211,6 @@ export function SettingsModal({
                                         </div>
                                     </div>
 
-                                    {/* Toggle sign-in / sign-up */}
                                     <div className="flex rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 text-xs font-semibold">
                                         <button
                                             type="button"
@@ -253,21 +236,21 @@ export function SettingsModal({
                                         placeholder="Passwort"
                                         value={authPassword}
                                         onChange={e => setAuthPassword(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && handleSupabaseAuth()}
+                                        onKeyDown={e => e.key === 'Enter' && handleAuth()}
                                         className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
                                     />
 
-                                    {syncStatus === 'error' && syncError && (
-                                        <p className="text-xs text-red-500 text-center break-words">{syncError}</p>
+                                    {authError && (
+                                        <p className="text-xs text-red-500 text-center break-words">{authError}</p>
                                     )}
 
                                     <button
                                         type="button"
-                                        onClick={handleSupabaseAuth}
-                                        disabled={syncStatus === 'signing-in' || !authEmail || !authPassword}
+                                        onClick={handleAuth}
+                                        disabled={authLoading || !authEmail || !authPassword}
                                         className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
                                     >
-                                        {syncStatus === 'signing-in' ? (
+                                        {authLoading ? (
                                             <><RefreshCw size={14} className="animate-spin" /> Bitte warten…</>
                                         ) : authMode === 'signin' ? 'Anmelden' : 'Konto erstellen'}
                                     </button>
