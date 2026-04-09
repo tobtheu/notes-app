@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Component } from 'react';
 import type { ReactNode } from 'react';
+import { PGliteProvider } from '@electric-sql/pglite-react';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
@@ -7,18 +8,18 @@ import { TitleBar } from './components/TitleBar';
 import { SettingsModal } from './components/SettingsModal';
 import { DeleteFolderModal } from './components/DeleteFolderModal';
 import { UpdateModal } from './components/UpdateModal';
-import { ConflictModal } from './components/ConflictModal';
 import { FolderEditModal } from './components/FolderEditModal';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { useNotes } from './hooks/useNotes';
 import { useSettings } from './hooks/useSettings';
 import { useTheme } from './hooks/useTheme';
-// import { QuickNote } from './components/QuickNote';
+import { getDb } from './lib/electric';
 import type { Note } from './types';
 import { Loader2, Book } from 'lucide-react';
 import clsx from 'clsx';
 import { platform } from '@tauri-apps/plugin-os';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import type { PGlite } from '@electric-sql/pglite';
 
 const appWindow = getCurrentWindow();
 
@@ -78,11 +79,12 @@ function App() {
     triggerSync,
     syncStatus,
     syncError,
-    lastSyncedAt,
-    conflictPairs,
-    resetSyncStatus,
+    hasPending,
     setupDefaultWorkspace,
-    reloadNotes,
+    signIn,
+    signUp,
+    signOut,
+    userEmail,
   } = useNotes();
 
   // If this Webview is the Quick Note window, display only the QuickNote component rather than the full app.
@@ -115,15 +117,7 @@ function App() {
   useEffect(() => { try { setIsIOS(platform() === 'ios'); } catch {} }, []);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => window.innerWidth < 768);
-  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
-
-  // Auto-open ConflictModal when a sync conflict is detected
-  useEffect(() => {
-    if (syncStatus === 'conflict' && conflictPairs.length > 0) {
-      setIsConflictModalOpen(true);
-    }
-  }, [syncStatus, conflictPairs]);
 
   // Update logic
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
@@ -311,8 +305,8 @@ function App() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           syncStatus={syncStatus}
           syncError={syncError}
-          lastSyncedAt={lastSyncedAt}
-          conflictFiles={conflictPairs}
+          lastSyncedAt={null}
+          conflictFiles={[]}
           onSync={triggerSync}
           isIOS={isIOS}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -352,8 +346,8 @@ function App() {
             onOpenSettings={() => setIsSettingsOpen(true)}
             syncStatus={syncStatus}
             syncError={syncError}
-            lastSyncedAt={lastSyncedAt}
-            conflictFiles={conflictPairs}
+            lastSyncedAt={null}
+            conflictFiles={[]}
             onSync={triggerSync}
           />
         )}
@@ -442,7 +436,12 @@ function App() {
           onToggleSpellcheck={setSpellcheckEnabled}
           landscapeFullscreen={landscapeFullscreen}
           onToggleLandscapeFullscreen={setLandscapeFullscreen}
-          onTriggerSync={triggerSync}
+          syncStatus={syncStatus}
+          hasPending={hasPending}
+          userEmail={userEmail}
+          onSignIn={signIn}
+          onSignUp={signUp}
+          onSignOut={signOut}
         />
       )}
 
@@ -475,19 +474,6 @@ function App() {
         />
       )}
 
-      {/* CONFLICT MODAL — auto-opens when sync detects a merge conflict */}
-      {isConflictModalOpen && conflictPairs.length > 0 && currentFolder && (
-        <ConflictModal
-          conflictPairs={conflictPairs}
-          baseFolder={currentFolder}
-          onClose={() => setIsConflictModalOpen(false)}
-          onReload={() => {
-            resetSyncStatus();
-            reloadNotes(false);
-          }}
-        />
-      )}
-
       {isLoading && (
         <div className="fixed bottom-6 right-6 z-50 bg-white dark:bg-gray-900 rounded-full shadow-lg p-3 border border-gray-100 dark:border-gray-700">
           <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
@@ -497,10 +483,26 @@ function App() {
   );
 }
 
+// PGliteProvider must wrap the entire tree so useLiveQuery works everywhere.
+// We initialise the db lazily (getDb returns a singleton promise) and pass
+// it to the provider once resolved.
+function PGliteWrapper({ children }: { children: ReactNode }) {
+    const [db, setDb] = useState<PGlite | null>(null);
+    useEffect(() => {
+        getDb().then(setDb).catch(console.error);
+    }, []);
+
+    if (!db) return null; // Wait for PGlite to initialise before rendering
+
+    return <PGliteProvider db={db}>{children}</PGliteProvider>;
+}
+
 export default function AppWithErrorBoundary() {
     return (
         <AppErrorBoundary>
-            <App />
+            <PGliteWrapper>
+                <App />
+            </PGliteWrapper>
         </AppErrorBoundary>
     );
 }

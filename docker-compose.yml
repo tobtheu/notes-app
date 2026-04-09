@@ -1,0 +1,65 @@
+# ============================================================
+# ElectricSQL Self-Hosted Service
+# ============================================================
+# Run this alongside your Supabase instance to enable
+# real-time offline-first sync for Lama Notes.
+#
+# Usage:
+#   docker compose up -d
+#
+# Prerequisites:
+#   - Supabase project with migration 001_electric_setup.sql applied
+#   - Set the environment variables in a .env file (see .env.example)
+# ============================================================
+
+services:
+  electric:
+    image: electricsql/electric:latest
+    restart: unless-stopped
+    environment:
+      # --------------------------------------------------------
+      # Required: Direct Postgres connection (NOT the pooler URL)
+      # Use the "Session pooler" or "Direct connection" from
+      # Supabase → Project Settings → Database
+      # --------------------------------------------------------
+      DATABASE_URL: "${ELECTRIC_DATABASE_URL}"
+
+      # --------------------------------------------------------
+      # Required: Secret used to sign Electric's internal tokens
+      # Generate with: openssl rand -hex 32
+      # --------------------------------------------------------
+      SECRET_KEY_BASE: "${ELECTRIC_SECRET_KEY_BASE}"
+
+      # --------------------------------------------------------
+      # Auth: Configure Electric to trust Supabase JWTs
+      # Your Supabase JWT secret is in:
+      # Supabase → Project Settings → API → JWT Settings
+      # --------------------------------------------------------
+      AUTH_MODE: "secure"
+      AUTH_JWT_ALG: "HS256"
+      AUTH_JWT_KEY: "${SUPABASE_JWT_SECRET}"
+
+      # --------------------------------------------------------
+      # Optional: Persistence directory for Electric's state
+      # --------------------------------------------------------
+      ELECTRIC_STORAGE_DIR: "/electric/storage"
+
+      # Optional: Enable detailed logging for debugging
+      # LOG_LEVEL: "debug"
+
+    ports:
+      - "5133:5133"       # Electric HTTP sync port (used by the client SDK)
+
+    volumes:
+      - electric_storage:/electric/storage
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5133/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  electric_storage:
+    driver: local
