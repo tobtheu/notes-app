@@ -25,6 +25,7 @@ interface EditorProps {
     onToggleFocus: () => void;
     onSync?: () => void;
     isIOS?: boolean;
+    iosLandscapeFullscreen?: boolean;
     className?: string;
 }
 
@@ -52,6 +53,7 @@ export function Editor({
     onToggleFocus,
     onSync,
     isIOS = false,
+    iosLandscapeFullscreen = false,
     className
 }: EditorProps) {
     /**
@@ -519,6 +521,7 @@ export function Editor({
                         </div>
                     ) : null}
                     isFocusMode={isFocusMode}
+                    iosLandscapeFullscreen={iosLandscapeFullscreen}
                     ref={markdownEditorRef}
                     onArrowUpAtStart={() => titleRef.current?.focus()}
                     onBlur={() => throttledSync()}

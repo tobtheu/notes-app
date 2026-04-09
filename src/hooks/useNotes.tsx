@@ -59,10 +59,15 @@ export function useNotes() {
                 try {
                     const docDir = await window.tauriAPI.getDocumentDir();
                     const newPath = `${docDir}/Lama Notes`.replace(/\\/g, '/');
-                    // Ensure the folder exists in the current sandbox path
-                    await window.tauriAPI.createFolder(docDir, newPath);
+                    // Update path FIRST (before createFolder) so we always use the current
+                    // sandbox UUID even if folder creation fails (syncNow creates it too).
                     savedFolder = newPath;
                     localStorage.setItem('notes-folder', savedFolder);
+                    try {
+                        await window.tauriAPI.createFolder(docDir, newPath);
+                    } catch {
+                        // Ignore — folder may already exist; syncNow will create it if needed
+                    }
                 } catch (e) {
                     console.error("Failed to resolve dynamic mobile path:", e);
                 }
@@ -120,11 +125,23 @@ export function useNotes() {
             } else {
                 meta.pinnedNotes = [];
             }
+
+            let needsMetadataSave = false;
+
+            // PIN CLEANUP: Remove pinned entries for notes that no longer exist on disk.
+            // This prevents stale pins from re-appearing when a new note reuses the same
+            // filename (e.g. "Untitled note.md" in the same folder as a previously pinned one).
+            const noteIds = new Set(uniqueNotes.map(n => getNoteId(n)));
+            const cleanedPins = meta.pinnedNotes.filter(p => noteIds.has(p));
+            if (cleanedPins.length !== meta.pinnedNotes.length) {
+                meta.pinnedNotes = cleanedPins;
+                needsMetadataSave = true;
+            }
+
             setMetadata(meta);
 
             // FOLDER REPAIR: Ensure folders seen on disk exist in the metadata order
             let order = meta.folderOrder || [];
-            let needsMetadataSave = false;
             const orderNormalized = order.map(f => normalizeStr(f));
 
             loadedFolders.forEach(folder => {
@@ -410,21 +427,15 @@ export function useNotes() {
             // Use the passed-in ID to find the note, which is more reliable than the hook's state
             let currentNote = currentNotes.find((n: Note) => getNoteId(n) === currentId);
 
-            // FALLBACK LOOKUP: If ID lookup failed (e.g. background state refresh), try identifying by filename/folder
-            if (!currentNote && currentId) {
-                currentNote = currentNotes.find((n: Note) =>
-                    normalizeStr(n.filename) === normalizeStr(filename) &&
-                    normalizeStr(n.folder) === normalizeStr(folder || "")
-                );
-            }
-
             // CRITICAL: Zombie Protection
-            // If we have an ID but NO currentNote (even after fallback), it means the note is missing 
-            // from the current app state (maybe a sync is in progress). 
-            // ABORT to avoid creating a new duplicate file from a stale ID.
-            // EXCEPTION: Allow "Quick Note.md" to be created even if not in state yet.
-            if (currentId && !currentNote && filename !== 'Quick Note.md') {
-                console.warn(`[saveNote] Aborting save: Note ID ${currentId} is not in current state. Prevents duplicate creation.`);
+            // If the ID lookup failed, the note is either gone (sync deleted it) or
+            // the state is stale. We must NOT fall back to matching by filename — that
+            // is exactly what causes content to be written to the wrong file when a
+            // rename races with a sync.
+            // EXCEPTION: Quick Note creation passes skipRename=true and may not be in
+            // state yet — allow it through so the file gets created.
+            if (currentId && !currentNote && !(filename === 'Quick Note.md' && skipRename)) {
+                console.warn(`[saveNote] Aborting save: Note ID ${currentId} not found in state. Prevents writing to wrong file.`);
                 return currentId;
             }
 
@@ -443,12 +454,19 @@ export function useNotes() {
             let finalId = currentId;
 
             if (isRenaming) {
-                // Check for collisions to avoid accidentally overwriting existing files
-                const collision = currentNotes.find((n: Note) => normalizeStr(n.filename) === normalizeStr(targetFilename) && normalizeStr(n.folder) === normalizeStr(folder || ""));
-
-                if (collision && getNoteId(collision) !== currentId) {
+                // If the target filename is already taken by a different note, abort the rename.
+                // The note keeps its current filename (e.g. "Untitled note.md") so the user
+                // can see it's a separate note and decide what to do.
+                const collision = currentNotes.some((n: Note) =>
+                    normalizeStr(n.filename) === normalizeStr(targetFilename) &&
+                    normalizeStr(n.folder) === normalizeStr(folder || "") &&
+                    getNoteId(n) !== currentId
+                );
+                if (collision) {
                     targetFilename = currentNote!.filename;
-                } else {
+                }
+
+                {
                     const oldRelativePath = folder ? `${folder}/${currentNote!.filename}` : currentNote!.filename;
                     const newRelativePath = folder ? `${folder}/${targetFilename}` : targetFilename;
 
@@ -499,7 +517,10 @@ export function useNotes() {
             const result = await window.tauriAPI.saveNote({
                 rootPath: baseFolder,
                 folderPath,
-                filename: isRenaming ? targetFilename : (currentNote?.filename || filename),
+                // currentNote is guaranteed non-null here (zombie guard aborts otherwise).
+                // Never fall back to the stale `filename` param — that's how content ends up
+                // in the wrong file when a sync races with a save.
+                filename: isRenaming ? targetFilename : currentNote!.filename,
                 content
             });
 

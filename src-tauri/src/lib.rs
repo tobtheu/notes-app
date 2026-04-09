@@ -248,7 +248,19 @@ async fn rename_note(_app: tauri::AppHandle, root_path: String, old_filename: St
     let root = Path::new(&root_path);
     let old_path = root.join(&old_filename);
     let new_path = root.join(&new_filename);
-    fs::rename(old_path, new_path).map_err(|e| e.to_string())?;
+    fs::rename(&old_path, &new_path).map_err(|e| e.to_string())?;
+
+    // After rename, stamp a fresh `updated:` timestamp into the frontmatter.
+    // fs::rename preserves the old mtime, so without this the moved/renamed file
+    // keeps its old timestamp. If Supabase has a stale (but newer-timestamped)
+    // entry for the new path, sync would overwrite the local file with remote
+    // content. A fresh timestamp ensures local always wins after a move/rename.
+    if let Ok(content) = fs::read_to_string(&new_path) {
+        let now = chrono::Utc::now().to_rfc3339();
+        let updated = inject_frontmatter(&content, &now);
+        let _ = fs::write(&new_path, updated);
+    }
+
     Ok(())
 }
 
@@ -633,7 +645,7 @@ async fn sync_now(app: tauri::AppHandle, folder_path: String) -> Result<SyncResu
     let root = Path::new(&folder_path);
 
     if !root.exists() {
-        fs::create_dir_all(root).map_err(|e| format!("Could not create folder: {}", e))?;
+        fs::create_dir_all(root).map_err(|e| format!("Could not create folder '{}': {}", root.display(), e))?;
     }
 
     // Check for Supabase credentials
@@ -820,4 +832,295 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// ===========================================================================
+// TESTS
+// ===========================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    // -----------------------------------------------------------------------
+    // parse_frontmatter
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_frontmatter_extracts_updated_timestamp() {
+        let raw = "---\nupdated: 2026-01-15T12:30:00+00:00\n---\n# Hello World";
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        fs::write(&file, raw).unwrap();
+
+        let (content, updated_at) = parse_frontmatter(raw, &file);
+        assert_eq!(content, "# Hello World");
+        assert!(updated_at.contains("2026-01-15"), "updated_at should contain the date: {}", updated_at);
+    }
+
+    #[test]
+    fn parse_frontmatter_strips_frontmatter_from_content() {
+        let raw = "---\nupdated: 2026-01-01T00:00:00Z\ntitle: Test\n---\n# Content here";
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        fs::write(&file, raw).unwrap();
+
+        let (content, _) = parse_frontmatter(raw, &file);
+        assert_eq!(content, "# Content here");
+        assert!(!content.contains("---"));
+    }
+
+    #[test]
+    fn parse_frontmatter_no_frontmatter_returns_full_content() {
+        let raw = "# Just a heading\nSome text";
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        fs::write(&file, raw).unwrap();
+
+        let (content, updated_at) = parse_frontmatter(raw, &file);
+        assert_eq!(content, raw);
+        // Falls back to filesystem mtime — should be a valid timestamp
+        assert!(updated_at.contains("20"), "should be a date string: {}", updated_at);
+    }
+
+    #[test]
+    fn parse_frontmatter_empty_frontmatter() {
+        // Empty frontmatter (nothing between --- delimiters) — parser can't find
+        // content between markers, so it returns raw content and falls back to mtime.
+        let raw = "---\n---\n# Empty frontmatter";
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        fs::write(&file, raw).unwrap();
+
+        let (content, updated_at) = parse_frontmatter(raw, &file);
+        // With zero bytes between "---\n" and "\n---" the parser treats it as no
+        // valid frontmatter. Content stays as-is, timestamp falls back to mtime.
+        assert_eq!(content, raw);
+        assert!(chrono::DateTime::parse_from_rfc3339(&updated_at).is_ok());
+    }
+
+    #[test]
+    fn parse_frontmatter_crlf_line_endings() {
+        let raw = "---\r\nupdated: 2026-06-01T10:00:00Z\r\n---\r\n# Windows style";
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        fs::write(&file, raw).unwrap();
+
+        let (content, updated_at) = parse_frontmatter(raw, &file);
+        assert!(content.contains("Windows style"));
+        assert!(updated_at.contains("2026-06-01"));
+    }
+
+    #[test]
+    fn parse_frontmatter_multiple_fields() {
+        let raw = "---\ntitle: My Note\nupdated: 2026-03-15T08:00:00Z\ntags: work\n---\n# Content";
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        fs::write(&file, raw).unwrap();
+
+        let (content, updated_at) = parse_frontmatter(raw, &file);
+        assert_eq!(content, "# Content");
+        assert!(updated_at.contains("2026-03-15"));
+    }
+
+    #[test]
+    fn parse_frontmatter_quoted_timestamp() {
+        let raw = "---\nupdated: \"2026-03-15T08:00:00Z\"\n---\n# Quoted";
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        fs::write(&file, raw).unwrap();
+
+        let (_, updated_at) = parse_frontmatter(raw, &file);
+        assert!(updated_at.contains("2026-03-15"));
+    }
+
+    // -----------------------------------------------------------------------
+    // inject_frontmatter
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn inject_frontmatter_creates_new_frontmatter() {
+        let content = "# New Note";
+        let ts = "2026-04-01T12:00:00Z";
+        let result = inject_frontmatter(content, ts);
+
+        assert!(result.starts_with("---\n"));
+        assert!(result.contains("updated: 2026-04-01T12:00:00Z"));
+        assert!(result.contains("# New Note"));
+    }
+
+    #[test]
+    fn inject_frontmatter_updates_existing_timestamp() {
+        let content = "---\nupdated: 2025-01-01T00:00:00Z\n---\n# Old note";
+        let ts = "2026-04-01T12:00:00Z";
+        let result = inject_frontmatter(content, ts);
+
+        assert!(result.contains("updated: 2026-04-01T12:00:00Z"));
+        assert!(!result.contains("2025-01-01"));
+        assert!(result.contains("# Old note"));
+    }
+
+    #[test]
+    fn inject_frontmatter_preserves_other_fields() {
+        let content = "---\ntitle: My Note\nupdated: 2025-01-01T00:00:00Z\ntags: work\n---\n# Content";
+        let ts = "2026-04-01T12:00:00Z";
+        let result = inject_frontmatter(content, ts);
+
+        assert!(result.contains("title: My Note"));
+        assert!(result.contains("tags: work"));
+        assert!(result.contains("updated: 2026-04-01T12:00:00Z"));
+        assert!(!result.contains("2025-01-01"));
+    }
+
+    #[test]
+    fn inject_frontmatter_adds_updated_if_missing_from_existing_frontmatter() {
+        let content = "---\ntitle: My Note\n---\n# Content";
+        let ts = "2026-04-01T12:00:00Z";
+        let result = inject_frontmatter(content, ts);
+
+        assert!(result.contains("title: My Note"));
+        assert!(result.contains("updated: 2026-04-01T12:00:00Z"));
+    }
+
+    #[test]
+    fn inject_frontmatter_roundtrip_with_parse() {
+        let original = "# Hello World";
+        let ts = "2026-04-01T12:00:00+00:00";
+
+        let injected = inject_frontmatter(original, ts);
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        fs::write(&file, &injected).unwrap();
+
+        let (content, updated_at) = parse_frontmatter(&injected, &file);
+        assert_eq!(content, "# Hello World");
+        assert!(updated_at.contains("2026-04-01"), "roundtrip updated_at: {}", updated_at);
+    }
+
+    // -----------------------------------------------------------------------
+    // get_files_recursively
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn get_files_recursively_finds_md_files() {
+        let tmp = TempDir::new().unwrap();
+        fs::write(tmp.path().join("note.md"), "# test").unwrap();
+        fs::write(tmp.path().join("readme.txt"), "text").unwrap();
+
+        let files = get_files_recursively(tmp.path());
+        assert_eq!(files.len(), 2);
+    }
+
+    #[test]
+    fn get_files_recursively_traverses_subdirectories() {
+        let tmp = TempDir::new().unwrap();
+        let sub = tmp.path().join("subfolder");
+        fs::create_dir(&sub).unwrap();
+        fs::write(sub.join("nested.md"), "# nested").unwrap();
+        fs::write(tmp.path().join("root.md"), "# root").unwrap();
+
+        let files = get_files_recursively(tmp.path());
+        assert_eq!(files.len(), 2);
+    }
+
+    #[test]
+    fn get_files_recursively_skips_hidden_directories() {
+        let tmp = TempDir::new().unwrap();
+        let hidden = tmp.path().join(".hidden");
+        fs::create_dir(&hidden).unwrap();
+        fs::write(hidden.join("secret.md"), "# secret").unwrap();
+        fs::write(tmp.path().join("visible.md"), "# visible").unwrap();
+
+        let files = get_files_recursively(tmp.path());
+        assert_eq!(files.len(), 1);
+        assert!(files[0].to_string_lossy().contains("visible"));
+    }
+
+    #[test]
+    fn get_files_recursively_skips_node_modules_and_target() {
+        let tmp = TempDir::new().unwrap();
+        for dir in &["node_modules", "target", "dist", "src-tauri"] {
+            let p = tmp.path().join(dir);
+            fs::create_dir(&p).unwrap();
+            fs::write(p.join("file.md"), "# skip").unwrap();
+        }
+        fs::write(tmp.path().join("keep.md"), "# keep").unwrap();
+
+        let files = get_files_recursively(tmp.path());
+        assert_eq!(files.len(), 1);
+    }
+
+    #[test]
+    fn get_files_recursively_empty_directory() {
+        let tmp = TempDir::new().unwrap();
+        let files = get_files_recursively(tmp.path());
+        assert!(files.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // delete_folder_move_contents (collision handling)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn delete_folder_move_contents_avoids_overwrite() {
+        let tmp = TempDir::new().unwrap();
+        let sub = tmp.path().join("subfolder");
+        fs::create_dir(&sub).unwrap();
+
+        // Same filename in root and subfolder
+        fs::write(tmp.path().join("note.md"), "# root version").unwrap();
+        fs::write(sub.join("note.md"), "# sub version").unwrap();
+
+        // Simulate the collision logic from delete_folder_move_contents
+        let files = get_files_recursively(&sub);
+        for file in files {
+            if file.extension().map_or(false, |ext| ext == "md") {
+                let basename = file.file_name().unwrap();
+                let mut target_path = tmp.path().join(basename);
+                let mut counter = 1;
+                while target_path.exists() {
+                    let name = file.file_stem().unwrap().to_string_lossy();
+                    let ext = file.extension().unwrap().to_string_lossy();
+                    target_path = tmp.path().join(format!("{}_{}.{}", name, counter, ext));
+                    counter += 1;
+                }
+                fs::rename(&file, &target_path).unwrap();
+            }
+        }
+
+        // Both files should exist
+        assert!(tmp.path().join("note.md").exists());
+        assert!(tmp.path().join("note_1.md").exists());
+        assert_eq!(fs::read_to_string(tmp.path().join("note.md")).unwrap(), "# root version");
+        assert_eq!(fs::read_to_string(tmp.path().join("note_1.md")).unwrap(), "# sub version");
+    }
+
+    // -----------------------------------------------------------------------
+    // Metadata migration
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn read_metadata_migrates_legacy_file() {
+        let tmp = TempDir::new().unwrap();
+        let legacy_path = tmp.path().join(".notizapp-metadata.json");
+        let config_path = tmp.path().join("notizapp-config.json");
+
+        let meta = r#"{"folders":{"Work":{"icon":"briefcase","color":"blue"}},"pinnedNotes":["test.md"]}"#;
+        fs::write(&legacy_path, meta).unwrap();
+
+        // Simulate migration check
+        let needs_migration = !config_path.exists() && legacy_path.exists();
+        assert!(needs_migration);
+
+        // Perform migration
+        if needs_migration {
+            let content = fs::read_to_string(&legacy_path).unwrap();
+            fs::write(&config_path, &content).unwrap();
+        }
+
+        assert!(config_path.exists());
+        let migrated: serde_json::Value = serde_json::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        assert!(migrated.get("folders").unwrap().get("Work").is_some());
+    }
 }

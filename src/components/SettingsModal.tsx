@@ -20,6 +20,8 @@ interface SettingsModalProps {
     setFontSize: (fontSize: 'small' | 'medium' | 'large') => void;
     spellcheckEnabled: boolean;
     onToggleSpellcheck: (enabled: boolean) => void;
+    landscapeFullscreen?: boolean;
+    onToggleLandscapeFullscreen?: (enabled: boolean) => void;
     onTriggerSync?: () => void;
 }
 
@@ -46,6 +48,8 @@ export function SettingsModal({
     setFontSize,
     spellcheckEnabled,
     onToggleSpellcheck,
+    landscapeFullscreen = false,
+    onToggleLandscapeFullscreen,
     onTriggerSync,
 }: SettingsModalProps) {
     /**
@@ -488,6 +492,30 @@ export function SettingsModal({
                             </button>
                         </div>
                     </div>
+
+                    {/* Landscape Fullscreen — iOS only */}
+                    {isIOS && (
+                        <div className="flex items-center justify-between mt-4">
+                            <div className="flex flex-col">
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Landscape Vollbild</span>
+                                <span className="text-xs text-gray-500">Notiz im Querformat über den ganzen Bildschirm</span>
+                            </div>
+                            <button
+                                type="button"
+                                title={landscapeFullscreen ? "Landscape Vollbild deaktivieren" : "Landscape Vollbild aktivieren"}
+                                onClick={() => onToggleLandscapeFullscreen?.(!landscapeFullscreen)}
+                                className={clsx(
+                                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
+                                    landscapeFullscreen ? "bg-primary-600" : "bg-gray-300 dark:bg-gray-700"
+                                )}
+                            >
+                                <span className={clsx(
+                                    "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                                    landscapeFullscreen ? "translate-x-6" : "translate-x-1"
+                                )} />
+                            </button>
+                        </div>
+                    )}
 
                     {/* --- ABOUT & UPDATER SECTION --- */}
                     <div className="mt-8 border-t border-gray-100 dark:border-gray-700 pt-6 mb-2">

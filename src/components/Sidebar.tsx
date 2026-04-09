@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import {
     Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
     Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart,
-    Plus, Settings, Settings2, Trash2, Pencil, GripVertical, Check
+    Plus, Settings, Settings2, Trash2, Pencil, GripVertical, Check, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import clsx from 'clsx';
 import { SyncStatusBadge } from './SyncStatusBadge';
@@ -60,6 +60,8 @@ interface SidebarProps {
     metadata: AppMetadata;
     selectedCategory: string | null;
     isCollapsed: boolean;
+    onToggleCollapse?: () => void;
+    isIOS?: boolean;
     onCreateNote: () => void;
     onCreateFolder?: (name: string) => void;
     onDeleteCategory: (name: string) => void;
@@ -311,6 +313,8 @@ export function Sidebar({
     onSelectCategory,
     onReorderFolders = undefined,
     onOpenSettings,
+    onToggleCollapse,
+    isIOS = false,
     syncStatus = 'idle',
     syncError = null,
     lastSyncedAt = null,
@@ -370,11 +374,21 @@ export function Sidebar({
                 className
             )}
         >
-            {/* --- SIDEBAR TOP SECTION REMOVED (Moved to TitleBar) --- */}
-
-
             {/* --- ACTIONS HEADER --- */}
-            <div className="px-2 pt-4 pb-2">
+            <div className="px-2 pb-2" style={isIOS ? { paddingTop: 'var(--safe-top, 16px)' } : { paddingTop: '1rem' }}>
+                {/* iOS: collapse/expand toggle above new-note button */}
+                {isIOS && onToggleCollapse && (
+                    <div className={clsx("mb-2 px-1 lg:px-2", isCollapsed ? "flex justify-center" : "flex justify-end")}>
+                        <button
+                            type="button"
+                            onClick={onToggleCollapse}
+                            className="p-2 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800 transition-all active:scale-95"
+                            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                        >
+                            {isCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+                        </button>
+                    </div>
+                )}
                 <div className={clsx("mb-6 px-1 lg:px-2", isCollapsed ? "flex flex-col items-center" : "block")}>
                     <button
                         onClick={onCreateNote}

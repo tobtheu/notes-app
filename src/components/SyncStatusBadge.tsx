@@ -72,7 +72,15 @@ export function SyncStatusBadge({ syncStatus, syncError, lastSyncedAt, conflictF
     return (
         <button
             type="button"
-            onClick={isAuthError && onOpenSettings ? onOpenSettings : (config.clickable && onSync ? onSync : undefined)}
+            onClick={
+                syncStatus === 'error' && syncError && !isAuthError
+                    ? () => alert(`Sync error:\n\n${syncError}`)
+                    : isAuthError && onOpenSettings
+                        ? onOpenSettings
+                        : config.clickable && onSync
+                            ? onSync
+                            : undefined
+            }
             disabled={!config.clickable || (!onSync && !(isAuthError && onOpenSettings))}
             title={
                 syncStatus === 'conflict'
@@ -81,9 +89,11 @@ export function SyncStatusBadge({ syncStatus, syncError, lastSyncedAt, conflictF
                         ? `Last synced ${formatRelativeTime(lastSyncedAt)}`
                         : syncStatus === 'offline'
                             ? 'No internet connection'
-                            : isAuthError
-                                ? 'GitHub-Token abgelaufen. GitHub in den Einstellungen neu verbinden.'
-                                : 'Sync with GitHub'
+                            : syncStatus === 'error' && syncError
+                                ? syncError
+                                : isAuthError
+                                    ? 'GitHub-Token abgelaufen. GitHub in den Einstellungen neu verbinden.'
+                                    : 'Sync with GitHub'
             }
             className={clsx(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors select-none',
