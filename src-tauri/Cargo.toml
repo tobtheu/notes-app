@@ -45,5 +45,8 @@ tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
 git2 = { version = "0.19", features = ["vendored-libgit2", "https", "vendored-openssl"] }
 
+[dev-dependencies]
+tempfile = "3"
+
 [target.'cfg(windows)'.dependencies]
 git2 = { version = "0.19", features = ["vendored-libgit2", "https"] }

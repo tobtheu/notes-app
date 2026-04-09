@@ -554,10 +554,18 @@ pub async fn sync(
                 (None, _) => true,  // already gone locally — nothing to do
                 (Some(_), None) => false, // exists locally but never synced → locally new, keep it
             };
-            if local_unchanged && local_path.exists() {
+            // Extra guard: if the local file is NEWER than the last known sync timestamp,
+            // it was re-created after the deletion was pushed. Never delete a newly created file.
+            let locally_recreated = match (local_notes.get(id.as_str()), known_ts) {
+                (Some((_, local_ts)), Some(k)) => is_newer(local_ts.as_str(), k.as_str()),
+                _ => false,
+            };
+            if local_unchanged && !locally_recreated && local_path.exists() {
                 let _ = std::fs::remove_file(&local_path);
                 deleted += 1;
                 info!("[supabase] deleted locally: {}", id);
+            } else if locally_recreated {
+                info!("[supabase] skipping delete — file was re-created locally since last sync: {}", id);
             }
             continue;
         }
@@ -685,4 +693,507 @@ pub async fn sync(
 
 fn urlencoding(s: &str) -> String {
     s.replace(':', "%3A").replace('+', "%2B").replace(' ', "%20")
+}
+
+// ===========================================================================
+// TESTS
+// ===========================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    // -----------------------------------------------------------------------
+    // is_conflict_copy
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn is_conflict_copy_detects_conflict_files() {
+        assert!(is_conflict_copy("Note (Konflikt 2026-03-27).md"));
+        assert!(is_conflict_copy("Work/Report (Konflikt 2025-12-01).md"));
+    }
+
+    #[test]
+    fn is_conflict_copy_rejects_normal_files() {
+        assert!(!is_conflict_copy("Note.md"));
+        assert!(!is_conflict_copy("Work/Report.md"));
+        assert!(!is_conflict_copy("Note (1).md"));
+        assert!(!is_conflict_copy("Note (Conflict 2026-01-01).md")); // English spelling
+    }
+
+    #[test]
+    fn is_conflict_copy_handles_edge_cases() {
+        assert!(!is_conflict_copy(""));
+        assert!(!is_conflict_copy(".md"));
+        assert!(is_conflict_copy(" (Konflikt x).md")); // malformed date but pattern matches
+    }
+
+    // -----------------------------------------------------------------------
+    // is_newer
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn is_newer_basic_comparison() {
+        assert!(is_newer("2026-01-01T13:00:00Z", "2026-01-01T12:00:00Z"));
+        assert!(!is_newer("2026-01-01T12:00:00Z", "2026-01-01T13:00:00Z"));
+    }
+
+    #[test]
+    fn is_newer_equal_timestamps() {
+        assert!(!is_newer("2026-01-01T12:00:00Z", "2026-01-01T12:00:00Z"));
+    }
+
+    #[test]
+    fn is_newer_timezone_aware() {
+        // 13:00 UTC+1 == 12:00 UTC — neither is newer
+        assert!(!is_newer(
+            "2026-01-01T13:00:00+01:00",
+            "2026-01-01T12:00:00+00:00"
+        ));
+
+        // 14:00 UTC+1 == 13:00 UTC > 12:00 UTC
+        assert!(is_newer(
+            "2026-01-01T14:00:00+01:00",
+            "2026-01-01T12:00:00+00:00"
+        ));
+    }
+
+    #[test]
+    fn is_newer_different_precisions() {
+        // With vs without fractional seconds
+        assert!(is_newer(
+            "2026-01-01T12:00:01.500Z",
+            "2026-01-01T12:00:00Z"
+        ));
+    }
+
+    #[test]
+    fn is_newer_fallback_string_compare() {
+        // Invalid RFC 3339 — should fall back to string comparison
+        assert!(is_newer("z_later", "a_earlier"));
+        assert!(!is_newer("a_earlier", "z_later"));
+    }
+
+    // -----------------------------------------------------------------------
+    // SyncState save/load roundtrip
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn sync_state_roundtrip() {
+        let tmp = TempDir::new().unwrap();
+        let state = SyncState {
+            known: HashMap::from([
+                ("note.md".to_string(), "2026-01-01T12:00:00Z".to_string()),
+                ("Work/report.md".to_string(), "2026-02-15T08:30:00Z".to_string()),
+            ]),
+        };
+
+        save_sync_state(tmp.path(), &state);
+        let loaded = load_sync_state(tmp.path());
+
+        assert_eq!(loaded.known.len(), 2);
+        assert_eq!(loaded.known.get("note.md").unwrap(), "2026-01-01T12:00:00Z");
+        assert_eq!(loaded.known.get("Work/report.md").unwrap(), "2026-02-15T08:30:00Z");
+    }
+
+    #[test]
+    fn sync_state_load_missing_file_returns_default() {
+        let tmp = TempDir::new().unwrap();
+        let state = load_sync_state(tmp.path());
+        assert!(state.known.is_empty());
+    }
+
+    #[test]
+    fn sync_state_load_corrupted_file_returns_default() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("notizapp-sync-state.json");
+        fs::write(&path, "not valid json!!!").unwrap();
+
+        let state = load_sync_state(tmp.path());
+        assert!(state.known.is_empty());
+    }
+
+    #[test]
+    fn sync_state_overwrite_on_save() {
+        let tmp = TempDir::new().unwrap();
+
+        let state1 = SyncState {
+            known: HashMap::from([("a.md".to_string(), "ts1".to_string())]),
+        };
+        save_sync_state(tmp.path(), &state1);
+
+        let state2 = SyncState {
+            known: HashMap::from([("b.md".to_string(), "ts2".to_string())]),
+        };
+        save_sync_state(tmp.path(), &state2);
+
+        let loaded = load_sync_state(tmp.path());
+        assert!(!loaded.known.contains_key("a.md"), "old state should be overwritten");
+        assert_eq!(loaded.known.get("b.md").unwrap(), "ts2");
+    }
+
+    // -----------------------------------------------------------------------
+    // collect_local_notes
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn collect_local_notes_finds_md_files() {
+        let tmp = TempDir::new().unwrap();
+        fs::write(tmp.path().join("note.md"), "---\nupdated: 2026-01-01T00:00:00Z\n---\n# Test").unwrap();
+        fs::write(tmp.path().join("readme.txt"), "not a note").unwrap();
+
+        let notes = collect_local_notes(tmp.path());
+        assert_eq!(notes.len(), 1);
+        assert!(notes.contains_key("note.md"));
+    }
+
+    #[test]
+    fn collect_local_notes_uses_relative_paths() {
+        let tmp = TempDir::new().unwrap();
+        let sub = tmp.path().join("Work");
+        fs::create_dir(&sub).unwrap();
+        fs::write(sub.join("report.md"), "# Report").unwrap();
+
+        let notes = collect_local_notes(tmp.path());
+        assert!(notes.contains_key("Work/report.md"), "key should be relative: {:?}", notes.keys().collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn collect_local_notes_skips_hidden_dirs() {
+        let tmp = TempDir::new().unwrap();
+        let hidden = tmp.path().join(".git");
+        fs::create_dir(&hidden).unwrap();
+        fs::write(hidden.join("HEAD"), "ref: refs/heads/main").unwrap();
+        fs::write(tmp.path().join("note.md"), "# Note").unwrap();
+
+        let notes = collect_local_notes(tmp.path());
+        assert_eq!(notes.len(), 1);
+        assert!(notes.contains_key("note.md"));
+    }
+
+    #[test]
+    fn collect_local_notes_deeply_nested() {
+        let tmp = TempDir::new().unwrap();
+        let deep = tmp.path().join("A").join("B").join("C");
+        fs::create_dir_all(&deep).unwrap();
+        fs::write(deep.join("deep.md"), "# Deep").unwrap();
+
+        let notes = collect_local_notes(tmp.path());
+        assert!(notes.contains_key("A/B/C/deep.md"));
+    }
+
+    #[test]
+    fn collect_local_notes_empty_dir() {
+        let tmp = TempDir::new().unwrap();
+        let notes = collect_local_notes(tmp.path());
+        assert!(notes.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // extract_updated_at
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn extract_updated_at_from_frontmatter() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        let content = "---\nupdated: 2026-05-10T15:00:00Z\n---\n# Content";
+        fs::write(&file, content).unwrap();
+
+        let ts = extract_updated_at(content, &file);
+        assert_eq!(ts, "2026-05-10T15:00:00Z");
+    }
+
+    #[test]
+    fn extract_updated_at_falls_back_to_mtime() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        fs::write(&file, "# No frontmatter").unwrap();
+
+        let ts = extract_updated_at("# No frontmatter", &file);
+        // Should be a valid RFC 3339 timestamp (the file's mtime)
+        assert!(chrono::DateTime::parse_from_rfc3339(&ts).is_ok(), "should be valid RFC3339: {}", ts);
+    }
+
+    #[test]
+    fn extract_updated_at_ignores_non_updated_frontmatter() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        let content = "---\ntitle: Test\ntags: work\n---\n# Content";
+        fs::write(&file, content).unwrap();
+
+        let ts = extract_updated_at(content, &file);
+        // No "updated:" field → falls back to mtime
+        assert!(chrono::DateTime::parse_from_rfc3339(&ts).is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // set_file_mtime
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn set_file_mtime_updates_modification_time() {
+        let tmp = TempDir::new().unwrap();
+        let file = tmp.path().join("note.md");
+        fs::write(&file, "# Test").unwrap();
+
+        let target_ts = "2020-06-15T10:30:00Z";
+        set_file_mtime(&file, target_ts);
+
+        let meta = fs::metadata(&file).unwrap();
+        let mtime: chrono::DateTime<chrono::Utc> = meta.modified().unwrap().into();
+        // Should be within a few seconds of the target
+        let target_dt = chrono::DateTime::parse_from_rfc3339(target_ts).unwrap();
+        let diff = (mtime.timestamp() - target_dt.timestamp()).abs();
+        assert!(diff < 2, "mtime should be close to target, diff = {}", diff);
+    }
+
+    // -----------------------------------------------------------------------
+    // urlencoding
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn urlencoding_encodes_special_chars() {
+        assert_eq!(urlencoding("a:b"), "a%3Ab");
+        assert_eq!(urlencoding("a+b"), "a%2Bb");
+        assert_eq!(urlencoding("a b"), "a%20b");
+    }
+
+    #[test]
+    fn urlencoding_preserves_normal_chars() {
+        assert_eq!(urlencoding("abc123"), "abc123");
+        assert_eq!(urlencoding("note.md"), "note.md");
+    }
+
+    // -----------------------------------------------------------------------
+    // Sync decision table — PULL phase logic (unit-level)
+    // -----------------------------------------------------------------------
+
+    /// Simulates the PULL decision for a single note to verify the sync
+    /// decision table from the module docstring.
+    fn simulate_pull_decision(
+        local_exists: bool,
+        local_content: &str,
+        local_ts: &str,
+        known_ts: Option<&str>,
+        remote_content: &str,
+        remote_ts: &str,
+        remote_deleted: bool,
+    ) -> &'static str {
+        if remote_deleted {
+            let local_unchanged = match (local_exists, known_ts) {
+                (true, Some(k)) => local_ts == k,
+                (false, _) => true,
+                (true, None) => false,
+            };
+            let locally_recreated = match (local_exists, known_ts) {
+                (true, Some(k)) => is_newer(local_ts, k),
+                _ => false,
+            };
+            if local_unchanged && !locally_recreated && local_exists {
+                return "delete_local";
+            }
+            if locally_recreated {
+                return "keep_local_recreated";
+            }
+            return "keep_local";
+        }
+
+        let remote_changed = known_ts.map_or(true, |k| remote_ts != k);
+
+        if !local_exists {
+            if known_ts.is_some() {
+                return "skip_locally_deleted";
+            } else {
+                return "pull_new";
+            }
+        }
+
+        let local_changed = known_ts.map_or(true, |k| local_ts != k);
+
+        if remote_changed && !local_changed {
+            if remote_content.trim() != local_content.trim() {
+                return "pull_remote_changed";
+            }
+            return "no_action";
+        } else if remote_changed && local_changed {
+            if is_newer(remote_ts, local_ts) && remote_content.trim() != local_content.trim() {
+                return "pull_remote_newer";
+            }
+            return "keep_local_newer";
+        }
+
+        "no_action"
+    }
+
+    #[test]
+    fn pull_decision_neither_changed() {
+        let result = simulate_pull_decision(
+            true, "# Note", "ts1", Some("ts1"),
+            "# Note", "ts1", false,
+        );
+        assert_eq!(result, "no_action");
+    }
+
+    #[test]
+    fn pull_decision_only_remote_changed() {
+        let result = simulate_pull_decision(
+            true, "# Old", "ts1", Some("ts1"),
+            "# New from remote", "ts2", false,
+        );
+        assert_eq!(result, "pull_remote_changed");
+    }
+
+    #[test]
+    fn pull_decision_only_local_changed() {
+        let result = simulate_pull_decision(
+            true, "# Local edit", "ts2", Some("ts1"),
+            "# Old remote", "ts1", false,
+        );
+        assert_eq!(result, "no_action"); // local changed, remote not → push phase handles it
+    }
+
+    #[test]
+    fn pull_decision_both_changed_remote_newer() {
+        let result = simulate_pull_decision(
+            true, "# Local", "2026-01-01T10:00:00Z", Some("2026-01-01T09:00:00Z"),
+            "# Remote", "2026-01-01T11:00:00Z", false,
+        );
+        assert_eq!(result, "pull_remote_newer");
+    }
+
+    #[test]
+    fn pull_decision_both_changed_local_newer() {
+        let result = simulate_pull_decision(
+            true, "# Local", "2026-01-01T12:00:00Z", Some("2026-01-01T09:00:00Z"),
+            "# Remote", "2026-01-01T11:00:00Z", false,
+        );
+        assert_eq!(result, "keep_local_newer");
+    }
+
+    #[test]
+    fn pull_decision_new_remote_note() {
+        let result = simulate_pull_decision(
+            false, "", "", None,
+            "# New remote", "ts1", false,
+        );
+        assert_eq!(result, "pull_new");
+    }
+
+    #[test]
+    fn pull_decision_locally_deleted_note_not_pulled_back() {
+        let result = simulate_pull_decision(
+            false, "", "", Some("ts1"), // known_ts exists → was previously synced
+            "# Remote content", "ts1", false,
+        );
+        assert_eq!(result, "skip_locally_deleted");
+    }
+
+    #[test]
+    fn pull_decision_remote_deleted_local_unchanged() {
+        let result = simulate_pull_decision(
+            true, "# Note", "ts1", Some("ts1"),
+            "", "ts2", true,
+        );
+        assert_eq!(result, "delete_local");
+    }
+
+    #[test]
+    fn pull_decision_remote_deleted_local_modified() {
+        let result = simulate_pull_decision(
+            true, "# Edited locally", "ts2", Some("ts1"),
+            "", "ts3", true,
+        );
+        // local_ts ("ts2") > known_ts ("ts1") → locally_recreated=true → keep
+        assert_eq!(result, "keep_local_recreated");
+    }
+
+    #[test]
+    fn pull_decision_remote_deleted_never_synced_locally() {
+        let result = simulate_pull_decision(
+            true, "# Brand new", "ts1", None,
+            "", "ts2", true,
+        );
+        assert_eq!(result, "keep_local"); // never synced, exists locally → keep
+    }
+
+    #[test]
+    fn pull_decision_remote_deleted_but_locally_recreated() {
+        // This is the "Bugs.md re-created after deletion" scenario:
+        // 1. Bugs.md was deleted and pushed to Supabase as deleted=true (known_ts = "ts1")
+        // 2. User creates a new Bugs.md locally — it gets a newer timestamp "ts3"
+        // 3. Sync pulls the deleted=true from remote — should NOT delete the new file
+        //    because local_ts ("ts3") > known_ts ("ts1") → file was re-created
+        let result = simulate_pull_decision(
+            true, "# Bugs", "2026-04-08T12:00:00Z", Some("2026-04-07T16:05:08Z"),
+            "", "2026-04-07T16:10:00Z", true,
+        );
+        assert_eq!(result, "keep_local_recreated");
+    }
+
+    #[test]
+    fn pull_decision_remote_deleted_old_local_same_ts_still_deleted() {
+        // Sanity check: if local_ts == known_ts (unchanged), deletion should still apply
+        let result = simulate_pull_decision(
+            true, "# Note", "2026-04-07T16:05:08Z", Some("2026-04-07T16:05:08Z"),
+            "", "2026-04-08T00:00:00Z", true,
+        );
+        assert_eq!(result, "delete_local");
+    }
+
+    // -----------------------------------------------------------------------
+    // Full filesystem sync test: collect → known tracking
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn collect_and_known_state_consistency() {
+        let tmp = TempDir::new().unwrap();
+
+        // Create some notes
+        fs::write(tmp.path().join("a.md"), "---\nupdated: 2026-01-01T00:00:00Z\n---\n# A").unwrap();
+        fs::write(tmp.path().join("b.md"), "---\nupdated: 2026-01-02T00:00:00Z\n---\n# B").unwrap();
+
+        let notes = collect_local_notes(tmp.path());
+        assert_eq!(notes.len(), 2);
+
+        // Simulate building known state (as sync does at the end)
+        let known: HashMap<String, String> = notes.iter()
+            .filter(|(id, _)| !is_conflict_copy(id))
+            .map(|(id, (_, ts))| (id.clone(), ts.clone()))
+            .collect();
+
+        assert_eq!(known.len(), 2);
+        assert_eq!(known.get("a.md").unwrap(), "2026-01-01T00:00:00Z");
+        assert_eq!(known.get("b.md").unwrap(), "2026-01-02T00:00:00Z");
+
+        // Delete a.md
+        fs::remove_file(tmp.path().join("a.md")).unwrap();
+        let notes_after = collect_local_notes(tmp.path());
+        assert_eq!(notes_after.len(), 1);
+        assert!(!notes_after.contains_key("a.md"));
+
+        // known still has a.md → sync should detect it as locally deleted
+        assert!(known.contains_key("a.md"));
+        assert!(!notes_after.contains_key("a.md"));
+    }
+
+    #[test]
+    fn conflict_copies_excluded_from_known() {
+        let tmp = TempDir::new().unwrap();
+        fs::write(tmp.path().join("note.md"), "# Normal").unwrap();
+        fs::write(tmp.path().join("note (Konflikt 2026-01-01).md"), "# Conflict").unwrap();
+
+        let notes = collect_local_notes(tmp.path());
+        assert_eq!(notes.len(), 2);
+
+        let known: HashMap<String, String> = notes.iter()
+            .filter(|(id, _)| !is_conflict_copy(id))
+            .map(|(id, (_, ts))| (id.clone(), ts.clone()))
+            .collect();
+
+        assert_eq!(known.len(), 1);
+        assert!(known.contains_key("note.md"));
+        assert!(!known.contains_key("note (Konflikt 2026-01-01).md"));
+    }
 }

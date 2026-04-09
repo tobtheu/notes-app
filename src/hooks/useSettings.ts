@@ -38,6 +38,11 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         return saved === null ? true : saved === 'true';
     });
 
+    const [landscapeFullscreen, setLandscapeFullscreen] = useState<boolean>(() => {
+        const saved = localStorage.getItem('landscape-fullscreen');
+        return saved === null ? false : saved === 'true';
+    });
+
     // Guard to prevent saving to cloud before metadata has been initially loaded
     const hasLoadedMetadata = useRef(false);
 
@@ -63,6 +68,7 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         localStorage.setItem('font-size', fontSize);
         localStorage.setItem('toolbar-visible', String(toolbarVisible));
         localStorage.setItem('spellcheck-enabled', String(spellcheckEnabled));
+        localStorage.setItem('landscape-fullscreen', String(landscapeFullscreen));
 
         // Sync with cloud metadata if callback provided AND we have already finished the initial load
         if (onSaveSettings && hasLoadedMetadata.current) {
@@ -73,7 +79,7 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
                 spellcheckEnabled,
             });
         }
-    }, [markdownEnabled, accentColor, fontFamily, fontSize, toolbarVisible, spellcheckEnabled, onSaveSettings]);
+    }, [markdownEnabled, accentColor, fontFamily, fontSize, toolbarVisible, spellcheckEnabled, landscapeFullscreen, onSaveSettings]);
 
     return {
         markdownEnabled,
@@ -88,5 +94,7 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         setToolbarVisible,
         spellcheckEnabled,
         setSpellcheckEnabled,
+        landscapeFullscreen,
+        setLandscapeFullscreen,
     };
 }

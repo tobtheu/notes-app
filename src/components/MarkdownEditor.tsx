@@ -57,6 +57,7 @@ interface MarkdownEditorProps {
     workspacePath: string;
     header?: React.ReactNode;
     isFocusMode?: boolean;
+    iosLandscapeFullscreen?: boolean;
     onArrowUpAtStart?: () => void;
     onBlur?: () => void;
 }
@@ -523,6 +524,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     workspacePath,
     header,
     isFocusMode = false,
+    iosLandscapeFullscreen = false,
     onArrowUpAtStart,
     onBlur
 }, ref) => {
@@ -1180,7 +1182,13 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                     }
                 }}
             >
-                <div className="max-w-4xl mx-auto pt-0 pb-8 px-4 md:px-8 min-h-full flex flex-col w-full">
+                <div
+                    className="max-w-4xl mx-auto pt-0 pb-8 px-4 md:px-8 min-h-full flex flex-col w-full"
+                    style={iosLandscapeFullscreen ? {
+                        paddingLeft: 'max(10%, env(safe-area-inset-left, 16px))',
+                        paddingRight: 'max(10%, env(safe-area-inset-right, 16px))',
+                    } : undefined}
+                >
                     {header}
                     <EditorContent editor={editor} className="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl flex-1 flex flex-col break-words [overflow-wrap:anywhere]" />
                 </div>

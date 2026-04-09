@@ -103,7 +103,9 @@ function App() {
     spellcheckEnabled,
     setSpellcheckEnabled,
     toolbarVisible,
-    setToolbarVisible
+    setToolbarVisible,
+    landscapeFullscreen,
+    setLandscapeFullscreen,
   } = useSettings(metadata.settings, (_settings) => {
     // metadata.settings is updated via useNotes.saveSettings contextually if needed
   });
@@ -283,11 +285,43 @@ function App() {
 
   return (
     <div
-      className="absolute inset-0 flex flex-col bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 overflow-hidden"
+      className="absolute inset-0 flex bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 overflow-hidden"
       style={{
         fontFamily: fontFamily === 'inter' ? "'Inter', sans-serif" : fontFamily === 'roboto' ? "'Roboto', sans-serif" : "ui-sans-serif, system-ui, sans-serif",
+        flexDirection: isIOS ? 'row' : 'column',
       }}
     >
+      {/* iOS only: Sidebar as first column spanning full height */}
+      {isIOS && !isFocusMode && (
+        <Sidebar
+          className={clsx(
+            "flex",
+            activeView === 'editor' ? (isLandscape && !landscapeFullscreen ? "flex" : "hidden") : "flex"
+          )}
+          folders={folders}
+          metadata={metadata}
+          selectedCategory={selectedCategory}
+          isCollapsed={isSidebarCollapsed}
+          onCreateNote={handleCreateNote}
+          onCreateFolder={createFolder}
+          onDeleteCategory={setCategoryToDelete}
+          onEditCategory={setEditingCategory}
+          onSelectCategory={handleSelectCategory}
+          onReorderFolders={reorderFolders}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          syncStatus={syncStatus}
+          syncError={syncError}
+          lastSyncedAt={lastSyncedAt}
+          conflictFiles={conflictPairs}
+          onSync={triggerSync}
+          isIOS={isIOS}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        />
+      )}
+
+      {/* Right column (iOS) or full layout (desktop): TitleBar + content */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+
       {!isFocusMode && (
         <TitleBar
           isSidebarCollapsed={isSidebarCollapsed}
@@ -298,12 +332,12 @@ function App() {
       )}
 
       <div className="flex-1 flex overflow-hidden">
-        {/* SIDEBAR — always visible except in editor view on mobile */}
-        {!isFocusMode && (
+        {/* Desktop sidebar inside content row */}
+        {!isIOS && !isFocusMode && (
           <Sidebar
             className={clsx(
               "md:flex",
-              activeView === 'editor' ? (isIOS && isLandscape ? "flex" : "hidden md:flex") : "flex"
+              activeView === 'editor' ? "hidden md:flex" : "flex"
             )}
             folders={folders}
             metadata={metadata}
@@ -329,7 +363,7 @@ function App() {
           <NoteList
             className={clsx(
               "flex-1 min-w-0 md:flex-none md:w-80 md:shrink-0 transition-all duration-300 ease-in-out",
-              activeView === 'editor' ? (isIOS && isLandscape ? "flex" : "hidden md:flex") :
+              activeView === 'editor' ? (isIOS && isLandscape && !landscapeFullscreen ? "flex" : "hidden md:flex") :
                 activeView === 'sidebar' ? "hidden md:flex" : "flex"
             )}
             notes={notes}
@@ -369,6 +403,7 @@ function App() {
             onSync={triggerSync}
             onNavigate={(id, _anchor) => handleNavigate(id)}
             isIOS={isIOS}
+            iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
           />
         ) : (
           <div className={clsx(
@@ -383,7 +418,8 @@ function App() {
             </div>
           </div>
         )}
-      </div>
+      </div>{/* end inner content row */}
+      </div>{/* end right column */}
 
       {isSettingsOpen && (
         <SettingsModal
@@ -404,6 +440,8 @@ function App() {
           setFontSize={setFontSize}
           spellcheckEnabled={spellcheckEnabled}
           onToggleSpellcheck={setSpellcheckEnabled}
+          landscapeFullscreen={landscapeFullscreen}
+          onToggleLandscapeFullscreen={setLandscapeFullscreen}
           onTriggerSync={triggerSync}
         />
       )}
