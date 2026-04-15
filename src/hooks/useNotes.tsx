@@ -5,7 +5,7 @@ import { normalizeStr, getPathId } from '../utils/path';
 import { getDb, startElectricSync, stopElectricSync } from '../lib/electric';
 import { supabase, setSupabaseSession, clearSupabaseSession } from '../lib/supabaseClient';
 import { enqueue, flushQueue, hasPendingWrites } from '../lib/offlineQueue';
-import type { PGlite } from '@electric-sql/pglite';
+import type { PGliteWithLive } from '@electric-sql/pglite/live';
 
 // ---------------------------------------------------------------------------
 // Sync status type
@@ -57,7 +57,7 @@ export function useNotes() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Db ref — set once PGlite is ready
-  const dbRef = useRef<PGlite | null>(null);
+  const dbRef = useRef<PGliteWithLive | null>(null);
 
   // Tracks the updated_at of our last local config write.
   // Used to filter out Electric echoes of our own writes.

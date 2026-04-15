@@ -23,6 +23,15 @@ export interface FolderMetadata {
  * AppMetadata Interface
  * Stored in PGlite `app_config` table and synced to Supabase.
  */
+/**
+ * ConflictPair — legacy type kept for ConflictModal compatibility.
+ * Conflicts are now resolved automatically by Electric's timestamp-based triggers.
+ */
+export interface ConflictPair {
+    original: string;
+    conflictCopy: string;
+}
+
 export interface AppMetadata {
     folders: Record<string, FolderMetadata>;
     pinnedNotes: string[];
