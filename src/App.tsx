@@ -288,6 +288,7 @@ function App() {
       style={{
         fontFamily: fontFamily === 'inter' ? "'Inter', sans-serif" : fontFamily === 'roboto' ? "'Roboto', sans-serif" : "ui-sans-serif, system-ui, sans-serif",
         flexDirection: isIOS ? 'row' : 'column',
+        borderRadius: '12px',
       }}
     >
       {/* iOS only: Sidebar as first column spanning full height */}
