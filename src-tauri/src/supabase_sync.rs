@@ -6,16 +6,11 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use log::info;
 
-// Read from environment at compile time, with hardcoded VPS fallback.
-// In CI the env vars are not set, so the fallback is used.
-pub const SUPABASE_URL: &str = match option_env!("VITE_SUPABASE_URL") {
-    Some(v) => v,
-    None => "http://76.13.147.191:9999",
-};
-pub const SUPABASE_ANON_KEY: &str = match option_env!("VITE_SUPABASE_ANON_KEY") {
-    Some(v) => v,
-    None => "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc2MTU2Njk0LCJleHAiOjIwOTE1MTY2OTR9.50XKkA3vMZX9uy3RK4rwM6-wy5n5A3FaGvMvJLYTfyU",
-};
+// Read from environment at compile time.
+// Values are injected via GitHub Actions secrets (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+// and locally via the .env file (loaded by build.rs).
+pub const SUPABASE_URL: &str = env!("VITE_SUPABASE_URL");
+pub const SUPABASE_ANON_KEY: &str = env!("VITE_SUPABASE_ANON_KEY");
 
 // ---------------------------------------------------------------------------
 // Types
