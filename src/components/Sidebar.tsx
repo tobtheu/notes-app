@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { SyncStatusBadge } from './SyncStatusBadge';
-import type { AppMetadata, ConflictPair } from '../types';
+import type { AppMetadata } from '../types';
+import type { SyncStatus } from '../hooks/useNotes';
 import {
     DndContext,
     closestCenter,
@@ -69,10 +70,9 @@ interface SidebarProps {
     onSelectCategory: (name: string | null) => void;
     onReorderFolders?: (newOrder: string[]) => void;
     onOpenSettings?: () => void;
-    syncStatus?: 'idle' | 'syncing' | 'synced' | 'offline' | 'error' | 'conflict';
+    syncStatus?: SyncStatus;
     syncError?: string | null;
     lastSyncedAt?: Date | null;
-    conflictFiles?: ConflictPair[];
     onSync?: () => void;
 }
 
@@ -315,10 +315,9 @@ export function Sidebar({
     onOpenSettings,
     onToggleCollapse,
     isIOS = false,
-    syncStatus = 'idle',
+    syncStatus = 'unauthenticated',
     syncError = null,
     lastSyncedAt = null,
-    conflictFiles = [],
     onSync,
 }: SidebarProps) {
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -553,8 +552,6 @@ export function Sidebar({
                         <SyncStatusBadge
                             syncStatus={syncStatus}
                             syncError={syncError}
-                            lastSyncedAt={lastSyncedAt}
-                            conflictFiles={conflictFiles}
                             onSync={onSync}
                             onOpenSettings={onOpenSettings}
                         />

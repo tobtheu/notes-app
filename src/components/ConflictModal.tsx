@@ -25,48 +25,9 @@ export function ConflictModal({
         setResolving(prev => new Set(prev).add(key));
 
         try {
-            if (action === 'discard-conflict') {
-                // Delete the conflict copy file using raw tauriAPI
-                const conflictFolder = pair.conflictCopy.includes('/')
-                    ? baseFolder + '/' + pair.conflictCopy.substring(0, pair.conflictCopy.lastIndexOf('/'))
-                    : baseFolder;
-                const conflictFilename = pair.conflictCopy.split('/').pop() || pair.conflictCopy;
-                await window.tauriAPI.deleteNote({
-                    rootPath: baseFolder,
-                    folderPath: conflictFolder,
-                    filename: conflictFilename,
-                });
-            } else if (action === 'use-remote') {
-                // Find the conflict copy content in the note list
-                const conflictName = pair.conflictCopy.split('/').pop() || '';
-                const notes = await window.tauriAPI.listNotes(baseFolder);
-                const conflictContent = notes.find(n => n.filename === conflictName)?.content || '';
-
-                const originalFolder = pair.original.includes('/')
-                    ? baseFolder + '/' + pair.original.substring(0, pair.original.lastIndexOf('/'))
-                    : baseFolder;
-                const originalFilename = pair.original.split('/').pop() || pair.original;
-
-                // Overwrite the original with the remote content
-                await window.tauriAPI.saveNote({
-                    rootPath: baseFolder,
-                    folderPath: originalFolder,
-                    filename: originalFilename,
-                    content: conflictContent,
-                });
-
-                // Delete the conflict copy
-                const conflictFolder = pair.conflictCopy.includes('/')
-                    ? baseFolder + '/' + pair.conflictCopy.substring(0, pair.conflictCopy.lastIndexOf('/'))
-                    : baseFolder;
-                const conflictFilename = pair.conflictCopy.split('/').pop() || pair.conflictCopy;
-                await window.tauriAPI.deleteNote({
-                    rootPath: baseFolder,
-                    folderPath: conflictFolder,
-                    filename: conflictFilename,
-                });
-            }
-            // 'keep-both': no action needed, both files already exist
+            // Conflicts are now resolved automatically by Electric's timestamp-based
+            // triggers. This modal is kept for UI compatibility only.
+            void pair; void action; void baseFolder;
 
             setResolved(prev => new Set(prev).add(key));
         } catch (e) {

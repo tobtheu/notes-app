@@ -1,5 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
-import { live } from '@electric-sql/pglite/live';
+import { live, type PGliteWithLive } from '@electric-sql/pglite/live';
 import { electricSync } from '@electric-sql/pglite-sync';
 import { initSchema } from './db';
 
@@ -9,15 +9,15 @@ const ELECTRIC_URL = import.meta.env.VITE_ELECTRIC_URL ?? 'http://localhost:5133
  * Singleton PGlite instance — shared across the entire app.
  * Uses OPFS for persistent storage (survives app restarts on all platforms).
  */
-let _db: PGlite | null = null;
-let _initPromise: Promise<PGlite> | null = null;
+let _db: PGliteWithLive | null = null;
+let _initPromise: Promise<PGliteWithLive> | null = null;
 let _shapesStarted = false;
 
 /**
  * Returns the initialised PGlite instance.
  * Safe to call multiple times — returns the same instance.
  */
-export async function getDb(): Promise<PGlite> {
+export async function getDb(): Promise<PGliteWithLive> {
   if (_db) return _db;
   if (_initPromise) return _initPromise;
 

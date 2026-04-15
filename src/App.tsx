@@ -19,13 +19,13 @@ import { Loader2, Book } from 'lucide-react';
 import clsx from 'clsx';
 import { platform } from '@tauri-apps/plugin-os';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { PGlite } from '@electric-sql/pglite';
+import type { PGliteWithLive } from '@electric-sql/pglite/live';
 
 const appWindow = getCurrentWindow();
 
 // Kick off PGlite init immediately at module load time so it's ready
 // (or nearly ready) by the time React renders PGliteWrapper.
-const _dbEarlyInit = getDb();
+void getDb(); // Kick off PGlite init early
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
     constructor(props: { children: ReactNode }) {
@@ -311,7 +311,6 @@ function App() {
           syncStatus={syncStatus}
           syncError={syncError}
           lastSyncedAt={null}
-          conflictFiles={[]}
           onSync={triggerSync}
           isIOS={isIOS}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -352,8 +351,7 @@ function App() {
             syncStatus={syncStatus}
             syncError={syncError}
             lastSyncedAt={null}
-            conflictFiles={[]}
-            onSync={triggerSync}
+              onSync={triggerSync}
           />
         )}
 
@@ -493,7 +491,7 @@ function App() {
 // We initialise the db lazily (getDb returns a singleton promise) and pass
 // it to the provider once resolved.
 function PGliteWrapper({ children }: { children: ReactNode }) {
-    const [db, setDb] = useState<PGlite | null>(null);
+    const [db, setDb] = useState<PGliteWithLive | null>(null);
     useEffect(() => {
         getDb().then(setDb).catch(console.error);
     }, []);
