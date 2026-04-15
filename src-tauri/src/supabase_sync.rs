@@ -6,8 +6,9 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use log::info;
 
-// Read from environment at compile time via build.rs
-// Falls back to VPS defaults if not set
+// Read from environment at compile time.
+// Values are injected via GitHub Actions secrets (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
+// and locally via the .env file (loaded by build.rs).
 pub const SUPABASE_URL: &str = env!("VITE_SUPABASE_URL");
 pub const SUPABASE_ANON_KEY: &str = env!("VITE_SUPABASE_ANON_KEY");
 
