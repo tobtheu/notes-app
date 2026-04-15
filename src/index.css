@@ -205,7 +205,6 @@ body {
   overflow: hidden;
   background-color: transparent !important;
   background: transparent !important;
-  border-radius: 10px;
 }
 
 /* Ensure Tauri webview handles transparency correctly */

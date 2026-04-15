@@ -31,3 +31,6 @@ updater.key
 updater.key.pub
   
 docs/ 
+
+# Environment Variables
+.env

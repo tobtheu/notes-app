@@ -48,8 +48,9 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
         <div
             id="titlebar"
             onMouseDown={handleMouseDown}
+            style={{ borderTopRightRadius: '12px' }}
             className={clsx(
-                "pt-[var(--safe-top,0vh)] flex items-center justify-between select-none relative z-[9999] box-content",
+                "pt-[var(--safe-top,0vh)] flex items-stretch justify-between select-none relative z-[9999] box-content",
                 isIOS ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-950",
                 isIOS ? "h-6 min-h-[24px]" : "h-10 min-h-[40px]"
             )}
@@ -139,6 +140,7 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                         type="button"
                         title="Close"
                         onClick={() => appWindow?.close()}
+                        style={{ borderTopRightRadius: '12px' }}
                         className="flex items-center justify-center w-12 hover:bg-red-500 hover:text-white text-gray-500 dark:text-gray-400 transition-colors no-drag"
                     >
                         <X size={14} />
