@@ -3,8 +3,8 @@ import { useLiveQuery } from '@electric-sql/pglite-react';
 import type { Note, AppMetadata, FolderMetadata } from '../types';
 import { normalizeStr, getPathId } from '../utils/path';
 import { getDb, startElectricSync, stopElectricSync } from '../lib/electric';
-import { supabase, setSupabaseSession, clearSupabaseSession } from '../lib/supabaseClient';
-import { enqueue, flushQueue, hasPendingWrites } from '../lib/offlineQueue';
+import { setSupabaseSession, clearSupabaseSession } from '../lib/supabaseClient';
+import { enqueue, flushQueue } from '../lib/offlineQueue';
 import type { PGliteWithLive } from '@electric-sql/pglite/live';
 
 // ---------------------------------------------------------------------------

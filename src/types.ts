@@ -91,6 +91,9 @@ export interface TauriAPI {
     startWatch: (folderPath: string) => void;
     onFileChanged: (callback: (data: { type: 'add' | 'change' | 'unlink'; path: string }) => void) => () => void;
 
+    // PDF export (desktop only)
+    exportPdf: (htmlContent: string) => Promise<void>;
+
     // Auto-updater (desktop only)
     checkForUpdates: () => Promise<void>;
     downloadUpdate: () => Promise<void>;
