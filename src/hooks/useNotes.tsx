@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLiveQuery } from '@electric-sql/pglite-react';
 import type { Note, AppMetadata, FolderMetadata } from '../types';
 import { normalizeStr, getPathId } from '../utils/path';
@@ -208,7 +208,7 @@ export function useNotes() {
   // Merge folders from notes + empty folders stored in folderOrder metadata.
   // Deduplicate by normalized name — folderOrder display name wins over the
   // lowercase name derived from note IDs (e.g. "Work" beats "work").
-  const sortedFolders = (() => {
+  const sortedFolders = useMemo(() => {
     const order = metadata.folderOrder ?? [];
     const orderNorm = order.map(f => normalizeStr(f));
 
@@ -232,7 +232,7 @@ export function useNotes() {
       if (idxB === -1) return -1;
       return idxA - idxB;
     });
-  })();
+  }, [metadata.folderOrder, folders]);
 
   // ── Note ID helper ────────────────────────────────────────────────────────
 
@@ -720,8 +720,6 @@ export function useNotes() {
     // Use the selected folder's name as the target folder in the app
     const folderName = folder.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? '';
 
-    const { getPathId } = await import('../utils/path');
-
     for (const file of scanned as { relPath: string; content: string; updatedAt: string }[]) {
       const filename = file.relPath.replace(/\\/g, '/').split('/').pop() ?? file.relPath;
       const id = getPathId(filename, folderName);
@@ -825,13 +823,8 @@ export function useNotes() {
     importFolder,
     setupDefaultWorkspace,
 
-    // Legacy compatibility (no-ops or re-mapped)
-    reloadNotes: async () => {},
+    // Sync helpers
     triggerSync: async () => { if (dbRef.current) await flushQueue(dbRef.current); },
-    isSyncing: syncStatus === 'initialising',
-    lastSyncedAt: null as Date | null,
-    conflictPairs: [] as { original: string; conflictCopy: string }[],
     resetSyncStatus: () => setSyncStatus(navigator.onLine ? 'synced' : 'offline'),
-    clearGithubCredentials: window.tauriAPI.clearGithubCredentials,
   };
 }

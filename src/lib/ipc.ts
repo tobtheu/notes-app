@@ -70,8 +70,10 @@ export const tauriAPI: TauriAPI = {
         const doc = iframe.contentWindow?.document;
         if (doc) {
             doc.open();
-            doc.write(`<html><head><title>Note Export</title></head><body>${htmlContent}</body></html>`);
+            doc.write('<!DOCTYPE html><html><head><title>Note Export</title></head><body></body></html>');
             doc.close();
+            // Use innerHTML on the body instead of doc.write with interpolation
+            doc.body.innerHTML = htmlContent;
             setTimeout(() => {
                 iframe.contentWindow?.focus();
                 iframe.contentWindow?.print();

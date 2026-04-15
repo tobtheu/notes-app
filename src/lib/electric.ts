@@ -7,7 +7,7 @@ const ELECTRIC_URL = import.meta.env.VITE_ELECTRIC_URL ?? 'http://localhost:5133
 
 /**
  * Singleton PGlite instance — shared across the entire app.
- * Uses OPFS for persistent storage (survives app restarts on all platforms).
+ * Uses IndexedDB for persistent storage (survives app restarts on all platforms).
  */
 let _db: PGliteWithLive | null = null;
 let _initPromise: Promise<PGliteWithLive> | null = null;
@@ -42,6 +42,10 @@ export async function getDb(): Promise<PGliteWithLive> {
  */
 export async function startElectricSync(userId: string, accessToken: string): Promise<void> {
   if (_shapesStarted) return;
+  // Validate userId is a valid UUID to prevent injection in shape params
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+    throw new Error('Invalid userId format');
+  }
   const db = await getDb();
 
   const authHeaders = { Authorization: `Bearer ${accessToken}` };

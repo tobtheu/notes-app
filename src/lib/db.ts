@@ -1,9 +1,8 @@
 import type { PGlite } from '@electric-sql/pglite';
 
 /**
- * SQL schema for the local PGlite database.
- * This mirrors the Supabase Postgres schema exactly so Electric
- * can sync rows directly into these tables without transformation.
+ * SQL schema for the local PGlite (WASM Postgres) database.
+ * Mirrors the Supabase schema so Electric can sync rows directly.
  */
 export const DB_SCHEMA = /* sql */ `
   CREATE TABLE IF NOT EXISTS notes (

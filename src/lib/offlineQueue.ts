@@ -116,13 +116,3 @@ export async function flushQueue(db: PGliteWithLive): Promise<number> {
 
   return flushed;
 }
-
-/**
- * Returns true if there are any pending (unsynced) writes.
- */
-export async function hasPendingWrites(db: PGliteWithLive): Promise<boolean> {
-  const { rows } = await db.query<{ count: number }>(
-    `SELECT COUNT(*) AS count FROM pending_writes`,
-  );
-  return (rows[0]?.count ?? 0) > 0;
-}

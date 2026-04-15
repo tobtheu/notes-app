@@ -8,6 +8,7 @@ import clsx from 'clsx';
 import { SyncStatusBadge } from './SyncStatusBadge';
 import type { AppMetadata } from '../types';
 import type { SyncStatus } from '../hooks/useNotes';
+import { normalizeStr } from '../utils/path';
 import {
     DndContext,
     closestCenter,
@@ -104,8 +105,6 @@ interface SortableFolderItemProps {
     onEditCategory: (name: string) => void;
     onDeleteCategory: (name: string) => void;
 }
-
-const normalizeStr = (s: string) => s.normalize('NFC').toLowerCase();
 
 /**
  * FolderItem Component
