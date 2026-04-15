@@ -32,13 +32,6 @@ export interface ConfigWritePayload {
 
 type WriteOperation = 'upsert';
 
-interface PendingWrite {
-  id: string;
-  table_name: 'notes' | 'app_config';
-  operation: WriteOperation;
-  payload: string;
-}
-
 /**
  * Enqueue a write. Writes are deduplicated by id — if there's already
  * a pending write for the same row, it's replaced with the latest payload.

@@ -1,9 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
+import type { DownloadEvent } from '@tauri-apps/plugin-updater';
 import type { TauriAPI } from '../types';
 
-let updateInstance: Awaited<ReturnType<typeof import('@tauri-apps/plugin-updater').check>> | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let updateInstance: any = null;
 
 /**
  * tauriAPI Implementation
@@ -102,11 +104,15 @@ export const tauriAPI: TauriAPI = {
     downloadUpdate: async () => {
         if (!updateInstance) return;
         try {
-            await updateInstance.downloadAndInstall((progress: { event: string; data?: { downloaded: number; contentLength: number } }) => {
+            let totalSize = 0;
+            let downloaded = 0;
+            await updateInstance.downloadAndInstall((progress: DownloadEvent) => {
                 if (progress.event === 'Started') {
+                    totalSize = progress.data.contentLength ?? 0;
                     window.dispatchEvent(new CustomEvent('tauri-update-status', { detail: { type: 'downloading', progress: 0 } }));
-                } else if (progress.event === 'Progress' && progress.data) {
-                    const percent = (progress.data.downloaded / progress.data.contentLength) * 100;
+                } else if (progress.event === 'Progress') {
+                    downloaded += progress.data.chunkLength;
+                    const percent = totalSize > 0 ? (downloaded / totalSize) * 100 : 0;
                     window.dispatchEvent(new CustomEvent('tauri-update-status', { detail: { type: 'downloading', progress: percent } }));
                 } else if (progress.event === 'Finished') {
                     window.dispatchEvent(new CustomEvent('tauri-update-status', { detail: { type: 'downloaded' } }));
