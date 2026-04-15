@@ -490,8 +490,8 @@ pub struct ScannedNote {
     pub updated_at: String,
 }
 
-/// Scans a folder (one level deep) and returns all .md files with their content.
-/// The folder name itself becomes the note folder (rel_path = "foldername/note.md").
+/// Scans a folder recursively and returns all .md files with their content.
+/// rel_path is relative to root, e.g. "subfolder/note.md" or "note.md".
 fn scan_md_files(dir: &Path, root: &Path) -> Vec<ScannedNote> {
     let mut results = Vec::new();
     let Ok(entries) = fs::read_dir(dir) else { return results };
@@ -499,7 +499,10 @@ fn scan_md_files(dir: &Path, root: &Path) -> Vec<ScannedNote> {
         let path = entry.path();
         let name = path.file_name().unwrap_or_default().to_string_lossy();
         if name.starts_with('.') { continue; }
-        if path.is_file() && path.extension().map_or(false, |e| e == "md") {
+        if path.is_dir() {
+            // Recurse into subdirectory
+            results.extend(scan_md_files(&path, root));
+        } else if path.is_file() && path.extension().map_or(false, |e| e == "md") {
             let content = fs::read_to_string(&path).unwrap_or_default();
             let rel = path.strip_prefix(root).unwrap_or(&path);
             let rel_path = rel.to_string_lossy().replace('\\', "/");

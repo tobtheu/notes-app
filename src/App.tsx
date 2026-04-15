@@ -90,6 +90,7 @@ function App() {
     signOut,
     userEmail,
     importFolder,
+    goLocalOnly,
   } = useNotes();
 
   // If this Webview is the Quick Note window, display only the QuickNote component rather than the full app.
@@ -273,11 +274,14 @@ function App() {
     }
   };
 
-  if (!currentFolder) {
+  if (!currentFolder || syncStatus === 'unauthenticated') {
     return (
       <OnboardingScreen
         onSelectFolder={selectFolder}
         onSetupWorkspace={async () => { await setupDefaultWorkspace(true); }}
+        onSignIn={signIn}
+        onSignUp={signUp}
+        onLocalOnly={goLocalOnly}
       />
     );
   }

@@ -55,6 +55,7 @@ export function useNotes() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentFolder, setCurrentFolder] = useState<string | null>(() => localStorage.getItem('notes-folder'));
 
   // Db ref — set once PGlite is ready
   const dbRef = useRef<PGliteWithLive | null>(null);
@@ -634,40 +635,82 @@ export function useNotes() {
 
   // ── Auth ──────────────────────────────────────────────────────────────────
 
+  /**
+   * Migrates notes written under the 'local' user_id to the real Supabase userId.
+   * Called after sign-in/sign-up when the user was previously in local-only mode.
+   * The Electric conflict-resolution trigger (updated_at comparison) will handle
+   * merging with any existing cloud notes once sync starts.
+   */
+  const migrateLocalNotes = useCallback(async (db: PGliteWithLive, realUserId: string) => {
+    const { rows } = await db.query<{ id: string; content: string; updated_at: string }>(
+      `SELECT id, content, updated_at FROM notes WHERE user_id = 'local' AND deleted = false`,
+    );
+    if (rows.length === 0) return;
+
+    const updatedAt = new Date().toISOString();
+    for (const row of rows) {
+      // Write under the real userId (ON CONFLICT keeps the newer version)
+      await db.query(
+        `INSERT INTO notes (id, user_id, content, updated_at, deleted)
+         VALUES ($1, $2, $3, $4, false)
+         ON CONFLICT (id, user_id) DO UPDATE SET
+           content    = EXCLUDED.content,
+           updated_at = EXCLUDED.updated_at
+         WHERE EXCLUDED.updated_at::timestamptz >= notes.updated_at::timestamptz`,
+        [row.id, realUserId, row.content, row.updated_at ?? updatedAt],
+      );
+      // Enqueue for Supabase upload
+      await enqueue(db, 'notes', 'upsert', {
+        id: row.id,
+        user_id: realUserId,
+        content: row.content,
+        updated_at: row.updated_at ?? updatedAt,
+        deleted: false,
+      });
+    }
+    // Remove the temporary local-user rows
+    await db.query(`DELETE FROM notes WHERE user_id = 'local'`);
+  }, []);
+
   const signIn = useCallback(async (email: string, password: string) => {
     const result = await window.tauriAPI.supabaseSignIn(email, password);
     const creds = await window.tauriAPI.getSupabaseCredentials();
     if (creds) {
       await setSupabaseSession(creds.accessToken, creds.refreshToken);
+      const db = await getDb();
+      dbRef.current = db;
+      // If coming from local-only mode, migrate notes to the real account first
+      if (userId === 'local') await migrateLocalNotes(db, result.userId);
       setUserId(result.userId);
       setUserEmail(result.email);
       localStorage.setItem('lama-user-id', result.userId);
       localStorage.setItem('lama-user-email', result.email);
-      const db = await getDb();
-      dbRef.current = db;
       await startElectricSync(result.userId, creds.accessToken);
       setSyncStatus('synced');
       if (navigator.onLine) await flushQueue(db);
     }
     return result;
-  }, []);
+  }, [userId, migrateLocalNotes]);
 
   const signUp = useCallback(async (email: string, password: string) => {
     const result = await window.tauriAPI.supabaseSignUp(email, password);
     const creds = await window.tauriAPI.getSupabaseCredentials();
     if (creds) {
       await setSupabaseSession(creds.accessToken, creds.refreshToken);
+      const db = await getDb();
+      dbRef.current = db;
+      // If coming from local-only mode, migrate notes to the new account
+      if (userId === 'local') await migrateLocalNotes(db, result.userId);
       setUserId(result.userId);
       setUserEmail(result.email);
       localStorage.setItem('lama-user-id', result.userId);
       localStorage.setItem('lama-user-email', result.email);
-      const db = await getDb();
-      dbRef.current = db;
       await startElectricSync(result.userId, creds.accessToken);
       setSyncStatus('synced');
+      if (navigator.onLine) await flushQueue(db);
     }
     return result;
-  }, []);
+  }, [userId, migrateLocalNotes]);
 
   const signOut = useCallback(async () => {
     await window.tauriAPI.supabaseSignOut();
@@ -688,6 +731,7 @@ export function useNotes() {
     await window.tauriAPI.createFolder(docDir, defaultPath);
     if (updateState) {
       localStorage.setItem('notes-folder', defaultPath);
+      setCurrentFolder(defaultPath);
     }
     return defaultPath;
   }, []);
@@ -696,7 +740,54 @@ export function useNotes() {
     const folder = await window.tauriAPI.selectFolder();
     if (folder) {
       localStorage.setItem('notes-folder', folder);
+      setCurrentFolder(folder);
     }
+  }, []);
+
+  // Enter local-only mode without an account — let user pick a folder,
+  // scan it for existing .md files, import them, then open the app offline.
+  const goLocalOnly = useCallback(async () => {
+    const db = await getDb();
+    dbRef.current = db;
+
+    // Let the user pick a folder (or use Documents/Lama Notes as default on mobile)
+    let folder = await window.tauriAPI.selectFolder();
+    if (!folder) {
+      // User cancelled — create default workspace instead
+      const docDir = await window.tauriAPI.getDocumentDir();
+      folder = `${docDir}/Lama Notes`.replace(/\\/g, '/');
+      await window.tauriAPI.createFolder(docDir, folder);
+    }
+
+    localStorage.setItem('notes-folder', folder);
+    setCurrentFolder(folder);
+    // Use a fixed local-only user ID so live queries and writes work without auth
+    setUserId('local');
+
+    // Scan the selected folder recursively for existing .md files and import them
+    try {
+      const scanned = await (window.tauriAPI as any).scanImportFolder(folder) as
+        { relPath: string; content: string; updatedAt: string }[];
+      for (const file of scanned) {
+        const parts = file.relPath.replace(/\\/g, '/').split('/');
+        const filename = parts.pop() ?? file.relPath;
+        const fileFolder = parts.join('/'); // e.g. "Work" or "" for root-level
+        const id = getPathId(filename, fileFolder);
+        const content = file.content.replace(/^---\n[\s\S]*?\n---\n?/, '').trimStart();
+        await db.query(
+          `INSERT INTO notes (id, user_id, content, updated_at, deleted)
+           VALUES ($1, $2, $3, $4, false)
+           ON CONFLICT (id, user_id) DO UPDATE SET
+             content    = EXCLUDED.content,
+             updated_at = EXCLUDED.updated_at`,
+          [id, 'local', content, file.updatedAt],
+        );
+      }
+    } catch {
+      // Folder may be empty or scan unsupported — proceed anyway
+    }
+
+    setSyncStatus('offline');
   }, []);
 
   /**
@@ -786,7 +877,7 @@ export function useNotes() {
     hasPending,
     userId,
     userEmail,
-    currentFolder: localStorage.getItem('notes-folder'),
+    currentFolder,
 
     // Setters
     setSelectedNote: setSelectedNoteId,
@@ -820,6 +911,7 @@ export function useNotes() {
 
     // Workspace
     selectFolder,
+    goLocalOnly,
     importFolder,
     setupDefaultWorkspace,
 

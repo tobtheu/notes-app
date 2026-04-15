@@ -5,12 +5,15 @@ import logo from '../assets/logo.png';
 interface Props {
     onSelectFolder: () => void;
     onSetupWorkspace: () => Promise<void>;
+    onSignIn?: (email: string, password: string) => Promise<{ userId: string; email: string }>;
+    onSignUp?: (email: string, password: string) => Promise<{ userId: string; email: string }>;
+    onLocalOnly?: () => Promise<void>;
 }
 
 type Screen = 'choice' | 'email';
 type AuthMode = 'signin' | 'signup';
 
-export function OnboardingScreen({ onSelectFolder, onSetupWorkspace }: Props) {
+export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, onSignUp, onLocalOnly }: Props) {
     const [screen, setScreen] = useState<Screen>('choice');
     const [authMode, setAuthMode] = useState<AuthMode>('signin');
 
@@ -27,9 +30,17 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace }: Props) {
         setError(null);
         try {
             if (authMode === 'signin') {
-                await window.tauriAPI.supabaseSignIn(email, password);
+                if (onSignIn) {
+                    await onSignIn(email, password);
+                } else {
+                    await window.tauriAPI.supabaseSignIn(email, password);
+                }
             } else {
-                await window.tauriAPI.supabaseSignUp(email, password);
+                if (onSignUp) {
+                    await onSignUp(email, password);
+                } else {
+                    await window.tauriAPI.supabaseSignUp(email, password);
+                }
             }
             setSuccess(true);
             // Short delay so user sees the checkmark, then load the workspace
@@ -132,7 +143,8 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace }: Props) {
 
                         {/* Local only */}
                         <button
-                            onClick={onSelectFolder}
+                            type="button"
+                            onClick={onLocalOnly ?? onSelectFolder}
                             className="group flex items-center justify-between px-6 py-4 bg-transparent border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 rounded-2xl transition-all active:scale-[0.98]"
                         >
                             <div className="flex items-center gap-4 text-left">
