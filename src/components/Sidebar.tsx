@@ -72,7 +72,6 @@ interface SidebarProps {
     onOpenSettings?: () => void;
     syncStatus?: SyncStatus;
     syncError?: string | null;
-    lastSyncedAt?: Date | null;
     onSync?: () => void;
 }
 
@@ -317,7 +316,6 @@ export function Sidebar({
     isIOS = false,
     syncStatus = 'unauthenticated',
     syncError = null,
-    lastSyncedAt = null,
     onSync,
 }: SidebarProps) {
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);

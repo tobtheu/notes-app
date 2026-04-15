@@ -1,4 +1,4 @@
-import type { PGlite } from '@electric-sql/pglite';
+import type { PGliteWithLive } from '@electric-sql/pglite/live';
 import { supabase } from './supabaseClient';
 import type { AppMetadata } from '../types';
 
@@ -44,7 +44,7 @@ interface PendingWrite {
  * a pending write for the same row, it's replaced with the latest payload.
  */
 export async function enqueue(
-  db: PGlite,
+  db: PGliteWithLive,
   table: 'notes' | 'app_config',
   operation: WriteOperation,
   payload: NoteWritePayload | ConfigWritePayload,
@@ -70,7 +70,7 @@ export async function enqueue(
  * Called on: app start, network reconnect, and after every online write.
  * Returns the number of writes successfully flushed.
  */
-export async function flushQueue(db: PGlite): Promise<number> {
+export async function flushQueue(db: PGliteWithLive): Promise<number> {
   if (!navigator.onLine) return 0;
 
   const { rows } = await db.query<{
@@ -127,7 +127,7 @@ export async function flushQueue(db: PGlite): Promise<number> {
 /**
  * Returns true if there are any pending (unsynced) writes.
  */
-export async function hasPendingWrites(db: PGlite): Promise<boolean> {
+export async function hasPendingWrites(db: PGliteWithLive): Promise<boolean> {
   const { rows } = await db.query<{ count: number }>(
     `SELECT COUNT(*) AS count FROM pending_writes`,
   );

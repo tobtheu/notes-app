@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Loader2, X, Zap } from 'lucide-react';
 
 export function QuickNote() {
-  const { currentFolder, saveNote, notes, isLoading, getNoteId, reloadNotes } = useNotes();
+  const { currentFolder, saveNote, notes, isLoading, getNoteId } = useNotes();
   const [content, setContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -54,7 +54,6 @@ export function QuickNote() {
       const id = existingNote ? getNoteId(existingNote) : getNoteId({ filename: 'Quick Note.md', folder: '', content: '' } as any);
       
       await saveNote(id, 'Quick Note.md', finalContent, '', true);
-      await reloadNotes(false);
       setContent(''); // Clear after save
     } catch (e) {
       console.error('Failed to save quick note', e);

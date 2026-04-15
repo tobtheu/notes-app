@@ -310,7 +310,7 @@ function App() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           syncStatus={syncStatus}
           syncError={syncError}
-          lastSyncedAt={null}
+
           onSync={triggerSync}
           isIOS={isIOS}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -350,7 +350,7 @@ function App() {
             onOpenSettings={() => setIsSettingsOpen(true)}
             syncStatus={syncStatus}
             syncError={syncError}
-            lastSyncedAt={null}
+  
               onSync={triggerSync}
           />
         )}
