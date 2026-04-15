@@ -30,14 +30,14 @@ export function SyncStatusBadge({
             case 'initialising':
                 return {
                     icon: <RefreshCw size={18} className="animate-spin" />,
-                    label: 'Wird geladen…',
+                    label: 'Laden…',
                     color: 'text-blue-500 dark:text-blue-400',
                     clickable: false,
                 };
             case 'synced':
                 return {
                     icon: <CheckCircle2 size={18} />,
-                    label: hasPending ? 'Synchronisiert (ausstehend)' : 'Synchronisiert',
+                    label: hasPending ? 'Ausstehend' : 'Synced',
                     color: hasPending
                         ? 'text-amber-500 dark:text-amber-400'
                         : 'text-emerald-500 dark:text-emerald-400',
@@ -46,7 +46,7 @@ export function SyncStatusBadge({
             case 'pending':
                 return {
                     icon: <Clock size={18} />,
-                    label: 'Ausstehende Änderungen',
+                    label: 'Ausstehend',
                     color: 'text-amber-500 dark:text-amber-400',
                     clickable: true,
                 };
@@ -60,14 +60,14 @@ export function SyncStatusBadge({
             case 'error':
                 return {
                     icon: <XCircle size={18} />,
-                    label: 'Sync-Fehler',
+                    label: 'Fehler',
                     color: 'text-red-500 dark:text-red-400',
                     clickable: true,
                 };
             case 'unauthenticated':
                 return {
                     icon: <Cloud size={18} />,
-                    label: 'Nicht angemeldet',
+                    label: 'Abgemeldet',
                     color: 'text-gray-400 dark:text-gray-500',
                     clickable: true,
                 };

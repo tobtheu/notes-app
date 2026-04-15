@@ -242,7 +242,16 @@ export const tauriAPI: TauriAPI = {
         invoke<{ userId: string; email: string }>('supabase_sign_up', { email, password }),
     supabaseSignOut: () => invoke<void>('supabase_sign_out'),
     getSupabaseUser: () => invoke<{ userId: string; email: string } | null>('get_supabase_user'),
-    resetSyncState: (folderPath: string) => invoke<void>('reset_sync_state', { folderPath })
+    getSupabaseCredentials: () => invoke<{ userId: string; email: string; accessToken: string; refreshToken: string } | null>('get_supabase_credentials'),
+    refreshSupabaseToken: () => invoke<{ userId: string; email: string; accessToken: string; refreshToken: string }>('refresh_supabase_token'),
+
+    // File mirror
+    writeMirrorFile: (payload) => invoke<void>('write_mirror_file', { payload }),
+    deleteMirrorFile: (payload) => invoke<void>('delete_mirror_file', { payload }),
+
+    // Folder import
+    scanImportFolder: (folderPath: string) =>
+        invoke<{ relPath: string; content: string; updatedAt: string }[]>('scan_import_folder', { folderPath }),
 };
 
 // Attach to window globally

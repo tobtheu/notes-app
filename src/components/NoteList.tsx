@@ -69,7 +69,8 @@ const NoteListItem = memo(({
     folders: string[];
 }) => {
     const previewText = useMemo(() => {
-        return stripMarkdown(note.content.replace(/^#\s.*?\r?\n/, '').trim()) || 'No additional content';
+        const stripped = note.content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').trimStart();
+        return stripMarkdown(stripped.replace(/^#\s.*?\r?\n/, '').trim()) || 'No additional content';
     }, [note.content]);
 
     const timeString = useMemo(() => {
@@ -79,7 +80,8 @@ const NoteListItem = memo(({
     }, [note.updatedAt]);
 
     const title = useMemo(() => {
-        const firstLine = note.content.split(/\r?\n/)[0] || '';
+        const withoutFrontmatter = note.content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').trimStart();
+        const firstLine = withoutFrontmatter.split(/\r?\n/)[0] || '';
         const extractedTitle = firstLine.replace(/^#\s*/, '').trim();
         return extractedTitle || note.filename.replace('.md', '');
     }, [note.content, note.filename]);
@@ -150,8 +152,8 @@ const NoteListItem = memo(({
     }, [isSelected]);
 
     return (
-        <div style={{ contain: 'paint' }}>
-            <div className="relative mb-0.5 rounded-xl border-2 border-transparent overflow-hidden">
+        <div>
+            <div className="relative mb-0.5 rounded-xl border-2 border-transparent overflow-visible">
                 {/* Swipe Actions (Behind) */}
                 <div className="absolute inset-y-0 right-0 flex items-center justify-end px-3 gap-2 bg-gray-100 dark:bg-gray-800/80 w-full z-0 h-full rounded-xl pointer-events-auto">
                     <button
@@ -200,7 +202,7 @@ const NoteListItem = memo(({
                     }}
                     style={{ transform: `translateX(${swipeOffset}px)` }}
                     className={clsx(
-                        "group relative p-2.5 rounded-xl cursor-pointer z-10 w-full border-2",
+                        "group relative p-2.5 rounded-xl cursor-pointer z-10 w-full border-2 overflow-hidden",
                         isSnapping && "transition-transform duration-200",
                         isSelected
                             ? "bg-primary-50 dark:bg-primary-950 border-primary-500 shadow-sm"

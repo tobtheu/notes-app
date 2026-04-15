@@ -6,8 +6,10 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use log::info;
 
-pub const SUPABASE_URL: &str = "https://rbyidtxmvzxzvaayllxe.supabase.co";
-pub const SUPABASE_ANON_KEY: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJieWlkdHhtdnp4enZhYXlsbHhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MDMxNTEsImV4cCI6MjA5MDE3OTE1MX0.uQZurIYUL6fCd-gUtH-KUlUEZrVcX5cQ4lfYnIwxPx8";
+// Read from environment at compile time via build.rs
+// Falls back to VPS defaults if not set
+pub const SUPABASE_URL: &str = env!("VITE_SUPABASE_URL");
+pub const SUPABASE_ANON_KEY: &str = env!("VITE_SUPABASE_ANON_KEY");
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,9 +32,12 @@ struct AuthUser {
 
 #[derive(Deserialize, Debug)]
 struct AuthResponse {
-    access_token: String,
-    refresh_token: String,
-    user: AuthUser,
+    access_token: Option<String>,
+    refresh_token: Option<String>,
+    user: Option<AuthUser>,
+    // GoTrue sign-up without autoconfirm returns id/email at top level
+    id: Option<String>,
+    email: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -60,13 +65,19 @@ pub async fn sign_in(email: &str, password: &str) -> Result<SupabaseCredentials,
     }
 
     let auth: AuthResponse = res.json().await.map_err(|e| format!("Parse error: {}", e))?;
-    info!("[supabase_auth] signed in: {}", auth.user.email.as_deref().unwrap_or("?"));
+    let user_id = auth.user.as_ref().map(|u| u.id.clone())
+        .or(auth.id.clone())
+        .ok_or("No user id in response")?;
+    let email_out = auth.user.as_ref().and_then(|u| u.email.clone())
+        .or(auth.email.clone())
+        .unwrap_or_default();
+    info!("[supabase_auth] signed in: {}", email_out);
 
     Ok(SupabaseCredentials {
-        access_token: auth.access_token,
-        refresh_token: auth.refresh_token,
-        user_id: auth.user.id,
-        email: auth.user.email.unwrap_or_default(),
+        access_token: auth.access_token.ok_or("No access_token in response")?,
+        refresh_token: auth.refresh_token.ok_or("No refresh_token in response")?,
+        user_id,
+        email: email_out,
     })
 }
 
@@ -91,13 +102,19 @@ pub async fn sign_up(email: &str, password: &str) -> Result<SupabaseCredentials,
     }
 
     let auth: AuthResponse = res.json().await.map_err(|e| format!("Parse error: {}", e))?;
-    info!("[supabase_auth] signed up: {}", auth.user.email.as_deref().unwrap_or("?"));
+    let user_id = auth.user.as_ref().map(|u| u.id.clone())
+        .or(auth.id.clone())
+        .ok_or("No user id in response")?;
+    let email_out = auth.user.as_ref().and_then(|u| u.email.clone())
+        .or(auth.email.clone())
+        .unwrap_or_default();
+    info!("[supabase_auth] signed up: {}", email_out);
 
     Ok(SupabaseCredentials {
-        access_token: auth.access_token,
-        refresh_token: auth.refresh_token,
-        user_id: auth.user.id,
-        email: auth.user.email.unwrap_or_default(),
+        access_token: auth.access_token.ok_or("No access_token in response")?,
+        refresh_token: auth.refresh_token.ok_or("No refresh_token in response")?,
+        user_id,
+        email: email_out,
     })
 }
 
@@ -122,12 +139,18 @@ pub async fn refresh_session(refresh_token: &str) -> Result<SupabaseCredentials,
     }
 
     let auth: AuthResponse = res.json().await.map_err(|e| format!("Parse error: {}", e))?;
-    info!("[supabase_auth] token refreshed for: {}", auth.user.email.as_deref().unwrap_or("?"));
+    let user_id = auth.user.as_ref().map(|u| u.id.clone())
+        .or(auth.id.clone())
+        .ok_or("No user id in response")?;
+    let email_out = auth.user.as_ref().and_then(|u| u.email.clone())
+        .or(auth.email.clone())
+        .unwrap_or_default();
+    info!("[supabase_auth] token refreshed for: {}", email_out);
 
     Ok(SupabaseCredentials {
-        access_token: auth.access_token,
-        refresh_token: auth.refresh_token,
-        user_id: auth.user.id,
-        email: auth.user.email.unwrap_or_default(),
+        access_token: auth.access_token.ok_or("No access_token in response")?,
+        refresh_token: auth.refresh_token.ok_or("No refresh_token in response")?,
+        user_id,
+        email: email_out,
     })
 }

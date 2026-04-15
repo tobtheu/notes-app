@@ -5,6 +5,11 @@ import clsx from 'clsx';
 import { MoreVertical, FileDown, Eye, EyeOff, Loader2, Zap, X } from 'lucide-react';
 import { getPathId, normalizeStr } from '../utils/path';
 
+/** Strip YAML frontmatter (--- ... ---) from note content before display. */
+function stripFrontmatter(content: string): string {
+    return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').trimStart();
+}
+
 const extractTitle = (content: string) => {
     const firstLine = content.split(/\r?\n/)[0] || '';
     return firstLine.replace(/^#\s*/, '').trim();
@@ -59,7 +64,7 @@ export function Editor({
     /**
      * --- LOCAL STATE & REFS ---
      */
-    const [content, setContent] = useState(note.content);
+    const [content, setContent] = useState(() => stripFrontmatter(note.content));
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const titleRef = useRef<HTMLTextAreaElement>(null);
     const markdownEditorRef = useRef<MarkdownEditorRef>(null);
@@ -69,7 +74,7 @@ export function Editor({
     const lastNoteId = useRef(getPathId(note.filename, note.folder || ""));
 
     // Tracks the last version committed to disk to avoid redundant saves
-    const lastSavedContent = useRef(note.content);
+    const lastSavedContent = useRef(stripFrontmatter(note.content));
 
     // Throttle sync-on-blur: don't trigger more than once per 10s to avoid constant syncing
     const lastSyncTime = useRef(0);
@@ -104,8 +109,8 @@ export function Editor({
         } else {
             // Parent updated the SAME note (e.g. from GitHub). Only accept if we aren't typing.
             if (!isDirty.current && note.content !== lastSavedContent.current) {
-                setContent(note.content);
-                lastSavedContent.current = note.content;
+                setContent(stripFrontmatter(note.content));
+                lastSavedContent.current = stripFrontmatter(note.content);
             }
         }
     }, [note.folder, note.filename, note.content]);

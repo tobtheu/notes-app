@@ -23,6 +23,10 @@ import type { PGlite } from '@electric-sql/pglite';
 
 const appWindow = getCurrentWindow();
 
+// Kick off PGlite init immediately at module load time so it's ready
+// (or nearly ready) by the time React renders PGliteWrapper.
+const _dbEarlyInit = getDb();
+
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
     constructor(props: { children: ReactNode }) {
         super(props);
@@ -85,6 +89,7 @@ function App() {
     signUp,
     signOut,
     userEmail,
+    importFolder,
   } = useNotes();
 
   // If this Webview is the Quick Note window, display only the QuickNote component rather than the full app.
@@ -442,6 +447,7 @@ function App() {
           onSignIn={signIn}
           onSignUp={signUp}
           onSignOut={signOut}
+          onImportFolder={isIOS ? undefined : importFolder}
         />
       )}
 
@@ -492,7 +498,11 @@ function PGliteWrapper({ children }: { children: ReactNode }) {
         getDb().then(setDb).catch(console.error);
     }, []);
 
-    if (!db) return null; // Wait for PGlite to initialise before rendering
+    if (!db) return (
+        <div className="flex items-center justify-center w-full h-full min-h-screen bg-white dark:bg-gray-900">
+            <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+        </div>
+    );
 
     return <PGliteProvider db={db}>{children}</PGliteProvider>;
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, CloudOff, Clock, LogOut, Download, Rocket } from 'lucide-react';
+import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, CloudOff, Clock, LogOut, Download, Rocket, Upload } from 'lucide-react';
 import clsx from 'clsx';
 import type { SyncStatus } from '../hooks/useNotes';
 
@@ -30,6 +30,7 @@ interface SettingsModalProps {
     onSignIn?: (email: string, password: string) => Promise<{ userId: string; email: string }>;
     onSignUp?: (email: string, password: string) => Promise<{ userId: string; email: string }>;
     onSignOut?: () => Promise<void>;
+    onImportFolder?: () => Promise<number>;
 }
 
 /**
@@ -63,6 +64,7 @@ export function SettingsModal({
     onSignIn,
     onSignUp,
     onSignOut,
+    onImportFolder,
 }: SettingsModalProps) {
     /**
      * --- LOCAL STATE ---
@@ -75,6 +77,21 @@ export function SettingsModal({
         version?: string;
     }>({ type: 'idle' });
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [importState, setImportState] = useState<'idle' | 'loading' | 'done'>('idle');
+    const [importCount, setImportCount] = useState(0);
+
+    const handleImportFolder = async () => {
+        if (!onImportFolder) return;
+        setImportState('loading');
+        try {
+            const count = await onImportFolder();
+            setImportCount(count);
+            setImportState('done');
+            setTimeout(() => setImportState('idle'), 3000);
+        } catch {
+            setImportState('idle');
+        }
+    };
 
     // Auth form state
     const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -267,13 +284,35 @@ export function SettingsModal({
                             <p className="font-mono text-sm text-gray-700 dark:text-gray-300 break-all mb-3">
                                 {currentPath || 'Not selected'}
                             </p>
-                            <button
-                                onClick={onChangePath}
-                                className="flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
-                            >
-                                <FolderOpen size={16} />
-                                Change Location
-                            </button>
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <button
+                                    type="button"
+                                    onClick={onChangePath}
+                                    className="flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
+                                >
+                                    <FolderOpen size={16} />
+                                    Change Location
+                                </button>
+                                {onImportFolder && (
+                                    <button
+                                        type="button"
+                                        onClick={handleImportFolder}
+                                        disabled={importState === 'loading'}
+                                        className="flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors disabled:opacity-50"
+                                    >
+                                        {importState === 'loading' ? (
+                                            <RefreshCw size={16} className="animate-spin" />
+                                        ) : importState === 'done' ? (
+                                            <CheckCircle2 size={16} className="text-emerald-500" />
+                                        ) : (
+                                            <Upload size={16} />
+                                        )}
+                                        {importState === 'done'
+                                            ? `${importCount} Notizen importiert`
+                                            : 'Ordner importieren'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 

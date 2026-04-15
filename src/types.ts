@@ -63,6 +63,7 @@ export interface TauriAPI {
     // File mirror (write-only, Electric is the canonical source)
     writeMirrorFile: (payload: { mirrorFolder: string; note: Note }) => Promise<void>;
     deleteMirrorFile: (payload: { mirrorFolder: string; noteId: string }) => Promise<void>;
+    scanImportFolder: (folderPath: string) => Promise<{ relPath: string; content: string; updatedAt: string }[]>;
 
     // Folder operations (still filesystem-backed for the mirror)
     listFolders: (folderPath: string) => Promise<string[]>;

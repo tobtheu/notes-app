@@ -480,6 +480,53 @@ async fn complete_github_oauth(app: tauri::AppHandle, device_code: String, inter
 // ---------------------------------------------------------------------------
 
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
+/// A scanned note returned by scan_import_folder.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ScannedNote {
+    /// Normalized relative path from the import root, e.g. "work/meeting.md"
+    pub rel_path: String,
+    pub content: String,
+    pub updated_at: String,
+}
+
+/// Scans a folder (one level deep) and returns all .md files with their content.
+/// The folder name itself becomes the note folder (rel_path = "foldername/note.md").
+fn scan_md_files(dir: &Path, root: &Path) -> Vec<ScannedNote> {
+    let mut results = Vec::new();
+    let Ok(entries) = fs::read_dir(dir) else { return results };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        if name.starts_with('.') { continue; }
+        if path.is_file() && path.extension().map_or(false, |e| e == "md") {
+            let content = fs::read_to_string(&path).unwrap_or_default();
+            let rel = path.strip_prefix(root).unwrap_or(&path);
+            let rel_path = rel.to_string_lossy().replace('\\', "/");
+            let updated_at = path.metadata()
+                .and_then(|m| m.modified())
+                .map(|t| {
+                    let secs = t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+                    chrono::DateTime::from_timestamp(secs as i64, 0)
+                        .unwrap_or_else(|| Utc::now())
+                        .to_rfc3339()
+                })
+                .unwrap_or_else(|_| Utc::now().to_rfc3339());
+            results.push(ScannedNote { rel_path, content, updated_at });
+        }
+    }
+    results
+}
+
+#[tauri::command]
+async fn scan_import_folder(folder_path: String) -> Result<Vec<ScannedNote>, String> {
+    let root = Path::new(&folder_path);
+    if !root.exists() {
+        return Err(format!("Folder not found: {}", folder_path));
+    }
+    Ok(scan_md_files(root, root))
+}
+
 #[tauri::command]
 async fn export_pdf(_app: tauri::AppHandle, html: String) -> Result<bool, String> {
     info!("[lib.rs] export_pdf called, html length: {}", html.len());
@@ -551,6 +598,7 @@ pub fn run() {
             complete_github_oauth,
             #[cfg(not(any(target_os = "ios", target_os = "android")))]
             export_pdf,
+            scan_import_folder,
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
         .setup(|app| {
