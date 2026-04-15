@@ -25,19 +25,10 @@ services:
       DATABASE_URL: "${ELECTRIC_DATABASE_URL}"
 
       # --------------------------------------------------------
-      # Required: Secret used to sign Electric's internal tokens
-      # Generate with: openssl rand -hex 32
+      # Security: use ELECTRIC_INSECURE for local dev,
+      # or set ELECTRIC_SECRET for production.
       # --------------------------------------------------------
-      SECRET_KEY_BASE: "${ELECTRIC_SECRET_KEY_BASE}"
-
-      # --------------------------------------------------------
-      # Auth: Configure Electric to trust Supabase JWTs
-      # Your Supabase JWT secret is in:
-      # Supabase → Project Settings → API → JWT Settings
-      # --------------------------------------------------------
-      AUTH_MODE: "secure"
-      AUTH_JWT_ALG: "HS256"
-      AUTH_JWT_KEY: "${SUPABASE_JWT_SECRET}"
+      ELECTRIC_INSECURE: "true"
 
       # --------------------------------------------------------
       # Optional: Persistence directory for Electric's state
@@ -48,7 +39,7 @@ services:
       # LOG_LEVEL: "debug"
 
     ports:
-      - "5133:5133"       # Electric HTTP sync port (used by the client SDK)
+      - "5133:3000"       # Electric HTTP sync port (used by the client SDK)
 
     volumes:
       - electric_storage:/electric/storage

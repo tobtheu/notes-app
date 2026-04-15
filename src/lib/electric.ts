@@ -1,6 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
+import { live } from '@electric-sql/pglite/live';
 import { electricSync } from '@electric-sql/pglite-sync';
-import { live } from '@electric-sql/pglite-react';
 import { initSchema } from './db';
 
 const ELECTRIC_URL = import.meta.env.VITE_ELECTRIC_URL ?? 'http://localhost:5133';
@@ -22,7 +22,7 @@ export async function getDb(): Promise<PGlite> {
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
-    const db = await PGlite.create('idb://lama-notes', {
+    const db = await PGlite.create('idb://lama-notes-v2', {
       extensions: {
         electric: electricSync(),
         live,

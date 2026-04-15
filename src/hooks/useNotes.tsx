@@ -41,9 +41,14 @@ function rowToNote(row: {
 
 export function useNotes() {
   // ── Auth ────────────────────────────────────────────────────────────────
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('initialising');
+  // Pre-seed userId from localStorage so live queries run immediately on mount,
+  // before the async Tauri secure-store read completes. The async init will
+  // validate/refresh the session and start Electric in the background.
+  const [userId, setUserId] = useState<string | null>(() => localStorage.getItem('lama-user-id'));
+  const [userEmail, setUserEmail] = useState<string | null>(() => localStorage.getItem('lama-user-email'));
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() =>
+    localStorage.getItem('lama-user-id') ? 'synced' : 'initialising',
+  );
   const [syncError, setSyncError] = useState<string | null>(null);
 
   // ── Local UI state ───────────────────────────────────────────────────────
@@ -53,6 +58,12 @@ export function useNotes() {
 
   // Db ref — set once PGlite is ready
   const dbRef = useRef<PGlite | null>(null);
+
+  // Tracks the updated_at of our last local config write.
+  // Used to filter out Electric echoes of our own writes.
+  const lastConfigWriteAt = useRef<string | null>(null);
+  // Ref that always holds the latest metadata — avoids stale closures in callbacks
+  const metadataRef = useRef<AppMetadata>({ folders: {}, pinnedNotes: [] });
 
   // ── Initialise PGlite + restore session ──────────────────────────────────
   useEffect(() => {
@@ -67,6 +78,8 @@ export function useNotes() {
         // Restore stored Supabase session from Tauri secure store
         const stored = await window.tauriAPI.getSupabaseCredentials().catch(() => null);
         if (!stored) {
+          localStorage.removeItem('lama-user-id');
+          localStorage.removeItem('lama-user-email');
           setSyncStatus('unauthenticated');
           return;
         }
@@ -75,6 +88,8 @@ export function useNotes() {
         await setSupabaseSession(stored.accessToken, stored.refreshToken);
         setUserId(stored.userId);
         setUserEmail(stored.email);
+        localStorage.setItem('lama-user-id', stored.userId);
+        localStorage.setItem('lama-user-email', stored.email);
 
         // Start Electric shapes — real-time sync begins here
         if (!navigator.onLine) {
@@ -119,12 +134,9 @@ export function useNotes() {
     id: string; content: string; updated_at: string;
   }>(
     userId
-      ? `SELECT id, content, updated_at
-           FROM notes
-          WHERE user_id = $1 AND deleted = 0
-          ORDER BY updated_at DESC`
-      : null,
-    userId ? [userId] : undefined,
+      ? `SELECT id, content, updated_at FROM notes WHERE user_id = $1 AND deleted = false ORDER BY updated_at DESC`
+      : `SELECT id, content, updated_at FROM notes WHERE 1=0`,
+    userId ? [userId] : [],
   );
 
   // ── Live queries — Folders ────────────────────────────────────────────────
@@ -132,53 +144,95 @@ export function useNotes() {
     userId
       ? `SELECT DISTINCT
                CASE
-                 WHEN instr(id, '/') > 0 THEN substr(id, 1, instr(id, '/') - 1)
+                 WHEN strpos(id, '/') > 0 THEN substring(id, 1, strpos(id, '/') - 1)
                  ELSE ''
                END AS folder
            FROM notes
-          WHERE user_id = $1 AND deleted = 0 AND instr(id, '/') > 0
+          WHERE user_id = $1 AND deleted = false AND strpos(id, '/') > 0
           ORDER BY folder ASC`
-      : null,
-    userId ? [userId] : undefined,
+      : `SELECT '' AS folder WHERE 1=0`,
+    userId ? [userId] : [],
   );
 
-  // ── Live queries — App Config ─────────────────────────────────────────────
-  const configQuery = useLiveQuery<{ metadata: string }>(
+  // ── App Config — stable React state (not a live query) ───────────────────
+  // Config is managed as plain React state to avoid Electric-driven re-renders.
+  // Electric/PGlite changes are merged only when they're newer than our last write.
+  const configQuery = useLiveQuery<{ metadata: string | AppMetadata; updated_at: string }>(
     userId
-      ? `SELECT metadata FROM app_config WHERE user_id = $1`
-      : null,
-    userId ? [userId] : undefined,
+      ? `SELECT metadata, updated_at FROM app_config WHERE user_id = $1`
+      : `SELECT '' AS metadata, '' AS updated_at WHERE 1=0`,
+    userId ? [userId] : [],
   );
 
-  // Derived state from queries
-  const rawNotes = notesQuery?.rows ?? [];
-  const notes: Note[] = rawNotes.map(rowToNote);
+  const [metadata, setMetadataState] = useState<AppMetadata>({ folders: {}, pinnedNotes: [] });
+
+  // Apply incoming config changes only when they're newer than our last local write.
+  // This prevents Electric sync (confirming our own write, or old snapshots) from
+  // causing visible flicker — only genuine remote changes (other device) come through.
+  useEffect(() => {
+    const row = configQuery?.rows?.[0];
+    if (!row?.updated_at) return;
+    const incomingAt = row.updated_at as string;
+    // Skip if this is our own write echoing back (same or older timestamp)
+    if (lastConfigWriteAt.current && incomingAt <= lastConfigWriteAt.current) return;
+    // It's a remote change (or initial load) — apply it
+    try {
+      const m = row.metadata;
+      const parsed = (typeof m === 'string' ? JSON.parse(m) : m) as AppMetadata;
+      setMetadataState(parsed);
+      metadataRef.current = parsed;
+    } catch { /* ignore parse errors */ }
+  }, [configQuery]);
+
+  // Keep ref in sync for callback access without stale closures
+  metadataRef.current = metadata;
+
+  // Stable notes state — only re-renders when note IDs or content actually change.
+  // Prevents Electric batch-sync events from causing multiple list re-renders.
+  const [notes, setNotesState] = useState<Note[]>([]);
+  const notesSignature = useRef<string>('');
+
+  useEffect(() => {
+    const rows = notesQuery?.rows ?? [];
+    // Build a cheap signature to detect actual changes
+    const sig = rows.map(r => `${r.id}:${r.updated_at}`).join('|');
+    if (sig === notesSignature.current) return;
+    notesSignature.current = sig;
+    setNotesState(rows.map(rowToNote));
+  }, [notesQuery]);
 
   const folders: string[] = (foldersQuery?.rows ?? [])
     .map(r => r.folder)
     .filter(Boolean);
 
-  const metadata: AppMetadata = (() => {
-    const row = configQuery?.rows?.[0];
-    if (!row) return { folders: {}, pinnedNotes: [] };
-    try {
-      return JSON.parse(row.metadata) as AppMetadata;
-    } catch {
-      return { folders: {}, pinnedNotes: [] };
-    }
-  })();
-
-  // Apply folder order from metadata
-  const sortedFolders = [...folders].sort((a, b) => {
+  // Merge folders from notes + empty folders stored in folderOrder metadata.
+  // Deduplicate by normalized name — folderOrder display name wins over the
+  // lowercase name derived from note IDs (e.g. "Work" beats "work").
+  const sortedFolders = (() => {
     const order = metadata.folderOrder ?? [];
     const orderNorm = order.map(f => normalizeStr(f));
-    const idxA = orderNorm.indexOf(normalizeStr(a));
-    const idxB = orderNorm.indexOf(normalizeStr(b));
-    if (idxA === -1 && idxB === -1) return a.localeCompare(b);
-    if (idxA === -1) return 1;
-    if (idxB === -1) return -1;
-    return idxA - idxB;
-  });
+
+    const seen = new Set<string>();
+    const allFolders: string[] = [];
+
+    for (const f of order) {
+      const n = normalizeStr(f);
+      if (!seen.has(n)) { seen.add(n); allFolders.push(f); }
+    }
+    for (const f of folders) {
+      const n = normalizeStr(f);
+      if (!seen.has(n)) { seen.add(n); allFolders.push(f); }
+    }
+
+    return allFolders.sort((a, b) => {
+      const idxA = orderNorm.indexOf(normalizeStr(a));
+      const idxB = orderNorm.indexOf(normalizeStr(b));
+      if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
+    });
+  })();
 
   // ── Note ID helper ────────────────────────────────────────────────────────
 
@@ -194,10 +248,13 @@ export function useNotes() {
   const hasPending = (pendingQuery?.rows?.[0]?.count ?? 0) > 0;
 
   useEffect(() => {
-    if (syncStatus === 'synced' || syncStatus === 'offline') {
-      setSyncStatus(hasPending && navigator.onLine ? 'pending' : syncStatus);
+    if (syncStatus === 'error' || syncStatus === 'initialising' || syncStatus === 'unauthenticated') return;
+    if (hasPending && navigator.onLine) {
+      setSyncStatus('pending');
+    } else {
+      setSyncStatus(navigator.onLine ? 'synced' : 'offline');
     }
-  }, [hasPending, syncStatus]);
+  }, [hasPending]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── File Mirror ───────────────────────────────────────────────────────────
   // Write .md files to the filesystem whenever notes change in PGlite.
@@ -242,7 +299,7 @@ export function useNotes() {
         updated_at = EXCLUDED.updated_at,
         deleted    = EXCLUDED.deleted
       `,
-      [id, userId, content, updatedAt, deleted ? 1 : 0],
+      [id, userId, content, updatedAt, deleted],
     );
 
     // 2. Enqueue for Supabase flush
@@ -266,7 +323,11 @@ export function useNotes() {
     if (!userId || !dbRef.current) return;
     const db = dbRef.current;
     const updatedAt = new Date().toISOString();
-    const metaJson = JSON.stringify(newMetadata);
+
+    // Update local state immediately — no waiting for PGlite or Electric
+    lastConfigWriteAt.current = updatedAt;
+    setMetadataState(newMetadata);
+    metadataRef.current = newMetadata;
 
     await db.query(
       /* sql */ `
@@ -276,7 +337,7 @@ export function useNotes() {
         metadata   = EXCLUDED.metadata,
         updated_at = EXCLUDED.updated_at
       `,
-      [userId, metaJson, updatedAt],
+      [userId, JSON.stringify(newMetadata), updatedAt],
     );
 
     await enqueue(db, 'app_config', 'upsert', {
@@ -490,7 +551,7 @@ export function useNotes() {
     const normalizedNew = normalizeStr(newName);
     const updatedAt = new Date().toISOString();
 
-    // Re-id all notes in the folder
+    // 1. Move notes first (old folder disappears, new folder appears in live query)
     const folderNotes = notes.filter(n => normalizeStr(n.folder) === normalizedOld);
     await Promise.all(folderNotes.map(async n => {
       const oldId = getNoteId(n);
@@ -499,12 +560,7 @@ export function useNotes() {
       await writeNote(newId, n.content, updatedAt, false);
     }));
 
-    // Rename mirror folder
-    const mirrorFolder = localStorage.getItem('notes-folder');
-    if (mirrorFolder) {
-      window.tauriAPI.renameFolder({ rootPath: mirrorFolder, oldName, newName }).catch(() => {});
-    }
-
+    // 2. Update metadata after notes are moved
     const newMeta = { ...metadata };
     const existingKey = Object.keys(newMeta.folders).find(k => normalizeStr(k) === normalizedOld);
     if (existingKey) {
@@ -523,6 +579,12 @@ export function useNotes() {
       newMeta.folderOrder = newMeta.folderOrder.map(f => normalizeStr(f) === normalizedOld ? newName : f);
     }
     await writeConfig(newMeta);
+
+    // 3. Rename mirror folder
+    const mirrorFolder = localStorage.getItem('notes-folder');
+    if (mirrorFolder) {
+      window.tauriAPI.renameFolder({ rootPath: mirrorFolder, oldName, newName }).catch(() => {});
+    }
 
     if (selectedCategory === oldName) setSelectedCategory(newName);
     return { success: true };
@@ -550,17 +612,20 @@ export function useNotes() {
   }, [getNoteId, metadata, writeConfig]);
 
   const updateFolderMetadata = useCallback(async (folderName: string, meta: FolderMetadata) => {
+    // Use ref — always has latest metadata, no stale closure, no async read needed
+    const current = metadataRef.current;
     const normalizedTarget = normalizeStr(folderName);
-    const existingKey = Object.keys(metadata.folders).find(k => normalizeStr(k) === normalizedTarget);
+    const existingKey = Object.keys(current.folders ?? {}).find(k => normalizeStr(k) === normalizedTarget);
     const keyToUse = existingKey ?? folderName;
-    const newMeta = { ...metadata };
+    const newMeta = { ...current, folders: { ...current.folders } };
     newMeta.folders[keyToUse] = { ...newMeta.folders[keyToUse], ...meta };
     await writeConfig(newMeta);
-  }, [metadata, writeConfig]);
+  }, [writeConfig]);
 
   const saveSettings = useCallback(async (settings: any) => {
-    await writeConfig({ ...metadata, settings: { ...metadata.settings, ...settings } });
-  }, [metadata, writeConfig]);
+    const current = metadataRef.current;
+    await writeConfig({ ...current, settings: { ...current.settings, ...settings } });
+  }, [writeConfig]);
 
   const isNotePinned = useCallback(
     (note: Note) => (metadata.pinnedNotes ?? []).includes(getNoteId(note)),
@@ -576,6 +641,8 @@ export function useNotes() {
       await setSupabaseSession(creds.accessToken, creds.refreshToken);
       setUserId(result.userId);
       setUserEmail(result.email);
+      localStorage.setItem('lama-user-id', result.userId);
+      localStorage.setItem('lama-user-email', result.email);
       const db = await getDb();
       dbRef.current = db;
       await startElectricSync(result.userId, creds.accessToken);
@@ -592,6 +659,8 @@ export function useNotes() {
       await setSupabaseSession(creds.accessToken, creds.refreshToken);
       setUserId(result.userId);
       setUserEmail(result.email);
+      localStorage.setItem('lama-user-id', result.userId);
+      localStorage.setItem('lama-user-email', result.email);
       const db = await getDb();
       dbRef.current = db;
       await startElectricSync(result.userId, creds.accessToken);
@@ -606,6 +675,8 @@ export function useNotes() {
     stopElectricSync();
     setUserId(null);
     setUserEmail(null);
+    localStorage.removeItem('lama-user-id');
+    localStorage.removeItem('lama-user-email');
     setSyncStatus('unauthenticated');
   }, []);
 
@@ -627,6 +698,44 @@ export function useNotes() {
       localStorage.setItem('notes-folder', folder);
     }
   }, []);
+
+  /**
+   * importFolder — lets the user pick a local folder, scans all .md files,
+   * and imports them into PGlite (+ enqueues for server sync).
+   * Existing notes with newer timestamps are not overwritten.
+   * Returns the number of imported notes.
+   */
+  const importFolder = useCallback(async (): Promise<number> => {
+    if (!userId || !dbRef.current) return 0;
+
+    const folder = await window.tauriAPI.selectFolder();
+    if (!folder) return 0;
+
+    const scanned = await (window.tauriAPI as any).scanImportFolder(folder);
+    if (!scanned?.length) return 0;
+
+    const db = dbRef.current;
+    let imported = 0;
+
+    // Use the selected folder's name as the target folder in the app
+    const folderName = folder.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? '';
+
+    const { getPathId } = await import('../utils/path');
+
+    for (const file of scanned as { relPath: string; content: string; updatedAt: string }[]) {
+      const filename = file.relPath.replace(/\\/g, '/').split('/').pop() ?? file.relPath;
+      const id = getPathId(filename, folderName);
+
+      // Strip YAML frontmatter (--- ... ---) injected by the mirror writer
+      const content = file.content.replace(/^---\n[\s\S]*?\n---\n?/, '').trimStart();
+
+      await writeNote(id, content, file.updatedAt, false);
+      imported++;
+    }
+
+    if (navigator.onLine) await flushQueue(db);
+    return imported;
+  }, [userId, writeNote]);
 
   // ── Derived state — filtering & sorting ───────────────────────────────────
 
@@ -713,6 +822,7 @@ export function useNotes() {
 
     // Workspace
     selectFolder,
+    importFolder,
     setupDefaultWorkspace,
 
     // Legacy compatibility (no-ops or re-mapped)

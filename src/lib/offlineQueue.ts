@@ -59,7 +59,7 @@ export async function enqueue(
     ON CONFLICT (id) DO UPDATE SET
       payload    = EXCLUDED.payload,
       attempts   = 0,
-      created_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+      created_at = NOW()
     `,
     [writeId, table, operation, JSON.stringify(payload)],
   );

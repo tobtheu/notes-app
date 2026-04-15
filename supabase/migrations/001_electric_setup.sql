@@ -55,32 +55,38 @@ ALTER TABLE app_config REPLICA IDENTITY FULL;
 -- Notes
 ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "notes_select_own" ON notes
-    FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY IF NOT EXISTS "notes_insert_own" ON notes
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY IF NOT EXISTS "notes_update_own" ON notes
-    FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY IF NOT EXISTS "notes_delete_own" ON notes
-    FOR DELETE USING (auth.uid() = user_id);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'notes' AND policyname = 'notes_select_own') THEN
+        CREATE POLICY "notes_select_own" ON notes FOR SELECT USING (auth.uid() = user_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'notes' AND policyname = 'notes_insert_own') THEN
+        CREATE POLICY "notes_insert_own" ON notes FOR INSERT WITH CHECK (auth.uid() = user_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'notes' AND policyname = 'notes_update_own') THEN
+        CREATE POLICY "notes_update_own" ON notes FOR UPDATE USING (auth.uid() = user_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'notes' AND policyname = 'notes_delete_own') THEN
+        CREATE POLICY "notes_delete_own" ON notes FOR DELETE USING (auth.uid() = user_id);
+    END IF;
+END $$;
 
 -- App Config
 ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "config_select_own" ON app_config
-    FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY IF NOT EXISTS "config_insert_own" ON app_config
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY IF NOT EXISTS "config_update_own" ON app_config
-    FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY IF NOT EXISTS "config_delete_own" ON app_config
-    FOR DELETE USING (auth.uid() = user_id);
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'app_config' AND policyname = 'config_select_own') THEN
+        CREATE POLICY "config_select_own" ON app_config FOR SELECT USING (auth.uid() = user_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'app_config' AND policyname = 'config_insert_own') THEN
+        CREATE POLICY "config_insert_own" ON app_config FOR INSERT WITH CHECK (auth.uid() = user_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'app_config' AND policyname = 'config_update_own') THEN
+        CREATE POLICY "config_update_own" ON app_config FOR UPDATE USING (auth.uid() = user_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'app_config' AND policyname = 'config_delete_own') THEN
+        CREATE POLICY "config_delete_own" ON app_config FOR DELETE USING (auth.uid() = user_id);
+    END IF;
+END $$;
 
 -- ------------------------------------------------------------
 -- 4. POSTGRES PUBLICATION FOR ELECTRIC
