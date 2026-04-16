@@ -234,7 +234,7 @@ const NoteListItem = memo(({
                                         "p-1 rounded-md transition-all pointer-events-auto",
                                         isPinned
                                             ? "text-primary-500 bg-primary-50 dark:bg-primary-900/30 opacity-100"
-                                            : "text-gray-300 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700"
+                                            : "text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700"
                                     )}
                                     title={isPinned ? "Unpin Note" : "Pin Note"}
                                 >
@@ -244,12 +244,12 @@ const NoteListItem = memo(({
                         </div>
 
                         {!isCompact && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 mb-2 leading-5 h-10 overflow-hidden">
+                            <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-2 leading-5 h-10 overflow-hidden">
                                 {previewText}
                             </p>
                         )}
 
-                        <div className="flex items-center justify-between text-[10px] font-medium text-gray-400 uppercase tracking-tight relative pointer-events-auto">
+                        <div className="flex items-center justify-between text-[10px] font-medium text-gray-500 uppercase tracking-tight relative pointer-events-auto">
                             <div className="flex items-center gap-1.5 min-w-0 pr-2">
                                 <span className="shrink-0">{timeString}</span>
                                 {note.folder && (
@@ -269,7 +269,7 @@ const NoteListItem = memo(({
                                         "p-1 rounded transition-all pointer-events-auto",
                                         dropdownOpenId === noteId
                                             ? "bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400 opacity-100"
-                                            : "opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-300 hover:text-gray-600 dark:hover:text-gray-200"
+                                            : "opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                                     )}
                                     title="Move to Folder"
                                 >
@@ -280,7 +280,7 @@ const NoteListItem = memo(({
                                         e.stopPropagation();
                                         onDeleteNote(noteId);
                                     }}
-                                    className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-300 hover:text-red-500 rounded transition-all pointer-events-auto"
+                                    className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 rounded transition-all pointer-events-auto"
                                     title="Delete Note"
                                 >
                                     <Trash2 size={12} />
@@ -415,7 +415,7 @@ export function NoteList({
                         <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 truncate">
                             {folders.includes(selectedCategory || '') ? selectedCategory : 'All Notes'}
                         </h2>
-                        <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             {notes.length} {notes.length === 1 ? 'Note' : 'Notes'}
                         </span>
                     </div>

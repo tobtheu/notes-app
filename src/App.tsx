@@ -85,6 +85,7 @@ function App() {
     syncError,
     hasPending,
     setupDefaultWorkspace,
+    changeFolder,
     signIn,
     signUp,
     signOut,
@@ -429,7 +430,7 @@ function App() {
           onClose={() => setIsSettingsOpen(false)}
           isIOS={isIOS}
           currentPath={currentFolder}
-          onChangePath={selectFolder}
+          onChangePath={changeFolder}
           theme={theme}
           setTheme={setTheme}
           markdownEnabled={markdownEnabled}

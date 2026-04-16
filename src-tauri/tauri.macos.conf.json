@@ -3,6 +3,7 @@
     "windows": [
       {
         "label": "main",
+        "title": "",
         "decorations": true,
         "titleBarStyle": "Overlay"
       }

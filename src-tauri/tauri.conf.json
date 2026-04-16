@@ -16,8 +16,10 @@
         "title": "",
         "resizable": true,
         "fullscreen": false,
-        "width": 1200,
-        "height": 800,
+        "width": 1270,
+        "height": 900,
+        "minWidth": 800,
+        "minHeight": 600,
         "decorations": true,
         "transparent": true,
         "dragDropEnabled": false

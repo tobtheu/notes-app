@@ -136,13 +136,26 @@ export const DB_SCHEMA = /* sql */ `
   -- Pending writes: local changes not yet flushed to Supabase.
   -- Used for offline-first: written immediately, synced when online.
   CREATE TABLE IF NOT EXISTS pending_writes (
-    id          TEXT        NOT NULL PRIMARY KEY,
-    table_name  TEXT        NOT NULL,
-    operation   TEXT        NOT NULL,  -- 'upsert' | 'delete'
-    payload     TEXT        NOT NULL,  -- JSON
-    created_at  TEXT        NOT NULL DEFAULT (NOW()),
-    attempts    INTEGER     NOT NULL DEFAULT 0
+    id            TEXT        NOT NULL PRIMARY KEY,
+    table_name    TEXT        NOT NULL,
+    operation     TEXT        NOT NULL,  -- 'upsert' | 'delete'
+    payload       TEXT        NOT NULL,  -- JSON
+    created_at    TEXT        NOT NULL DEFAULT (NOW()),
+    attempts      INTEGER     NOT NULL DEFAULT 0,
+    next_retry_at TEXT        NOT NULL DEFAULT (NOW())
   );
+
+  -- Add next_retry_at to existing installs that predate this column
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'pending_writes' AND column_name = 'next_retry_at'
+    ) THEN
+      ALTER TABLE pending_writes ADD COLUMN next_retry_at TEXT NOT NULL DEFAULT (NOW());
+    END IF;
+  END
+  $$;
 `;
 
 /**

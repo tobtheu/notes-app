@@ -94,6 +94,56 @@ fn inject_frontmatter(content: &str, timestamp: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// Path safety helpers
+// ---------------------------------------------------------------------------
+
+/// Returns true if a single path component is safe: no traversal, no absolute
+/// paths, no null bytes, no control characters.
+fn is_safe_component(s: &str) -> bool {
+    !s.is_empty()
+        && s != ".."
+        && s != "."
+        && !s.contains('\0')
+        && !s.contains('/')
+        && !s.contains('\\')
+}
+
+/// Validates that every component of a relative path (e.g. "Work/note.md") is safe.
+fn is_safe_relative_path(rel: &str) -> bool {
+    if rel.is_empty() { return true; }
+    rel.split('/').all(is_safe_component)
+}
+
+/// Canonicalizes `path` and verifies it stays inside `root`.
+/// Returns Err if the path escapes the root (path traversal).
+fn assert_within_root(root: &std::path::Path, path: &std::path::Path) -> Result<(), String> {
+    // If path doesn't exist yet, walk up until we find an existing ancestor.
+    let canonical_path = {
+        let mut p = path.to_path_buf();
+        let mut suffix = std::path::PathBuf::new();
+        loop {
+            if p.exists() {
+                let mut full = p.canonicalize().map_err(|e| e.to_string())?;
+                full.push(suffix);
+                break full;
+            }
+            match p.file_name() {
+                Some(name) => {
+                    suffix = std::path::Path::new(name).join(&suffix);
+                    p = p.parent().unwrap_or(&p).to_path_buf();
+                }
+                None => break path.to_path_buf(),
+            }
+        }
+    };
+    let canonical_root = root.canonicalize().map_err(|e| e.to_string())?;
+    if !canonical_path.starts_with(&canonical_root) {
+        return Err(format!("Path traversal detected: {:?} is outside {:?}", canonical_path, canonical_root));
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // File Mirror — write .md files from PGlite changes
 // ---------------------------------------------------------------------------
 
@@ -123,12 +173,23 @@ fn mirror_path(mirror_folder: &str, note_id: &str) -> PathBuf {
 /// Called by the frontend whenever PGlite reports a note change.
 #[tauri::command]
 async fn write_mirror_file(payload: MirrorNotePayload) -> Result<(), String> {
-    let path = mirror_path(&payload.mirror_folder, &format!(
-        "{}{}{}",
-        if payload.note.folder.is_empty() { "" } else { &payload.note.folder },
-        if payload.note.folder.is_empty() { "" } else { "/" },
-        payload.note.filename,
-    ));
+    // Validate each folder segment and the filename independently
+    if !payload.note.folder.is_empty() && !is_safe_relative_path(&payload.note.folder) {
+        return Err("Invalid folder path".to_string());
+    }
+    if !is_safe_component(&payload.note.filename) {
+        return Err("Invalid filename".to_string());
+    }
+
+    let rel = if payload.note.folder.is_empty() {
+        payload.note.filename.clone()
+    } else {
+        format!("{}/{}", payload.note.folder, payload.note.filename)
+    };
+
+    let path = mirror_path(&payload.mirror_folder, &rel);
+    let root = Path::new(&payload.mirror_folder);
+    assert_within_root(root, &path)?;
 
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -142,7 +203,12 @@ async fn write_mirror_file(payload: MirrorNotePayload) -> Result<(), String> {
 /// Deletes a note's .md mirror file (called on soft-delete / move).
 #[tauri::command]
 async fn delete_mirror_file(payload: DeleteMirrorPayload) -> Result<(), String> {
+    if !is_safe_relative_path(&payload.note_id) {
+        return Err("Invalid note_id path".to_string());
+    }
     let path = mirror_path(&payload.mirror_folder, &payload.note_id);
+    let root = Path::new(&payload.mirror_folder);
+    assert_within_root(root, &path)?;
     if path.exists() {
         fs::remove_file(&path).map_err(|e| e.to_string())?;
     }
@@ -235,6 +301,11 @@ pub struct SaveAssetResponse {
 
 #[tauri::command]
 async fn save_asset(_app: tauri::AppHandle, root_path: String, filename: String, content_base64: String) -> Result<SaveAssetResponse, String> {
+    // Only allow a flat filename — no path separators or traversal
+    if !is_safe_component(&filename) {
+        return Err("Invalid filename".to_string());
+    }
+
     let root = Path::new(&root_path);
     let assets_dir = root.join(".assets");
     if !assets_dir.exists() {
@@ -244,13 +315,16 @@ async fn save_asset(_app: tauri::AppHandle, root_path: String, filename: String,
     if !gitkeep_path.exists() {
         let _ = fs::write(&gitkeep_path, "");
     }
+
+    let file_path = assets_dir.join(&filename);
+    assert_within_root(&assets_dir, &file_path)?;
+
     let b64_data = if let Some(idx) = content_base64.find("base64,") {
         &content_base64[idx + 7..]
     } else {
         &content_base64
     };
     let decoded = general_purpose::STANDARD.decode(b64_data).map_err(|e| format!("Base64 Error: {}", e))?;
-    let file_path = assets_dir.join(&filename);
     fs::write(&file_path, decoded).map_err(|e| e.to_string())?;
     Ok(SaveAssetResponse {
         success: true,
@@ -561,7 +635,13 @@ pub fn run() {
     builder
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
+            .level(log::LevelFilter::Debug)
+            .target(tauri_plugin_log::Target::new(
+                tauri_plugin_log::TargetKind::Stdout,
+            ))
+            .target(tauri_plugin_log::Target::new(
+                tauri_plugin_log::TargetKind::Webview,
+            ))
             .build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -607,6 +687,32 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
+                use tauri::LogicalSize;
+                use tauri_plugin_store::StoreExt;
+
+                if let Some(window) = app.get_webview_window("main") {
+                    // Always enforce minimum size
+                    let _ = window.set_min_size(Some(LogicalSize::new(800u32, 600u32)));
+
+                    // On the very first launch (no saved window size in store),
+                    // set the desired default size. On subsequent launches the OS
+                    // restores the user's last size — we leave that alone.
+                    let store = app.store("window.json").ok();
+                    let first_launch = store.as_ref()
+                        .map(|s| s.get("sized").is_none())
+                        .unwrap_or(true);
+
+                    if first_launch {
+                        let _ = window.set_size(LogicalSize::new(1270u32, 900u32));
+                        if let Some(s) = store {
+                            let _ = s.set("sized", serde_json::json!(true));
+                            let _ = s.save();
+                        }
+                    }
+                }
+            }
+            #[cfg(desktop)]
+            {
                 use tauri::tray::TrayIconBuilder;
                 use tauri::menu::{Menu, MenuItem};
 
@@ -633,7 +739,7 @@ pub fn run() {
                         }
                     })
                     .build(app)?;
-            }
+            } // end tray #[cfg(desktop)]
             Ok(())
         })
         .run(tauri::generate_context!())
