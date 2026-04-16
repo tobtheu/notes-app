@@ -566,20 +566,22 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
         if (isIOS) {
             // On iOS, WKWebView scrolls `window` when the keyboard opens to bring
             // the cursor into view. This shifts the entire scroll container upward,
-            // clipping the title. Fix: reset window scroll and track keyboard height
-            // so we can add bottom padding to keep content reachable.
-            const update = () => {
+            // clipping the title. Fix: reset window scroll on keyboard resize only,
+            // and track keyboard height so we can add bottom padding.
+            //
+            // IMPORTANT: window.scrollTo(0,0) must NOT run on visualViewport 'scroll'
+            // events — those also fire during text-selection drag, causing jitter as
+            // iOS tries to scroll the selection handle into view while we reset it.
+            const onResize = () => {
                 window.scrollTo(0, 0);
                 const kbHeight = window.innerHeight - vv.height - vv.offsetTop;
                 const h = kbHeight > 50 ? kbHeight : 0;
                 keyboardHeightRef.current = h;
                 setKeyboardHeight(h);
             };
-            vv.addEventListener('resize', update);
-            vv.addEventListener('scroll', update);
+            vv.addEventListener('resize', onResize);
             return () => {
-                vv.removeEventListener('resize', update);
-                vv.removeEventListener('scroll', update);
+                vv.removeEventListener('resize', onResize);
             };
         }
 
@@ -894,6 +896,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     useEffect(() => {
         if (!isIOS || !editor) return;
 
+        // Tell native to show the editor toolbar now that MarkdownEditor is active
+        (window as any).webkit?.messageHandlers?.toolbarVisible?.postMessage(true);
+
         (window as any).toolbarAction = (action: string) => {
             // No .focus() — avoids WKWebView scroll-to-cursor jump on iOS.
             // The editor is already focused (keyboard is open), so focus is preserved.
@@ -942,6 +947,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             delete (window as any).toolbarAction;
             editor.off('selectionUpdate', sendState);
             editor.off('transaction', sendState);
+            // Hide the toolbar when MarkdownEditor unmounts (e.g. navigating back to sign-in)
+            (window as any).webkit?.messageHandlers?.toolbarVisible?.postMessage(false);
         };
     }, [isIOS, editor]);
 

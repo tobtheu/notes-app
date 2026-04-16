@@ -518,7 +518,7 @@ export function SettingsModal({
 
                     {/* Landscape Fullscreen — iOS only */}
                     {isIOS && (
-                        <div className="flex items-center justify-between mt-4">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg mt-3">
                             <div className="flex flex-col">
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Landscape Vollbild</span>
                                 <span className="text-xs text-gray-500">Notiz im Querformat über den ganzen Bildschirm</span>

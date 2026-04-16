@@ -19,6 +19,7 @@ static void setupToolbar(WKWebView *webView);
 
 static WKWebView *gWebView = nil;
 static BOOL gToolbarSetupDone = NO;
+static BOOL gToolbarEnabled = NO;  // Only show toolbar when MarkdownEditor is active
 
 @class EditorAccessoryView;
 static EditorAccessoryView *gToolbarView = nil;
@@ -191,6 +192,38 @@ static EditorAccessoryView *gToolbarView = nil;
 }
 @end
 
+// ── Toolbar visibility control (JS → show/hide for non-editor inputs) ──
+
+@interface ToolbarVisibilityHandler : NSObject <WKScriptMessageHandler>
+@end
+
+@implementation ToolbarVisibilityHandler
+- (void)userContentController:(WKUserContentController *)ucc didReceiveScriptMessage:(WKScriptMessage *)message {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        gToolbarEnabled = [message.body boolValue];
+        // Refresh the keyboard accessory view for the current first responder
+        if (gWebView) {
+            [gWebView reloadInputViews];
+        }
+    });
+}
+@end
+
+// ── Haptic feedback (JS → UIImpactFeedbackGenerator) ───────────────────
+
+@interface HapticHandler : NSObject <WKScriptMessageHandler>
+@end
+
+@implementation HapticHandler
+- (void)userContentController:(WKUserContentController *)ucc didReceiveScriptMessage:(WKScriptMessage *)message {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
+        [gen prepare];
+        [gen impactOccurred];
+    });
+}
+@end
+
 static void setupToolbar(WKWebView *webView) {
     if (gToolbarSetupDone) return;
     gToolbarSetupDone = YES;
@@ -201,6 +234,14 @@ static void setupToolbar(WKWebView *webView) {
     // Register message handler for active-state updates from Tiptap
     ToolbarStateHandler *handler = [[ToolbarStateHandler alloc] init];
     [webView.configuration.userContentController addScriptMessageHandler:handler name:@"toolbarState"];
+
+    // Register handler to show/hide toolbar from JS (only show when MarkdownEditor is active)
+    ToolbarVisibilityHandler *visHandler = [[ToolbarVisibilityHandler alloc] init];
+    [webView.configuration.userContentController addScriptMessageHandler:visHandler name:@"toolbarVisible"];
+
+    // Register handler for haptic feedback on long-press
+    HapticHandler *hapticHandler = [[HapticHandler alloc] init];
+    [webView.configuration.userContentController addScriptMessageHandler:hapticHandler name:@"hapticImpact"];
 }
 
 // ── WKWebView layout + toolbar setup ──────────────────────────────────
@@ -264,7 +305,9 @@ static void setupFullscreenHook(void) {
     if (wkContentViewClass) {
         SEL sel = @selector(inputAccessoryView);
         IMP newImp = imp_implementationWithBlock(^UIView *(id _self) {
-            return gToolbarView; // nil until setupToolbar runs (harmless)
+            // Only show the editor toolbar when MarkdownEditor is active.
+            // Returns nil for all other inputs (login form, settings, etc.)
+            return gToolbarEnabled ? gToolbarView : nil;
         });
         Method existing = class_getInstanceMethod(wkContentViewClass, sel);
         if (existing) {

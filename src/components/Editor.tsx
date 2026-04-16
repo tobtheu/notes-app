@@ -432,6 +432,34 @@ export function Editor({
 
             {/* Title in Focus Mode removed - now passed as header prop to MarkdownEditor for scrolling */}
 
+            {/* On iOS: menu button lives in the TitleBar row (fixed top-right) */}
+            {isIOS && !isFocusMode && (
+                <div className="fixed right-2 z-10000 h-6 top-(--safe-top,0px) flex items-center no-drag" ref={menuRef}>
+                    <button
+                        type="button"
+                        onClick={() => setIsMenuOpen(!isMenuOpen)}
+                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-md transition-colors active:scale-90"
+                        title="Actions"
+                    >
+                        <MoreVertical size={18} />
+                    </button>
+                    {isMenuOpen && (
+                        <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 p-1.5 animate-in fade-in zoom-in duration-200 z-[100] backdrop-blur-xl">
+                            <button
+                                type="button"
+                                onClick={() => { handleExport(); setIsMenuOpen(false); }}
+                                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
+                            >
+                                <div className="w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 transition-colors group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                                    <FileDown size={16} />
+                                </div>
+                                <span className="font-medium">Export PDF</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Header with Title and Actions - Hidden in Focus Mode */}
             {!isFocusMode && (
                 <div className="w-full pt-3">
@@ -450,9 +478,12 @@ export function Editor({
                             rows={1}
                         />
 
+                        {/* Desktop/non-iOS menu button */}
+                        {!isIOS && (
                         <div className="flex items-center gap-2 shrink-0 pt-0.5" ref={menuRef}>
                             <div className="relative">
                                 <button
+                                    type="button"
                                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                                     className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
                                     title="Actions"
@@ -463,6 +494,7 @@ export function Editor({
                                 {isMenuOpen && (
                                     <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 p-1.5 animate-in fade-in zoom-in duration-200 z-[100] backdrop-blur-xl">
                                         <button
+                                            type="button"
                                             onClick={() => { onToggleFocus(); setIsMenuOpen(false); }}
                                             className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
                                         >
@@ -475,6 +507,7 @@ export function Editor({
                                         <div className="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-1.5" />
 
                                         <button
+                                            type="button"
                                             onClick={() => { handleExport(); setIsMenuOpen(false); }}
                                             className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
                                         >
@@ -484,8 +517,8 @@ export function Editor({
                                             <span className="font-medium">Export PDF</span>
                                         </button>
 
-                                        {!isIOS && (
                                         <button
+                                            type="button"
                                             onClick={() => { setToolbarVisible(!toolbarVisible); setIsMenuOpen(false); }}
                                             className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
                                         >
@@ -499,11 +532,11 @@ export function Editor({
                                             </div>
                                             <span className="font-medium">{toolbarVisible ? 'Hide' : 'Show'} Toolbar</span>
                                         </button>
-                                        )}
                                     </div>
                                 )}
                             </div>
                         </div>
+                        )}
                     </div>
                 </div>
             )}

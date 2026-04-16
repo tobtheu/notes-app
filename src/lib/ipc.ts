@@ -26,8 +26,11 @@ export const tauriAPI: TauriAPI = {
     // File mirror
     writeMirrorFile: (payload) => invoke<void>('write_mirror_file', { payload }),
     deleteMirrorFile: (payload) => invoke<void>('delete_mirror_file', { payload }),
-    scanImportFolder: (folderPath: string) =>
-        invoke<{ relPath: string; content: string; updatedAt: string }[]>('scan_import_folder', { folderPath }),
+    scanImportFolder: (folderPath: string) => {
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) return Promise.resolve([]);
+        return invoke<{ relPath: string; content: string; updatedAt: string }[]>('scan_import_folder', { folderPath });
+    },
 
     // Folder operations
     listFolders: (folderPath: string) => invoke<string[]>('list_folders', { folderPath }),
@@ -49,9 +52,15 @@ export const tauriAPI: TauriAPI = {
     // App info
     getAppVersion: () => invoke<string>('get_app_version'),
 
-    // File watcher
-    startWatch: (folderPath: string) => invoke('start_watch', { folderPath }),
+    // File watcher (desktop only — not available on iOS/Android)
+    startWatch: (folderPath: string) => {
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) return Promise.resolve();
+        return invoke('start_watch', { folderPath });
+    },
     onFileChanged: (callback) => {
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) return () => {};
         let unlisten: (() => void) | null = null;
         let isCancelled = false;
         listen('file-changed', () => {

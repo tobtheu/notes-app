@@ -148,6 +148,8 @@ const FolderItem = ({
         longPressTimer.current = setTimeout(() => {
             setIsPressing(false);
             setIsLongPressing(true);
+            // Haptic feedback on iOS
+            (window as any).webkit?.messageHandlers?.hapticImpact?.postMessage(null);
             if (onEditCategory) onEditCategory(folder);
         }, 500);
     };
@@ -181,7 +183,9 @@ const FolderItem = ({
                 "group relative flex items-center transition-all rounded-lg cursor-pointer mb-0.5 outline-none",
                 isCollapsed ? "justify-center py-1.5" : "px-1 py-1.5 gap-2 text-sm font-medium",
                 isSelected
-                    ? "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100"
+                    ? isCollapsed
+                        ? clsx(colorStyles.bg, colorStyles.darkBg, "shadow-sm")
+                        : "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100"
                     : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700",
                 isDragging && "opacity-40",
                 isOverlay && "shadow-lg scale-105 opacity-90 cursor-grabbing bg-white dark:bg-gray-800"
@@ -216,7 +220,7 @@ const FolderItem = ({
                 )}
                 <div className={clsx(
                     "p-1 rounded-md transition-colors shrink-0",
-                    isSelected ? colorStyles.bg + " " + colorStyles.darkBg : "bg-transparent"
+                    isSelected && !isCollapsed ? colorStyles.bg + " " + colorStyles.darkBg : "bg-transparent"
                 )}>
                     <IconComponent
                         size={isCollapsed ? 20 : 18}
@@ -385,7 +389,7 @@ export function Sidebar({
             <div className="px-2 pb-2" style={isIOS ? { paddingTop: 'var(--safe-top, 16px)' } : { paddingTop: '1rem' }}>
                 {/* iOS: collapse/expand toggle above new-note button */}
                 {isIOS && onToggleCollapse && (
-                    <div className={clsx("mb-2 px-1 lg:px-2", isCollapsed ? "flex justify-center" : "flex justify-end")}>
+                    <div className={clsx("mb-4 px-1 lg:px-2", isCollapsed ? "flex justify-center" : "flex justify-end")}>
                         <button
                             type="button"
                             onClick={onToggleCollapse}
@@ -396,7 +400,7 @@ export function Sidebar({
                         </button>
                     </div>
                 )}
-                <div className={clsx("mb-6 px-1 lg:px-2", isCollapsed ? "flex flex-col items-center" : "block")}>
+                <div className={clsx("mb-4 px-1 lg:px-2", isCollapsed ? "flex flex-col items-center" : "block")}>
                     <button
                         onClick={onCreateNote}
                         className={clsx(

@@ -575,6 +575,7 @@ pub struct ScannedNote {
     pub updated_at: String,
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 /// Scans a folder recursively and returns all .md files with their content.
 /// rel_path is relative to root, e.g. "subfolder/note.md" or "note.md".
 fn scan_md_files(dir: &Path, root: &Path) -> Vec<ScannedNote> {
@@ -606,6 +607,7 @@ fn scan_md_files(dir: &Path, root: &Path) -> Vec<ScannedNote> {
     results
 }
 
+#[cfg(not(any(target_os = "ios", target_os = "android")))]
 #[tauri::command]
 async fn scan_import_folder(folder_path: String) -> Result<Vec<ScannedNote>, String> {
     let root = Path::new(&folder_path);
@@ -692,6 +694,7 @@ pub fn run() {
             complete_github_oauth,
             #[cfg(not(any(target_os = "ios", target_os = "android")))]
             export_pdf,
+            #[cfg(not(any(target_os = "ios", target_os = "android")))]
             scan_import_folder,
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
