@@ -2,7 +2,10 @@ import { useRef, useState } from 'react';
 import {
     Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
     Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart,
-    Plus, Settings, Settings2, Trash2, Pencil, GripVertical, Check, PanelLeftClose, PanelLeftOpen
+    Plus, Settings, Settings2, Trash2, Pencil, GripVertical, Check, PanelLeftClose, PanelLeftOpen,
+    Pen, Globe, Lock, Archive, Bookmark, Lightbulb, Rocket, Award,
+    FileText, Headphones, Gamepad2, Dumbbell, Plane, Utensils,
+    Microscope, Palette, Film, TreePine, GraduationCap, Bike
 } from 'lucide-react';
 import clsx from 'clsx';
 import { SyncStatusBadge } from './SyncStatusBadge';
@@ -36,7 +39,10 @@ import { CSS } from '@dnd-kit/utilities';
  */
 const ICON_MAP: Record<string, any> = {
     Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
-    Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart, Settings, Trash2
+    Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart, Settings, Trash2,
+    Pen, Globe, Lock, Archive, Bookmark, Lightbulb, Rocket, Award,
+    FileText, Headphones, Gamepad2, Dumbbell, Plane, Utensils,
+    Microscope, Palette, Film, TreePine, GraduationCap, Bike
 };
 
 /**
@@ -47,12 +53,17 @@ const COLOR_MAP: Record<string, any> = {
     red: { bg: 'bg-red-100', text: 'text-red-600', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-400' },
     orange: { bg: 'bg-orange-100', text: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400' },
     amber: { bg: 'bg-amber-100', text: 'text-amber-600', darkBg: 'dark:bg-amber-900/30', darkText: 'dark:text-amber-400' },
+    lime: { bg: 'bg-lime-100', text: 'text-lime-700', darkBg: 'dark:bg-lime-900/30', darkText: 'dark:text-lime-400' },
     green: { bg: 'bg-emerald-100', text: 'text-emerald-600', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400' },
+    teal: { bg: 'bg-teal-100', text: 'text-teal-600', darkBg: 'dark:bg-teal-900/30', darkText: 'dark:text-teal-400' },
     cyan: { bg: 'bg-cyan-100', text: 'text-cyan-600', darkBg: 'dark:bg-cyan-900/30', darkText: 'dark:text-cyan-400' },
+    sky: { bg: 'bg-sky-100', text: 'text-sky-600', darkBg: 'dark:bg-sky-900/30', darkText: 'dark:text-sky-400' },
     blue: { bg: 'bg-blue-100', text: 'text-blue-600', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400' },
     indigo: { bg: 'bg-indigo-100', text: 'text-indigo-600', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400' },
+    violet: { bg: 'bg-violet-100', text: 'text-violet-600', darkBg: 'dark:bg-violet-900/30', darkText: 'dark:text-violet-400' },
     purple: { bg: 'bg-purple-100', text: 'text-purple-600', darkBg: 'dark:bg-purple-900/30', darkText: 'dark:text-purple-400' },
     pink: { bg: 'bg-pink-100', text: 'text-pink-600', darkBg: 'dark:bg-pink-900/30', darkText: 'dark:text-pink-400' },
+    rose: { bg: 'bg-rose-100', text: 'text-rose-600', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400' },
     gray: { bg: 'bg-gray-100', text: 'text-gray-600', darkBg: 'dark:bg-gray-800', darkText: 'dark:text-gray-400' },
 };
 
@@ -168,7 +179,7 @@ const FolderItem = ({
             style={{ ...style, WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' } as React.CSSProperties}
             className={clsx(
                 "group relative flex items-center transition-all rounded-lg cursor-pointer mb-0.5 outline-none",
-                isCollapsed ? "justify-center py-2.5" : "px-1 py-2.5 gap-2 text-sm font-medium",
+                isCollapsed ? "justify-center py-1.5" : "px-1 py-1.5 gap-2 text-sm font-medium",
                 isSelected
                     ? "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100"
                     : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700",
@@ -401,7 +412,7 @@ export function Sidebar({
 
                 {!isCollapsed && (
                     <div className="px-3 mb-2 flex items-center justify-between group">
-                        <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Categories
                         </span>
                         <div className="flex items-center gap-1">
@@ -416,11 +427,11 @@ export function Sidebar({
                                 </button>
                             ) : (
                                 <>
-                                    {/* Desktop: new folder on hover */}
+                                    {/* Desktop: new folder button — always visible */}
                                     <button
                                         type="button"
                                         onClick={() => setIsCreatingFolder(true)}
-                                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-400 transition-opacity hidden lg:block lg:opacity-0 lg:group-hover:opacity-100"
+                                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors hidden lg:block"
                                         title="New Folder"
                                     >
                                         <Plus size={14} />
@@ -450,18 +461,18 @@ export function Sidebar({
                     onDragEnd={handleDragEnd}
                     onDragCancel={() => setActiveId(null)}
                 >
-                    <div className="space-y-0.5 mb-4 px-1">
+                    <div className="space-y-0 mb-2 px-1">
                         {/* Static "All Notes" folder */}
                         <button
                             onClick={() => onSelectCategory(null)}
                             className={clsx(
                                 "w-full flex items-center transition-colors rounded-lg",
-                                isCollapsed ? "justify-center py-3" : "px-3 py-2.5 gap-3 text-sm font-medium",
+                                isCollapsed ? "justify-center py-1.5" : "px-3 py-1.5 gap-3 text-sm font-medium",
                                 !selectedCategory ? "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100" : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                             )}
                             title="All Notes"
                         >
-                            <Folder size={isCollapsed ? 20 : 18} className={!selectedCategory ? "text-primary-500" : "text-gray-400"} />
+                            <Folder size={isCollapsed ? 20 : 18} className={!selectedCategory ? "text-primary-500" : "text-gray-500 dark:text-gray-400"} />
                             {!isCollapsed && <span>All Notes</span>}
                         </button>
 

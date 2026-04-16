@@ -37,6 +37,65 @@ function rowToNote(row: {
 }
 
 // ---------------------------------------------------------------------------
+// Folder scan helper — imports .md files not yet known to PGlite
+// ---------------------------------------------------------------------------
+
+/**
+ * Scans the mirror folder and imports any .md files whose ID is not yet in PGlite.
+ * Safe to call repeatedly — existing notes are never overwritten (ON CONFLICT DO NOTHING).
+ * For cloud users, new notes are also enqueued for Supabase sync.
+ */
+async function scanAndImportNewFiles(
+  db: PGliteWithLive,
+  uid: string,
+  folder: string,
+): Promise<void> {
+  try {
+    const scanned = await (window.tauriAPI as any).scanImportFolder(folder) as
+      { relPath: string; content: string; updatedAt: string }[];
+    if (!scanned?.length) return;
+
+    const { rows: existingRows } = await db.query<{ id: string }>(
+      `SELECT id FROM notes WHERE user_id = $1 AND deleted = false`,
+      [uid],
+    );
+    const existingIds = new Set(existingRows.map(r => r.id));
+
+    let imported = 0;
+    for (const file of scanned) {
+      const parts = file.relPath.replace(/\\/g, '/').split('/');
+      const filename = parts.pop() ?? file.relPath;
+      const fileFolder = parts.join('/');
+      const id = getPathId(filename, fileFolder);
+      if (existingIds.has(id)) continue;
+
+      const content = file.content.replace(/^---\n[\s\S]*?\n---\n?/, '').trimStart();
+      await db.query(
+        `INSERT INTO notes (id, user_id, content, updated_at, deleted)
+         VALUES ($1, $2, $3, $4, false)
+         ON CONFLICT (id, user_id) DO NOTHING`,
+        [id, uid, content, file.updatedAt],
+      );
+
+      // For cloud users, also enqueue for Supabase sync
+      if (uid !== 'local') {
+        await enqueue(db, 'notes', 'upsert', {
+          id, user_id: uid, content, updated_at: file.updatedAt, deleted: false,
+        });
+      }
+
+      imported++;
+    }
+
+    if (imported > 0) {
+      log.info(`[scanAndImportNewFiles] imported ${imported} new file(s) for user ${uid}`);
+    }
+  } catch (e) {
+    log.warn('[scanAndImportNewFiles] error:', String(e));
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main hook
 // ---------------------------------------------------------------------------
 
@@ -89,6 +148,9 @@ export function useNotes() {
           log.info('[useNotes:init] restoring local-only mode');
           setUserId('local');
           setSyncStatus('offline');
+
+          const folder = localStorage.getItem('notes-folder');
+          if (folder) await scanAndImportNewFiles(db, 'local', folder);
           return;
         }
 
@@ -130,6 +192,13 @@ export function useNotes() {
         });
         log.info('[useNotes:init] Electric sync started');
 
+        // Scan mirror folder for files added externally while the app was closed
+        const mirrorFolder = localStorage.getItem('notes-folder');
+        if (mirrorFolder) {
+          log.info('[useNotes:init] scanning mirror folder for new files...');
+          await scanAndImportNewFiles(db, stored.userId, mirrorFolder);
+        }
+
         // Flush any writes that accumulated while offline
         if (navigator.onLine) {
           log.info('[useNotes:init] flushing offline queue...');
@@ -164,6 +233,33 @@ export function useNotes() {
       window.removeEventListener('offline', handleOffline);
     };
   }, [userId]);
+
+  // ── File watcher — import new .md files added externally while app is open ─
+  useEffect(() => {
+    if (!userId || !currentFolder) return;
+
+    // Start the Rust file watcher for the mirror folder
+    window.tauriAPI.startWatch(currentFolder);
+
+    // Subscribe to file-changed events and re-scan for new files.
+    // Debounced so that copying many files at once triggers only one scan.
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const unlisten = window.tauriAPI.onFileChanged(() => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(async () => {
+        if (!dbRef.current) return;
+        await scanAndImportNewFiles(dbRef.current, userId, currentFolder);
+        if (userId !== 'local' && navigator.onLine) {
+          flushQueue(dbRef.current).catch((e: unknown) => log.error(String(e)));
+        }
+      }, 1500);
+    });
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      unlisten();
+    };
+  }, [userId, currentFolder]);
 
   // ── Live queries — Notes ──────────────────────────────────────────────────
   const notesQuery = useLiveQuery<{
@@ -704,7 +800,7 @@ export function useNotes() {
          ON CONFLICT (id, user_id) DO UPDATE SET
            content    = EXCLUDED.content,
            updated_at = EXCLUDED.updated_at
-         WHERE EXCLUDED.updated_at::timestamptz >= notes.updated_at::timestamptz`,
+         WHERE CAST(EXCLUDED.updated_at AS timestamptz) >= CAST(notes.updated_at AS timestamptz)`,
         [row.id, realUserId, row.content, row.updated_at ?? updatedAt],
       );
       await enqueue(db, 'notes', 'upsert', {
@@ -900,9 +996,7 @@ export function useNotes() {
         await db.query(
           `INSERT INTO notes (id, user_id, content, updated_at, deleted)
            VALUES ($1, $2, $3, $4, false)
-           ON CONFLICT (id, user_id) DO UPDATE SET
-             content    = EXCLUDED.content,
-             updated_at = EXCLUDED.updated_at`,
+           ON CONFLICT (id, user_id) DO NOTHING`,
           [id, uid, content, file.updatedAt],
         );
         if (uid !== 'local') {
@@ -963,9 +1057,7 @@ export function useNotes() {
         await db.query(
           `INSERT INTO notes (id, user_id, content, updated_at, deleted)
            VALUES ($1, $2, $3, $4, false)
-           ON CONFLICT (id, user_id) DO UPDATE SET
-             content    = EXCLUDED.content,
-             updated_at = EXCLUDED.updated_at`,
+           ON CONFLICT (id, user_id) DO NOTHING`,
           [id, 'local', content, file.updatedAt],
         );
       }

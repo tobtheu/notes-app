@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { Note } from '../types';
 import { MarkdownEditor, type MarkdownEditorRef } from './MarkdownEditor';
 import clsx from 'clsx';
@@ -65,6 +65,17 @@ export function Editor({
      * --- LOCAL STATE & REFS ---
      */
     const [content, setContent] = useState(() => stripFrontmatter(note.content));
+
+    // Tiptap becomes unusably slow with large files. Above this threshold we
+    // force plain-text mode regardless of the user's markdownEnabled setting.
+    // Evaluated once on mount (content doesn't change size significantly during a session).
+    const isLargeFile = useMemo(
+        () => new Blob([content]).size > 200 * 1024,
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [], // intentionally only on mount — avoids re-checking on every keystroke
+    );
+    const effectiveMarkdownEnabled = markdownEnabled && !isLargeFile;
+
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const titleRef = useRef<HTMLTextAreaElement>(null);
     const markdownEditorRef = useRef<MarkdownEditorRef>(null);
@@ -213,6 +224,11 @@ export function Editor({
     useEffect(() => {
         // Configuration Point: Auto-save Debounce Delay (ms)
         const handler = setTimeout(async () => {
+            // Skip saves during the initial mount window — Tiptap's HTML normalisation
+            // can produce a slightly different markdown string than what was stored,
+            // which would trigger a spurious save (updating updated_at) even though
+            // the user hasn't made any changes.
+            if (isMounting.current) return;
             if (content !== lastSavedContent.current) {
                 // AUTO-SAVE: Always skip rename while typing to stay fluid
                 const newId = await onSave(lastNoteId.current, note.filename, content, note.folder, true);
@@ -227,15 +243,18 @@ export function Editor({
     // 2.1 Inactivity Rename: Performs the physical rename if user is idle for 5s
     useEffect(() => {
         const handler = setTimeout(async () => {
-            if (content !== lastSavedContent.current || (contentRef.current && normalizeStr(extractTitle(contentRef.current) + '.md') !== normalizeStr(note.filename))) {
-                // Check if title actually differs from disk filename
-                const currentTitle = extractTitle(content);
-                const currentDiskBase = note.filename.replace('.md', '');
+            // Apply the same title sanitization as saveNote so the comparison is consistent.
+            // Without this, titles with special characters (!, :, etc.) never match the
+            // sanitized filename and trigger a spurious rename/save on every note open.
+            const currentTitle = extractTitle(content);
+            const safeTitle = currentTitle.replace(/[^a-z0-9äöüß ]/gi, '').trim().substring(0, 50);
+            const currentDiskBase = note.filename.replace(/\.md$/, '');
 
-                if (normalizeStr(currentTitle) !== normalizeStr(currentDiskBase) && currentTitle.length > 0) {
-                    const newId = await onSave(lastNoteId.current, note.filename, content, note.folder, false);
-                    if (newId && typeof newId === 'string') lastNoteId.current = newId;
-                }
+            const titleDiffersFromFilename = safeTitle.length > 0 && normalizeStr(safeTitle) !== normalizeStr(currentDiskBase);
+
+            if (titleDiffersFromFilename) {
+                const newId = await onSave(lastNoteId.current, note.filename, content, note.folder, false);
+                if (newId && typeof newId === 'string') lastNoteId.current = newId;
             }
         }, 5000);
 
@@ -499,8 +518,15 @@ export function Editor({
                 </div>
             )}
 
+            {/* Large-file notice */}
+            {isLargeFile && markdownEnabled && (
+                <div className="mx-8 mb-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs">
+                    Große Datei — Rich-Text-Editor deaktiviert für bessere Performance.
+                </div>
+            )}
+
             {/* --- EDITOR CONTENT AREA --- */}
-            {markdownEnabled ? (
+            {effectiveMarkdownEnabled ? (
                 /* RICH TEXT MODE */
                 <MarkdownEditor
                     content={body}

@@ -71,7 +71,7 @@ export const DB_SCHEMA = /* sql */ `
         updated_at = NEW.updated_at,
         deleted    = NEW.deleted
       WHERE id = NEW.id AND user_id = NEW.user_id
-        AND NEW.updated_at::timestamptz >= updated_at::timestamptz;
+        AND CAST(NEW.updated_at AS timestamptz) >= CAST(updated_at AS timestamptz);
       RETURN NULL;
     END IF;
     RETURN NEW;
@@ -91,7 +91,7 @@ export const DB_SCHEMA = /* sql */ `
         metadata   = NEW.metadata,
         updated_at = NEW.updated_at
       WHERE user_id = NEW.user_id
-        AND NEW.updated_at::timestamptz >= updated_at::timestamptz;
+        AND CAST(NEW.updated_at AS timestamptz) >= CAST(updated_at AS timestamptz);
       RETURN NULL;
     END IF;
     RETURN NEW;
@@ -106,7 +106,7 @@ export const DB_SCHEMA = /* sql */ `
   CREATE OR REPLACE FUNCTION app_config_before_update_fn()
   RETURNS TRIGGER LANGUAGE plpgsql AS $$
   BEGIN
-    IF NEW.updated_at::timestamptz < OLD.updated_at::timestamptz THEN
+    IF CAST(NEW.updated_at AS timestamptz) < CAST(OLD.updated_at AS timestamptz) THEN
       RETURN NULL; -- Reject stale update
     END IF;
     RETURN NEW;
@@ -121,7 +121,7 @@ export const DB_SCHEMA = /* sql */ `
   CREATE OR REPLACE FUNCTION notes_before_update_fn()
   RETURNS TRIGGER LANGUAGE plpgsql AS $$
   BEGIN
-    IF NEW.updated_at::timestamptz < OLD.updated_at::timestamptz THEN
+    IF CAST(NEW.updated_at AS timestamptz) < CAST(OLD.updated_at AS timestamptz) THEN
       RETURN NULL; -- Reject stale update
     END IF;
     RETURN NEW;

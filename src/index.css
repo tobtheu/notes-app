@@ -459,10 +459,15 @@ body {
   min-width: 1em;
   border-right: 1px solid #cbd5e1;
   border-bottom: 1px solid #cbd5e1;
-  padding: 0px 10px;
+  padding: 4px 10px;
   vertical-align: top;
   box-sizing: border-box;
   position: relative;
+}
+
+.tiptap table td p,
+.tiptap table th p {
+  margin: 0;
 }
 
 .tiptap table td:last-child,

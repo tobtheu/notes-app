@@ -158,7 +158,7 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
   }>(
     /* sql */ `
     SELECT * FROM pending_writes
-    WHERE next_retry_at <= NOW()
+    WHERE CAST(next_retry_at AS timestamptz) <= NOW()
     ORDER BY created_at ASC
     LIMIT 50
     `,

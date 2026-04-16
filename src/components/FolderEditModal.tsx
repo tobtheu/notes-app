@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
     X, Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
     Type, Palette, Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart,
-    Settings, Trash2
+    Settings, Trash2,
+    Pen, Globe, Lock, Archive, Bookmark, Lightbulb, Rocket, Award,
+    FileText, Headphones, Gamepad2, Dumbbell, Plane, Utensils,
+    Microscope, Film, TreePine, GraduationCap, Bike
 } from 'lucide-react';
 import clsx from 'clsx';
 import type { FolderMetadata } from '../types';
@@ -36,18 +39,43 @@ const ICONS = [
     { id: 'ShoppingCart', icon: ShoppingCart },
     { id: 'Settings', icon: Settings },
     { id: 'Trash2', icon: Trash2 },
+    { id: 'Pen', icon: Pen },
+    { id: 'Globe', icon: Globe },
+    { id: 'Lock', icon: Lock },
+    { id: 'Archive', icon: Archive },
+    { id: 'Bookmark', icon: Bookmark },
+    { id: 'Lightbulb', icon: Lightbulb },
+    { id: 'Rocket', icon: Rocket },
+    { id: 'Award', icon: Award },
+    { id: 'FileText', icon: FileText },
+    { id: 'Headphones', icon: Headphones },
+    { id: 'Gamepad2', icon: Gamepad2 },
+    { id: 'Dumbbell', icon: Dumbbell },
+    { id: 'Plane', icon: Plane },
+    { id: 'Utensils', icon: Utensils },
+    { id: 'Microscope', icon: Microscope },
+    { id: 'Palette', icon: Palette },
+    { id: 'Film', icon: Film },
+    { id: 'TreePine', icon: TreePine },
+    { id: 'GraduationCap', icon: GraduationCap },
+    { id: 'Bike', icon: Bike },
 ] as const;
 
 const COLORS = [
     { id: 'red', bg: 'bg-red-100', text: 'text-red-600', border: 'border-red-200', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-400' },
     { id: 'orange', bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400' },
     { id: 'amber', bg: 'bg-amber-100', text: 'text-amber-600', border: 'border-amber-200', darkBg: 'dark:bg-amber-900/30', darkText: 'dark:text-amber-400' },
+    { id: 'lime', bg: 'bg-lime-100', text: 'text-lime-700', border: 'border-lime-200', darkBg: 'dark:bg-lime-900/30', darkText: 'dark:text-lime-400' },
     { id: 'green', bg: 'bg-emerald-100', text: 'text-emerald-600', border: 'border-emerald-200', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400' },
+    { id: 'teal', bg: 'bg-teal-100', text: 'text-teal-600', border: 'border-teal-200', darkBg: 'dark:bg-teal-900/30', darkText: 'dark:text-teal-400' },
     { id: 'cyan', bg: 'bg-cyan-100', text: 'text-cyan-600', border: 'border-cyan-200', darkBg: 'dark:bg-cyan-900/30', darkText: 'dark:text-cyan-400' },
+    { id: 'sky', bg: 'bg-sky-100', text: 'text-sky-600', border: 'border-sky-200', darkBg: 'dark:bg-sky-900/30', darkText: 'dark:text-sky-400' },
     { id: 'blue', bg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400' },
     { id: 'indigo', bg: 'bg-indigo-100', text: 'text-indigo-600', border: 'border-indigo-200', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400' },
+    { id: 'violet', bg: 'bg-violet-100', text: 'text-violet-600', border: 'border-violet-200', darkBg: 'dark:bg-violet-900/30', darkText: 'dark:text-violet-400' },
     { id: 'purple', bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200', darkBg: 'dark:bg-purple-900/30', darkText: 'dark:text-purple-400' },
     { id: 'pink', bg: 'bg-pink-100', text: 'text-pink-600', border: 'border-pink-200', darkBg: 'dark:bg-pink-900/30', darkText: 'dark:text-pink-400' },
+    { id: 'rose', bg: 'bg-rose-100', text: 'text-rose-600', border: 'border-rose-200', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400' },
     { id: 'gray', bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200', darkBg: 'dark:bg-gray-800', darkText: 'dark:text-gray-400' },
 ];
 
@@ -93,8 +121,8 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
     const SelectedIconComponent = (ICONS.find(i => i.id === selectedIcon) || ICONS[0]).icon;
 
     return (
-        <div className="fixed inset-0 z-10000 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-10000 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
 
                 {/* Header with Preview */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 shrink-0">

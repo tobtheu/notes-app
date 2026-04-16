@@ -20,8 +20,8 @@ interface UpdateModalProps {
  */
 export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, status }: UpdateModalProps) {
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300" onClick={onCancel}>
+            <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                 <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
                         {/* --- BRANDING ICON --- */}

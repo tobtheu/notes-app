@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use notify::{Watcher, RecursiveMode};
 use tauri::{Emitter, Manager};
 use base64::{engine::general_purpose, Engine as _};
+use filetime::FileTime;
 
 #[cfg(not(any(target_os = "ios", target_os = "android")))]
 mod git;
@@ -197,6 +198,16 @@ async fn write_mirror_file(payload: MirrorNotePayload) -> Result<(), String> {
 
     let final_content = inject_frontmatter(&payload.note.content, &payload.note.updated_at);
     fs::write(&path, final_content).map_err(|e| e.to_string())?;
+
+    // Preserve the note's canonical updated_at as the file's mtime.
+    // Without this, fs::write stamps mtime = now, so the next scan_import_folder
+    // would see a newer mtime than PGlite's updated_at and treat the file as
+    // externally modified — causing a spurious re-import and "just edited" appearance.
+    if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(&payload.note.updated_at) {
+        let ft = FileTime::from_unix_time(ts.timestamp(), ts.timestamp_subsec_nanos());
+        let _ = filetime::set_file_mtime(&path, ft); // best-effort — ignore errors
+    }
+
     Ok(())
 }
 
