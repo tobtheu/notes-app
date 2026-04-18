@@ -262,7 +262,7 @@ const WikiLinkSuggestion = Extension.create({
                         },
                         onExit() {
                             popup?.[0]?.destroy();
-                            component.destroy();
+                            component?.destroy();
                         },
                     };
                 },
@@ -324,7 +324,7 @@ const SlashCommands = Extension.create({
                         },
                         onExit() {
                             popup?.[0]?.destroy();
-                            component.destroy();
+                            component?.destroy();
                         },
                     };
                 },
@@ -559,6 +559,22 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     const toolbarRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+    const scrollCursorAboveKeyboard = useCallback((editorInstance: typeof editor) => {
+        if (!editorInstance || keyboardHeightRef.current <= 0) return;
+        const container = scrollContainerRef.current;
+        if (!container) return;
+        try {
+            const { from } = editorInstance.state.selection;
+            const coords = editorInstance.view.coordsAtPos(from);
+            // Use window.innerHeight - keyboardHeight as the true visible bottom,
+            // since the container may extend behind the keyboard on iOS.
+            const visibleBottom = window.innerHeight - keyboardHeightRef.current - 16;
+            if (coords.bottom > visibleBottom) {
+                container.scrollTop += coords.bottom - visibleBottom;
+            }
+        } catch { }
+    }, []);
+
     useEffect(() => {
         const vv = window.visualViewport;
         if (!vv) return;
@@ -764,17 +780,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             const markdown = (editor.storage as any).markdown.getMarkdown();
             editorMarkdownRef.current = markdown; // Track what the editor generated
             onChangeRef.current(markdown);
-            // On iOS: scroll our container so the cursor stays above the keyboard
-            if (keyboardHeightRef.current > 0 && scrollContainerRef.current) {
-                const sel = window.getSelection();
-                if (sel && sel.rangeCount > 0) {
-                    const range = sel.getRangeAt(0);
-                    const rect = range.getBoundingClientRect();
-                    const visibleBottom = window.innerHeight - keyboardHeightRef.current - 16;
-                    if (rect.bottom > visibleBottom) {
-                        scrollContainerRef.current.scrollTop += rect.bottom - visibleBottom;
-                    }
-                }
+            if (keyboardHeightRef.current > 0) {
+                requestAnimationFrame(() => scrollCursorAboveKeyboard(editor));
             }
         },
         onBlur: () => {
@@ -893,6 +900,15 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     const openImageModalRef = useRef(openImageModal);
     useEffect(() => { openImageModalRef.current = openImageModal; }, [openImageModal]);
 
+    // When the iOS keyboard finishes opening, scroll cursor above it.
+    // Two delayed attempts: first catches early settle, second catches late layout.
+    useEffect(() => {
+        if (!isIOS || !editor || keyboardHeight <= 0) return;
+        const t1 = setTimeout(() => scrollCursorAboveKeyboard(editor), 100);
+        const t2 = setTimeout(() => scrollCursorAboveKeyboard(editor), 400);
+        return () => { clearTimeout(t1); clearTimeout(t2); };
+    }, [isIOS, editor, keyboardHeight, scrollCursorAboveKeyboard]);
+
     useEffect(() => {
         if (!isIOS || !editor) return;
 
@@ -943,10 +959,19 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
         editor.on('selectionUpdate', sendState);
         editor.on('transaction', sendState);
 
+        // On iOS: when tapping to reposition cursor, keep it above the keyboard.
+        const ensureCursorVisible = () => {
+            requestAnimationFrame(() => scrollCursorAboveKeyboard(editor));
+        };
+        editor.on('selectionUpdate', ensureCursorVisible);
+        editor.on('focus', ensureCursorVisible);
+
         return () => {
             delete (window as any).toolbarAction;
             editor.off('selectionUpdate', sendState);
             editor.off('transaction', sendState);
+            editor.off('selectionUpdate', ensureCursorVisible);
+            editor.off('focus', ensureCursorVisible);
             // Hide the toolbar when MarkdownEditor unmounts (e.g. navigating back to sign-in)
             (window as any).webkit?.messageHandlers?.toolbarVisible?.postMessage(false);
         };
@@ -1129,7 +1154,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                     "flex-1 overflow-y-auto custom-scrollbar min-h-0 cursor-text group/editor",
                     isFocusMode && "focus-mode-active"
                 )}
-                style={isIOS && keyboardHeight > 0 ? { paddingBottom: keyboardHeight } : undefined}
+                style={isIOS && keyboardHeight > 0 ? { paddingBottom: `${keyboardHeight + 80}px` } : undefined}
                 onScroll={handleScroll}
                 onDragEnter={(e) => {
                     e.preventDefault();

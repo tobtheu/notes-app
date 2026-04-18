@@ -89,6 +89,7 @@ function App() {
     signIn,
     signUp,
     signOut,
+    deleteAccount,
     userEmail,
     importFolder,
     goLocalOnly,
@@ -120,6 +121,7 @@ function App() {
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  useEffect(() => { if (syncStatus === 'unauthenticated') setIsSettingsOpen(false); }, [syncStatus]);
   const [isIOS, setIsIOS] = useState(false);
   useEffect(() => { try { setIsIOS(platform() === 'ios'); } catch {} }, []);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
@@ -143,6 +145,12 @@ function App() {
   const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('notelist');
   const [selectionCount, setSelectionCount] = useState(0);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  // Hide native iOS toolbar accessory bar whenever the user leaves the editor view
+  useEffect(() => {
+    if (isIOS && activeView !== 'editor') {
+      (window as any).webkit?.messageHandlers?.toolbarVisible?.postMessage(false);
+    }
+  }, [isIOS, activeView]);
 
   const { theme, setTheme } = useTheme();
   const lastWidth = useRef(window.innerWidth);
@@ -381,6 +389,7 @@ function App() {
             onSearchChange={setSearchTerm}
             folders={folders}
             selectedCategory={selectedCategory}
+            isIOS={isIOS}
           />
         )}
 
@@ -451,6 +460,7 @@ function App() {
           onSignIn={signIn}
           onSignUp={signUp}
           onSignOut={signOut}
+          onDeleteAccount={deleteAccount}
           onImportFolder={isIOS ? undefined : importFolder}
         />
       )}

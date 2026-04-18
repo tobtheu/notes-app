@@ -1,4 +1,4 @@
-import { useState, memo, useMemo, useRef, useEffect } from 'react';
+import { useState, memo, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
     Search, List, LayoutList, Trash2, Pin, FolderTree
 } from 'lucide-react';
@@ -18,6 +18,7 @@ interface NoteListProps {
     onMoveNote: (id: string, folder: string | null) => void;
     onTogglePin: (note: Note) => void;
     isNotePinned: (note: Note) => boolean;
+    isIOS?: boolean;
     getNoteId: (note: Note) => string;
     selectedCategory: string | null;
 }
@@ -155,7 +156,7 @@ const NoteListItem = memo(({
         <div>
             <div className="relative mb-0.5 rounded-xl border-2 border-transparent overflow-visible">
                 {/* Swipe Actions (Behind) */}
-                <div className="absolute inset-y-0 right-0 flex items-center justify-end px-3 gap-2 bg-gray-100 dark:bg-gray-800/80 w-full z-0 h-full rounded-xl pointer-events-auto">
+                <div className="absolute inset-y-0 right-0 flex items-center justify-end px-3 gap-2 bg-gray-100 dark:bg-gray-800/80 w-full z-0 h-full rounded-xl pointer-events-auto overflow-hidden">
                     <button
                         onClick={(e) => { e.stopPropagation(); onTogglePin(note); setSwipeOffset(0); isSwipedRef.current = false; }}
                         className={clsx("p-2 rounded-lg text-white font-medium transition-colors", isPinned ? "bg-primary-600 hover:bg-primary-700" : "bg-gray-400 hover:bg-gray-500 dark:bg-gray-600 dark:hover:bg-gray-500")}
@@ -364,6 +365,7 @@ export function NoteList({
     onMoveNote,
     onTogglePin,
     isNotePinned,
+    isIOS = false,
     getNoteId,
     selectedCategory,
 }: NoteListProps) {
@@ -379,6 +381,40 @@ export function NoteList({
     // Tracks which note's folder selection menu is currently open
     const [dropdownOpenId, setDropdownOpenId] = useState<string | null>(null);
 
+    // On iOS, search bar is hidden by default and revealed by scrolling up.
+    // isIOS starts as false (async detection in App.tsx), so we init to true and
+    // immediately hide once isIOS is confirmed — avoids the visible flash.
+    const [searchVisible, setSearchVisible] = useState(!isIOS);
+    const prevScrollTop = useRef(0);
+    const iosDetectedRef = useRef(false);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (isIOS && !iosDetectedRef.current) {
+            iosDetectedRef.current = true;
+            if (!searchTerm) setSearchVisible(false);
+        }
+    }, [isIOS, searchTerm]);
+
+    useEffect(() => {
+        if (searchTerm) setSearchVisible(true);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        if (!isIOS) return;
+        if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
+        prevScrollTop.current = 0;
+        if (!searchTerm) setSearchVisible(false);
+    }, [selectedCategory, isIOS, searchTerm]);
+
+    const handleNotesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        if (!isIOS) return;
+        const scrollTop = e.currentTarget.scrollTop;
+        if (scrollTop < prevScrollTop.current && scrollTop <= 20) setSearchVisible(true);
+        else if (scrollTop > prevScrollTop.current && scrollTop > 60 && !searchTerm) setSearchVisible(false);
+        prevScrollTop.current = scrollTop;
+    }, [isIOS, searchTerm]);
+
     // Toggles between Detailed (with preview) and Compact (titles only) view
     const toggleView = () => {
         const newState = !isCompact;
@@ -393,24 +429,27 @@ export function NoteList({
         )}>
 
             {/* --- HEADER: SEARCH & FILTER --- */}
-            <div
-                className="p-3 space-y-2"
-            >
-                <div className="flex items-center gap-3">
-                    <div className="relative group flex-1">
-                        <Search className="absolute left-3 top-2.5 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search notes..."
-                            className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500/20 rounded-xl outline-none transition-all dark:text-gray-100 text-base"
-                            value={searchTerm}
-                            onChange={(e) => onSearchChange(e.target.value)}
-                        />
+            <div>
+                <div className={clsx(
+                    "overflow-hidden transition-all duration-200",
+                    (searchVisible || !isIOS) ? "max-h-16 px-3 pt-3 pb-1" : "max-h-0"
+                )}>
+                    <div className="flex items-center gap-3">
+                        <div className="relative group flex-1">
+                            <Search className="absolute left-3 top-2.5 text-gray-400 group-focus-within:text-primary-500 transition-colors" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Search notes..."
+                                className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500/20 rounded-xl outline-none transition-all dark:text-gray-100 text-base"
+                                value={searchTerm}
+                                onChange={(e) => onSearchChange(e.target.value)}
+                            />
+                        </div>
                     </div>
                 </div>
 
                 {/* CURRENT CONTEXT INFO */}
-                <div className="flex items-center justify-between px-1">
+                <div className={clsx("flex items-center justify-between px-4 pb-1", (searchVisible || !isIOS) ? "pt-2" : "pt-3")}>
                     <div className="flex flex-col min-w-0">
                         <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 truncate">
                             {folders.includes(selectedCategory || '') ? selectedCategory : 'All Notes'}
@@ -421,6 +460,7 @@ export function NoteList({
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                         <button
+                            type="button"
                             onClick={toggleView}
                             className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 transition-colors"
                             title={isCompact ? "Detail View" : "Compact View"}
@@ -432,7 +472,7 @@ export function NoteList({
             </div>
 
             {/* --- NOTES SCROLL AREA --- */}
-            <div className="flex-1 overflow-y-auto px-2 pb-[calc(1rem+var(--safe-bottom,0vh))] custom-scrollbar">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-2 pb-[calc(1rem+var(--safe-bottom,0vh))] custom-scrollbar" onScroll={handleNotesScroll}>
                 {notes.length === 0 ? (
                     <div className="p-8 text-center text-gray-400 text-sm">
                         No notes found.

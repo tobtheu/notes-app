@@ -52,7 +52,7 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
             className={clsx(
                 "pt-[var(--safe-top,0vh)] flex items-stretch justify-between select-none relative z-[9999] box-content",
                 isIOS ? "bg-white dark:bg-gray-900" : "bg-gray-50 dark:bg-gray-950",
-                isIOS ? "h-6 min-h-[24px]" : "h-10 min-h-[40px]"
+                isIOS && activeView !== 'editor' ? "h-0 min-h-0 overflow-hidden" : isIOS ? "h-6 min-h-[24px]" : "h-10 min-h-[40px]"
             )}
         >
             {/* Sidebar / Back Button Area */}

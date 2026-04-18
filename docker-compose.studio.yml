@@ -1,0 +1,85 @@
+# ============================================================
+# Supabase Studio — Self-Hosted Database UI
+# ============================================================
+# Deploy this on your VPS alongside your existing services.
+#
+# Usage:
+#   docker compose -f docker-compose.studio.yml up -d
+#
+# Then open: http://your-vps-ip:3030
+#
+# Required env vars (add to your .env on the VPS):
+#   POSTGRES_PASSWORD   — your Postgres password
+#   SUPABASE_ANON_KEY   — your anon JWT key
+#   SUPABASE_SERVICE_KEY — your service_role JWT key
+#   AUTH_JWT_SECRET     — your JWT secret
+#   SUPABASE_API_URL    — public URL of your PostgREST/API
+#                         e.g. http://your-vps-ip:13000
+# ============================================================
+
+services:
+
+  # ── postgres-meta ──────────────────────────────────────────
+  # Provides the table/schema introspection API that Studio uses
+  # to browse and edit your database.
+  meta:
+    image: supabase/postgres-meta:v0.84.2
+    restart: unless-stopped
+    networks:
+      - default
+      - lama-notes-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: host.docker.internal   # postgres runs on the host
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Supabase Studio ────────────────────────────────────────
+  studio:
+    image: supabase/studio:20250113-83c9420
+    restart: unless-stopped
+    depends_on:
+      meta:
+        condition: service_healthy
+    networks:
+      - default
+      - lama-notes-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:3030:3000"   # Only accessible via SSH tunnel, not publicly
+    environment:
+      STUDIO_PG_META_URL: http://meta:8080
+
+      # Public API URL (PostgREST or Kong if you have one)
+      SUPABASE_URL: "http://postgrest-postgrest-1:3000"
+      SUPABASE_PUBLIC_URL: "http://postgrest-postgrest-1:3000"
+
+      SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY}"
+      SUPABASE_SERVICE_KEY: "${SUPABASE_SERVICE_KEY}"
+
+      # Needed for Auth section in Studio
+      AUTH_JWT_SECRET: "${AUTH_JWT_SECRET}"
+
+      # Direct postgres connection for migrations/SQL editor
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+
+      # Disable telemetry
+      NEXT_TELEMETRY_DISABLED: 1
+      NEXT_PUBLIC_ENABLE_LOGS: "false"
+
+      STUDIO_DEFAULT_ORGANIZATION: "Lama Notes"
+      STUDIO_DEFAULT_PROJECT: "lama-notes"
+
+networks:
+  lama-notes-net:
+    external: true

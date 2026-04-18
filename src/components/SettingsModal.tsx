@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, CloudOff, Clock, LogOut, Download, Rocket, Upload } from 'lucide-react';
+import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, CloudOff, Clock, LogOut, Download, Rocket, Upload, Trash2, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
 import type { SyncStatus } from '../hooks/useNotes';
 
@@ -29,7 +29,8 @@ interface SettingsModalProps {
     userEmail?: string | null;
     onSignIn?: (email: string, password: string) => Promise<{ userId: string; email: string }>;
     onSignUp?: (email: string, password: string) => Promise<{ userId: string; email: string }>;
-    onSignOut?: () => Promise<void>;
+    onSignOut?: (deleteLocal: boolean) => Promise<void>;
+    onDeleteAccount?: () => Promise<void>;
     onImportFolder?: () => Promise<number>;
 }
 
@@ -64,6 +65,7 @@ export function SettingsModal({
     onSignIn,
     onSignUp,
     onSignOut,
+    onDeleteAccount,
     onImportFolder,
 }: SettingsModalProps) {
     /**
@@ -99,6 +101,14 @@ export function SettingsModal({
     const [authPassword, setAuthPassword] = useState('');
     const [authLoading, setAuthLoading] = useState(false);
     const [authError, setAuthError] = useState<string | null>(null);
+
+    // Sign-out confirmation: idle → ask → confirm-delete
+    const [signOutStep, setSignOutStep] = useState<'idle' | 'ask' | 'confirm-delete'>('idle');
+    const [signOutLoading, setSignOutLoading] = useState(false);
+
+    // Delete account confirmation
+    const [deleteAccountStep, setDeleteAccountStep] = useState<'idle' | 'confirm'>('idle');
+    const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
 
     // Auto-scroll to update status box when it appears
     useEffect(() => {
@@ -137,14 +147,39 @@ export function SettingsModal({
             setAuthEmail('');
             setAuthPassword('');
         } catch (e: any) {
-            setAuthError(e?.toString() ?? 'Fehler beim Anmelden');
+            const msg = e?.toString() ?? '';
+            if (msg.includes('Invalid login credentials') || msg.includes('invalid_grant')) {
+                setAuthError('E-Mail oder Passwort ist falsch.');
+            } else if (msg.includes('User already registered')) {
+                setAuthError('Diese E-Mail ist bereits registriert. Melde dich stattdessen an.');
+            } else if (msg.includes('Password should be at least')) {
+                setAuthError('Das Passwort muss mindestens 6 Zeichen lang sein.');
+            } else {
+                setAuthError('Verbindung fehlgeschlagen. Bitte überprüfe deine Internetverbindung.');
+            }
         } finally {
             setAuthLoading(false);
         }
     };
 
-    const handleSignOut = async () => {
-        await onSignOut?.();
+    const handleSignOutConfirm = async (deleteLocal: boolean) => {
+        setSignOutLoading(true);
+        try {
+            await onSignOut?.(deleteLocal);
+            setSignOutStep('idle');
+        } finally {
+            setSignOutLoading(false);
+        }
+    };
+
+    const handleDeleteAccountConfirm = async () => {
+        setDeleteAccountLoading(true);
+        try {
+            await onDeleteAccount?.();
+            setDeleteAccountStep('idle');
+        } finally {
+            setDeleteAccountLoading(false);
+        }
     };
 
     const handleCheckForUpdates = () => {
@@ -206,14 +241,68 @@ export function SettingsModal({
                                             Ausstehende Änderungen werden synchronisiert, sobald du online bist.
                                         </p>
                                     )}
-                                    <button
-                                        type="button"
-                                        onClick={handleSignOut}
-                                        className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
-                                    >
-                                        <LogOut size={14} />
-                                        Abmelden
-                                    </button>
+
+                                    {/* Sign-out flow */}
+                                    {signOutStep === 'idle' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSignOutStep('ask')}
+                                            className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                        >
+                                            <LogOut size={14} />
+                                            Abmelden
+                                        </button>
+                                    )}
+                                    {signOutStep === 'ask' && (
+                                        <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 flex flex-col gap-2">
+                                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Lokale Dateien nach dem Abmelden behalten?</p>
+                                            <div className="flex gap-2">
+                                                <button type="button" onClick={() => setSignOutStep('idle')} className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Abbrechen</button>
+                                                <button type="button" onClick={() => handleSignOutConfirm(false)} disabled={signOutLoading} className="flex-1 px-2 py-1.5 text-xs rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-60">Behalten</button>
+                                                <button type="button" onClick={() => setSignOutStep('confirm-delete')} className="flex-1 px-2 py-1.5 text-xs rounded-md bg-white dark:bg-gray-900 border border-red-300 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Löschen</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {signOutStep === 'confirm-delete' && (
+                                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex flex-col gap-2">
+                                            <div className="flex items-start gap-2">
+                                                <AlertTriangle size={14} className="text-red-600 shrink-0 mt-0.5" />
+                                                <p className="text-xs text-red-700 dark:text-red-400">Alle lokalen Notizen werden <strong>unwiderruflich gelöscht</strong>. Diese Aktion kann nicht rückgängig gemacht werden.</p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button type="button" onClick={() => setSignOutStep('ask')} className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Zurück</button>
+                                                <button type="button" onClick={() => handleSignOutConfirm(true)} disabled={signOutLoading} className="flex-1 px-2 py-1.5 text-xs rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60">
+                                                    {signOutLoading ? 'Wird gelöscht...' : 'Löschen & Abmelden'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Delete account */}
+                                    {signOutStep === 'idle' && deleteAccountStep === 'idle' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setDeleteAccountStep('confirm')}
+                                            className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                        >
+                                            <Trash2 size={14} />
+                                            Konto löschen
+                                        </button>
+                                    )}
+                                    {deleteAccountStep === 'confirm' && (
+                                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex flex-col gap-2">
+                                            <div className="flex items-start gap-2">
+                                                <AlertTriangle size={14} className="text-red-600 shrink-0 mt-0.5" />
+                                                <p className="text-xs text-red-700 dark:text-red-400">Dein Konto und <strong>alle gespeicherten Daten werden unwiderruflich gelöscht</strong>. Diese Aktion kann nicht rückgängig gemacht werden.</p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button type="button" onClick={() => setDeleteAccountStep('idle')} className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Abbrechen</button>
+                                                <button type="button" onClick={handleDeleteAccountConfirm} disabled={deleteAccountLoading} className="flex-1 px-2 py-1.5 text-xs rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60">
+                                                    {deleteAccountLoading ? 'Wird gelöscht...' : 'Konto löschen'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="flex flex-col gap-3">
@@ -550,7 +639,7 @@ export function SettingsModal({
                                 <span className="text-xs text-gray-500">{version}</span>
                             </div>
 
-                            {(updateStatus.type === 'idle' || updateStatus.type === 'not-available' || updateStatus.type === 'error') && (
+                            {!isIOS && (updateStatus.type === 'idle' || updateStatus.type === 'not-available' || updateStatus.type === 'error') && (
                                 <button
                                     onClick={handleCheckForUpdates}
                                     className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"

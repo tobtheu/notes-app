@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
     Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart,
@@ -93,6 +93,7 @@ interface FolderItemProps {
     selectedCategory: string | null;
     isCollapsed: boolean;
     isReorderMode?: boolean;
+    isIOS?: boolean;
     onSelectCategory?: (name: string | null) => void;
     onEditCategory?: (name: string) => void;
     onDeleteCategory?: (name: string) => void;
@@ -112,6 +113,7 @@ interface SortableFolderItemProps {
     selectedCategory: string | null;
     isCollapsed: boolean;
     isReorderMode: boolean;
+    isIOS?: boolean;
     onSelectCategory: (name: string | null) => void;
     onEditCategory: (name: string) => void;
     onDeleteCategory: (name: string) => void;
@@ -122,7 +124,7 @@ interface SortableFolderItemProps {
  * Individual folder row inside the sidebar. Handles selection, hover actions (edit/delete), and DnD visual states.
  */
 const FolderItem = ({
-    folder, metadata, selectedCategory, isCollapsed, isReorderMode = false,
+    folder, metadata, selectedCategory, isCollapsed, isReorderMode = false, isIOS = false,
     onSelectCategory, onEditCategory, onDeleteCategory,
     isDragging, isOverlay, setNodeRef, attributes, listeners, style
 }: FolderItemProps) => {
@@ -181,7 +183,7 @@ const FolderItem = ({
             style={{ ...style, WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' } as React.CSSProperties}
             className={clsx(
                 "group relative flex items-center transition-all rounded-lg cursor-pointer mb-0.5 outline-none",
-                isCollapsed ? "justify-center py-1.5" : "px-1 py-1.5 gap-2 text-sm font-medium",
+                isCollapsed ? "justify-center py-1.5" : clsx("px-1 gap-2 text-sm font-medium", isIOS ? "py-2.5" : "py-1.5"),
                 isSelected
                     ? isCollapsed
                         ? clsx(colorStyles.bg, colorStyles.darkBg, "shadow-sm")
@@ -200,7 +202,7 @@ const FolderItem = ({
         >
             {/* Long-press ripple animation overlay */}
             {isPressing && (
-                <span className="absolute inset-0 rounded-lg bg-primary-500/25 animate-longpress pointer-events-none" />
+                <span className={clsx("absolute inset-0 rounded-lg animate-longpress pointer-events-none", colorStyles.bg, colorStyles.darkBg)} />
             )}
 
             <div className={clsx("flex items-center gap-2 shrink-0 min-w-0", isCollapsed ? "justify-center" : "flex-1 pr-1")}>
@@ -236,18 +238,18 @@ const FolderItem = ({
                     <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onEditCategory(folder); }}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary-500 rounded transition-all outline-none"
+                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary-500 rounded transition-all outline-none"
                         title="Edit Category"
                     >
-                        <Pencil size={12} />
+                        <Pencil size={16} />
                     </button>
                     <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onDeleteCategory(folder); }}
-                        className="p-1 hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-500 hover:text-red-500 rounded transition-all outline-none"
+                        className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-500 hover:text-red-500 rounded transition-all outline-none"
                         title="Delete Category"
                     >
-                        <Trash2 size={12} />
+                        <Trash2 size={16} />
                     </button>
                 </div>
             )}
@@ -258,18 +260,18 @@ const FolderItem = ({
                     <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onEditCategory(folder); }}
-                        className="p-1.5 text-gray-400 hover:text-primary-500 active:text-primary-500 rounded-md transition-all"
+                        className="p-2 text-gray-400 hover:text-primary-500 active:text-primary-500 rounded-md transition-all"
                         title="Edit"
                     >
-                        <Pencil size={13} />
+                        <Pencil size={16} />
                     </button>
                     <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onDeleteCategory(folder); }}
-                        className="p-1.5 text-gray-400 hover:text-red-500 active:text-red-500 rounded-md transition-all"
+                        className="p-2 text-gray-400 hover:text-red-500 active:text-red-500 rounded-md transition-all"
                         title="Delete"
                     >
-                        <Trash2 size={13} />
+                        <Trash2 size={16} />
                     </button>
                 </div>
             )}
@@ -305,6 +307,7 @@ const SortableFolderItem = (props: SortableFolderItemProps) => {
             listeners={listeners}
             isDragging={isDragging}
             isReorderMode={props.isReorderMode}
+            isIOS={props.isIOS}
         />
     );
 };
@@ -337,6 +340,33 @@ export function Sidebar({
     const [activeId, setActiveId] = useState<string | null>(null);
     const [isReorderMode, setIsReorderMode] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    // On iOS, scroll the folder creation input into view when keyboard opens
+    useEffect(() => {
+        if (!isCreatingFolder || !isIOS) return;
+        const el = inputRef.current;
+        if (!el) return;
+
+        const scrollIntoView = () => {
+            try {
+                el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            } catch { }
+        };
+
+        const timers = [
+            setTimeout(scrollIntoView, 350),
+            setTimeout(scrollIntoView, 700),
+        ];
+
+        const vv = (window as any).visualViewport;
+        const onResize = () => setTimeout(scrollIntoView, 50);
+        vv?.addEventListener?.('resize', onResize);
+
+        return () => {
+            timers.forEach(clearTimeout);
+            vv?.removeEventListener?.('resize', onResize);
+        };
+    }, [isCreatingFolder, isIOS]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -396,7 +426,7 @@ export function Sidebar({
                             className="p-2 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800 transition-all active:scale-95"
                             title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                         >
-                            {isCollapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+                            {isCollapsed ? <PanelLeftOpen size={isIOS ? 24 : 20} /> : <PanelLeftClose size={isIOS ? 24 : 20} />}
                         </button>
                     </div>
                 )}
@@ -409,15 +439,15 @@ export function Sidebar({
                         )}
                         title="New Note"
                     >
-                        <Plus size={18} />
+                        <Plus size={isIOS ? 22 : 18} />
                         {!isCollapsed && <span>New Note</span>}
                     </button>
                 </div>
 
                 {!isCollapsed && (
-                    <div className="px-3 mb-2 flex items-center justify-between group">
+                    <div className="px-1 lg:px-2 mb-2 flex items-center justify-between group">
                         <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                            Categories
+                            Folders
                         </span>
                         <div className="flex items-center gap-1">
                             {isReorderMode ? (
@@ -471,12 +501,12 @@ export function Sidebar({
                             onClick={() => onSelectCategory(null)}
                             className={clsx(
                                 "w-full flex items-center transition-colors rounded-lg",
-                                isCollapsed ? "justify-center py-1.5" : "px-3 py-1.5 gap-3 text-sm font-medium",
+                                isCollapsed ? "justify-center py-1.5" : clsx("px-3 gap-3 text-sm font-medium", isIOS ? "py-2.5" : "py-1.5"),
                                 !selectedCategory ? "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100" : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                             )}
                             title="All Notes"
                         >
-                            <Folder size={isCollapsed ? 20 : 18} className={!selectedCategory ? "text-primary-500" : "text-gray-500 dark:text-gray-400"} />
+                            <Folder size={isCollapsed ? (isIOS ? 24 : 20) : (isIOS ? 22 : 18)} className={!selectedCategory ? "text-primary-500" : "text-gray-500 dark:text-gray-400"} />
                             {!isCollapsed && <span>All Notes</span>}
                         </button>
 
@@ -494,6 +524,7 @@ export function Sidebar({
                                     selectedCategory={selectedCategory}
                                     isCollapsed={isCollapsed}
                                     isReorderMode={isReorderMode}
+                                    isIOS={isIOS}
                                     onSelectCategory={onSelectCategory}
                                     onEditCategory={onEditCategory}
                                     onDeleteCategory={onDeleteCategory}
@@ -517,12 +548,12 @@ export function Sidebar({
                         {/* Inline creation input */}
                         {!isCollapsed && (
                             isCreatingFolder ? (
-                                <form onSubmit={handleCreateFolder} className="px-1 py-1">
+                                <form onSubmit={handleCreateFolder} className="px-1 py-1 flex flex-col gap-2">
                                     <input
                                         ref={inputRef}
                                         type="text"
                                         className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-base dark:text-gray-100 outline-none focus:ring-2 focus:ring-primary-500/20 transition-all"
-                                        placeholder="New category..."
+                                        placeholder="New folder..."
                                         autoFocus
                                         value={newFolderName}
                                         onChange={(e) => setNewFolderName(e.target.value)}
@@ -530,14 +561,23 @@ export function Sidebar({
                                             if (!newFolderName.trim()) setIsCreatingFolder(false);
                                         }}
                                     />
+                                    <div className="lg:hidden flex items-center justify-between gap-2">
+                                        <span className="text-xs text-gray-400">oder Enter drücken</span>
+                                        <button
+                                            type="submit"
+                                            className="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                                        >
+                                            Fertig
+                                        </button>
+                                    </div>
                                 </form>
                             ) : (
                                 <button
                                     onClick={() => setIsCreatingFolder(true)}
                                     className="w-full flex items-center px-3 py-2.5 gap-3 text-sm font-medium text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800/50 rounded-lg transition-all border border-dashed border-gray-200 dark:border-gray-700/50 mt-1 mb-2 group lg:hidden"
                                 >
-                                    <Plus size={18} className="text-gray-300 group-hover:text-primary-500 transition-colors" />
-                                    <span>Add Category...</span>
+                                    <Plus size={isIOS ? 22 : 18} className="text-gray-300 group-hover:text-primary-500 transition-colors" />
+                                    <span>Add Folder...</span>
                                 </button>
                             )
                         )}
@@ -555,20 +595,10 @@ export function Sidebar({
                     )}
                     title="Settings"
                 >
-                    <Settings size={isCollapsed ? 20 : 18} />
+                    <Settings size={isCollapsed ? (isIOS ? 24 : 20) : (isIOS ? 22 : 18)} />
                     {!isCollapsed && <span>Settings</span>}
                 </button>
 
-                {!isCollapsed && onSync && (
-                    <div className="shrink-0">
-                        <SyncStatusBadge
-                            syncStatus={syncStatus}
-                            syncError={syncError}
-                            onSync={onSync}
-                            onOpenSettings={onOpenSettings}
-                        />
-                    </div>
-                )}
             </div>
         </div>
     );

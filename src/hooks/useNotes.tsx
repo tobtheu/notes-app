@@ -3,7 +3,7 @@ import { useLiveQuery } from '@electric-sql/pglite-react';
 import type { Note, AppMetadata, FolderMetadata } from '../types';
 import { normalizeStr, getPathId } from '../utils/path';
 import { getDb, startElectricSync, stopElectricSync } from '../lib/electric';
-import { setSupabaseSession, clearSupabaseSession } from '../lib/supabaseClient';
+import { supabase, setSupabaseSession, clearSupabaseSession } from '../lib/supabaseClient';
 import { enqueue, flushQueue } from '../lib/offlineQueue';
 import { log } from '../lib/logger';
 import type { PGliteWithLive } from '@electric-sql/pglite/live';
@@ -297,6 +297,17 @@ export function useNotes() {
   );
 
   const [metadata, setMetadataState] = useState<AppMetadata>({ folders: {}, pinnedNotes: [] });
+
+  // Reset metadata when the user changes so the previous account's folders don't bleed through.
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
+      setMetadataState({ folders: {}, pinnedNotes: [] });
+      metadataRef.current = { folders: {}, pinnedNotes: [] };
+      lastConfigWriteAt.current = null;
+    }
+    prevUserIdRef.current = userId;
+  }, [userId]);
 
   // Apply incoming config changes only when they're newer than our last local write.
   // This prevents Electric sync (confirming our own write, or old snapshots) from
@@ -930,8 +941,23 @@ export function useNotes() {
     return result;
   }, [userId, migrateLocalNotes]);
 
-  const signOut = useCallback(async () => {
-    log.info('[useNotes:signOut] signing out...');
+  const clearLocalData = useCallback(async (uid: string) => {
+    const db = dbRef.current;
+    if (!db) return;
+    const mirrorFolder = localStorage.getItem('notes-folder');
+    if (mirrorFolder) {
+      const rows = await db.query<{ id: string }>('SELECT id FROM notes WHERE user_id = $1 AND deleted = false', [uid]);
+      for (const row of rows.rows) {
+        window.tauriAPI.deleteMirrorFile({ mirrorFolder, noteId: row.id }).catch(() => {});
+      }
+    }
+    await db.query('DELETE FROM notes WHERE user_id = $1', [uid]);
+    await db.query('DELETE FROM app_config WHERE user_id = $1', [uid]);
+  }, []);
+
+  const signOut = useCallback(async (deleteLocal = false) => {
+    log.info('[useNotes:signOut] signing out, deleteLocal:', deleteLocal);
+    if (deleteLocal && userId) await clearLocalData(userId);
     await window.tauriAPI.supabaseSignOut();
     await clearSupabaseSession();
     stopElectricSync();
@@ -942,7 +968,27 @@ export function useNotes() {
     localStorage.removeItem('lama-mode');
     setSyncStatus('unauthenticated');
     log.info('[useNotes:signOut] done — status: unauthenticated');
-  }, []);
+  }, [userId, clearLocalData]);
+
+  const deleteAccount = useCallback(async () => {
+    const uid = userId;
+    if (!uid) return;
+    log.info('[useNotes:deleteAccount] deleting account for:', uid);
+    await supabase.from('notes').delete().eq('user_id', uid);
+    await supabase.from('app_config').delete().eq('user_id', uid);
+    await supabase.rpc('delete_user_account');
+    await clearLocalData(uid);
+    await window.tauriAPI.supabaseSignOut();
+    await clearSupabaseSession();
+    stopElectricSync();
+    setUserId(null);
+    setUserEmail(null);
+    localStorage.removeItem('lama-user-id');
+    localStorage.removeItem('lama-user-email');
+    localStorage.removeItem('lama-mode');
+    setSyncStatus('unauthenticated');
+    log.info('[useNotes:deleteAccount] done');
+  }, [userId, clearLocalData]);
 
   // ── Workspace setup ───────────────────────────────────────────────────────
 
@@ -1187,6 +1233,7 @@ export function useNotes() {
     signIn,
     signUp,
     signOut,
+    deleteAccount,
 
     // Workspace
     selectFolder,

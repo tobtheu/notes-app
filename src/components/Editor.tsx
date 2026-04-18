@@ -434,7 +434,7 @@ export function Editor({
 
             {/* On iOS: menu button lives in the TitleBar row (fixed top-right) */}
             {isIOS && !isFocusMode && (
-                <div className="fixed right-2 z-10000 h-6 top-(--safe-top,0px) flex items-center no-drag" ref={menuRef}>
+                <div className="fixed right-4 z-10000 h-6 top-(--safe-top,0px) flex items-center no-drag" ref={menuRef}>
                     <button
                         type="button"
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
