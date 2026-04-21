@@ -27,6 +27,17 @@ const appWindow = getCurrentWindow();
 // (or nearly ready) by the time React renders PGliteWrapper.
 void getDb(); // Kick off PGlite init early
 
+// Global handlers log async errors that would otherwise be swallowed
+// outside React's render cycle (unhandled promise rejections, window errors).
+if (typeof window !== 'undefined') {
+    window.addEventListener('error', (event) => {
+        console.error('[window.onerror]', event.error || event.message);
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+        console.error('[unhandledrejection]', event.reason);
+    });
+}
+
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
     constructor(props: { children: ReactNode }) {
         super(props);
@@ -39,10 +50,10 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
         if (this.state.error) {
             return (
                 <div className="fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 p-8 text-center gap-4">
-                    <p className="font-bold text-lg">Etwas ist schiefgelaufen</p>
+                    <p className="font-bold text-lg">Something went wrong</p>
                     <p className="text-sm text-gray-500 font-mono max-w-sm break-all">{this.state.error.message}</p>
                     <button type="button" className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm" onClick={() => window.location.reload()}>
-                        App neu laden
+                        Reload app
                     </button>
                 </div>
             );
@@ -276,9 +287,9 @@ function App() {
     await updateFolderMetadata(newName, folderMeta);
   };
 
-  const handleDeleteCategory = async () => {
+  const handleDeleteCategory = async (mode: 'recursive' | 'move') => {
     if (categoryToDelete) {
-      await deleteFolder(categoryToDelete, 'recursive');
+      await deleteFolder(categoryToDelete, mode);
       setCategoryToDelete(null);
     }
   };

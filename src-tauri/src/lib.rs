@@ -254,23 +254,41 @@ async fn list_folders(folder_path: String) -> Result<Vec<String>, String> {
 
 #[tauri::command]
 async fn rename_folder(_app: tauri::AppHandle, root_path: String, old_name: String, new_name: String) -> Result<(), String> {
+    // Reject traversal attempts: both names must be safe relative paths within root.
+    if !is_safe_relative_path(&old_name) || !is_safe_relative_path(&new_name) {
+        return Err("Invalid folder name".to_string());
+    }
     let root = Path::new(&root_path);
     let old_path = root.join(&old_name);
     let new_path = root.join(&new_name);
+    assert_within_root(root, &old_path)?;
+    assert_within_root(root, &new_path)?;
     fs::rename(old_path, new_path).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
 async fn create_folder(_app: tauri::AppHandle, root_path: String, folder_path: String) -> Result<(), String> {
-    let _root = Path::new(&root_path);
-    fs::create_dir_all(&folder_path).map_err(|e| e.to_string())?;
+    // folder_path is an absolute path; verify it stays inside root_path so the
+    // renderer can't create directories anywhere on disk.
+    let root = Path::new(&root_path);
+    let target = Path::new(&folder_path);
+    assert_within_root(root, target)?;
+    fs::create_dir_all(target).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
-async fn delete_folder_recursive(_app: tauri::AppHandle, _root_path: String, folder_path: String) -> Result<(), String> {
-    fs::remove_dir_all(&folder_path).map_err(|e| e.to_string())?;
+async fn delete_folder_recursive(_app: tauri::AppHandle, root_path: String, folder_path: String) -> Result<(), String> {
+    // Refuse to remove anything outside the workspace root.
+    let root = Path::new(&root_path);
+    let target = Path::new(&folder_path);
+    assert_within_root(root, target)?;
+    // Refuse to delete the root itself.
+    if target.canonicalize().ok() == root.canonicalize().ok() {
+        return Err("Refusing to delete workspace root".to_string());
+    }
+    fs::remove_dir_all(target).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -278,6 +296,10 @@ async fn delete_folder_recursive(_app: tauri::AppHandle, _root_path: String, fol
 async fn delete_folder_move_contents(_app: tauri::AppHandle, folder_path: String, root_path: String) -> Result<(), String> {
     let folder = Path::new(&folder_path);
     let root = Path::new(&root_path);
+    assert_within_root(root, folder)?;
+    if folder.canonicalize().ok() == root.canonicalize().ok() {
+        return Err("Refusing to delete workspace root".to_string());
+    }
 
     let files = get_files_recursively(folder);
     for file in files {

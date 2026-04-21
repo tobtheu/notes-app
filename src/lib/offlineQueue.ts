@@ -76,7 +76,7 @@ const REQUEST_TIMEOUT_MS = 15_000;
 
 async function upsertWithTimeout(
   table: 'notes' | 'app_config',
-  payload: NoteWritePayload | ConfigWritePayload,
+  payload: NoteWritePayload | ConfigWritePayload | NoteWritePayload[] | ConfigWritePayload[],
 ): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -85,7 +85,7 @@ async function upsertWithTimeout(
     const conflictCol = table === 'notes' ? 'id,user_id' : 'user_id';
     const { error } = await supabase
       .from(table)
-      .upsert(payload, { onConflict: conflictCol })
+      .upsert(payload as any, { onConflict: conflictCol })
       .abortSignal(controller.signal);
     if (error) throw new Error(error.message);
   } finally {
@@ -172,31 +172,56 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
   log.info(`[offlineQueue] flushing ${rows.length} pending write(s)...`);
   let flushed = 0;
 
-  for (const write of rows) {
+  // Group writes by table so each table can be upserted in a single Supabase call.
+  // On batch failure we fall back to per-row writes so we can track attempts/abandon
+  // individual rows without punishing the whole batch.
+  const byTable = new Map<'notes' | 'app_config', typeof rows>();
+  for (const row of rows) {
+    const table = row.table_name as 'notes' | 'app_config';
+    if (!byTable.has(table)) byTable.set(table, []);
+    byTable.get(table)!.push(row);
+  }
+
+  for (const [table, group] of byTable) {
+    const payloads = group.map(r => JSON.parse(r.payload));
     try {
-      const payload = JSON.parse(write.payload);
-      log.info(`[offlineQueue] writing ${write.id} (attempt ${write.attempts + 1})...`);
+      await upsertWithTimeout(table, payloads);
+      // Batch succeeded — delete all rows from pending_writes in one query
+      const ids = group.map(r => r.id);
+      await db.query(
+        `DELETE FROM pending_writes WHERE id = ANY($1::text[])`,
+        [ids],
+      );
+      flushed += group.length;
+      log.info(`[offlineQueue] ✓ batch-flushed ${group.length} ${table} write(s)`);
+    } catch (batchErr) {
+      const batchMsg = batchErr instanceof Error ? batchErr.message : String(batchErr);
+      log.warn(`[offlineQueue] batch ${table} failed (${batchMsg}) — falling back to per-row`);
 
-      await upsertWithTimeout(write.table_name as 'notes' | 'app_config', payload);
+      for (const write of group) {
+        try {
+          const payload = JSON.parse(write.payload);
+          await upsertWithTimeout(table, payload);
+          await db.query(`DELETE FROM pending_writes WHERE id = $1`, [write.id]);
+          flushed++;
+          log.info(`[offlineQueue] ✓ flushed ${write.id}`);
+        } catch (err) {
+          const newAttempts = write.attempts + 1;
+          const errMsg = err instanceof Error ? err.message : String(err);
+          log.error(`[offlineQueue] ✗ failed ${write.id} (attempt ${newAttempts}): ${errMsg}`);
 
-      await db.query(`DELETE FROM pending_writes WHERE id = $1`, [write.id]);
-      flushed++;
-      log.info(`[offlineQueue] ✓ flushed ${write.id}`);
-    } catch (err) {
-      const newAttempts = write.attempts + 1;
-      const errMsg = err instanceof Error ? err.message : String(err);
-      log.error(`[offlineQueue] ✗ failed ${write.id} (attempt ${newAttempts}): ${errMsg}`);
-
-      if (newAttempts >= 10) {
-        await db.query(`DELETE FROM pending_writes WHERE id = $1`, [write.id]);
-        log.error(`[offlineQueue] abandoned ${write.id} after 10 attempts`);
-      } else {
-        const nextRetry = new Date(Date.now() + backoffMs(newAttempts)).toISOString();
-        await db.query(
-          `UPDATE pending_writes SET attempts = $1, next_retry_at = $2 WHERE id = $3`,
-          [newAttempts, nextRetry, write.id],
-        );
-        log.info(`[offlineQueue] will retry ${write.id} after ${Math.round(backoffMs(newAttempts) / 1000)}s`);
+          if (newAttempts >= 10) {
+            await db.query(`DELETE FROM pending_writes WHERE id = $1`, [write.id]);
+            log.error(`[offlineQueue] abandoned ${write.id} after 10 attempts`);
+          } else {
+            const nextRetry = new Date(Date.now() + backoffMs(newAttempts)).toISOString();
+            await db.query(
+              `UPDATE pending_writes SET attempts = $1, next_retry_at = $2 WHERE id = $3`,
+              [newAttempts, nextRetry, write.id],
+            );
+            log.info(`[offlineQueue] will retry ${write.id} after ${Math.round(backoffMs(newAttempts) / 1000)}s`);
+          }
+        }
       }
     }
   }

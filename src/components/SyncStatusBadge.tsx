@@ -97,12 +97,12 @@ export function SyncStatusBadge({
                 syncStatus === 'error' && syncError
                     ? syncError
                     : syncStatus === 'unauthenticated'
-                        ? 'In den Einstellungen anmelden um zu synchronisieren'
+                        ? 'Sign in via settings to sync'
                         : syncStatus === 'pending'
-                            ? 'Lokale Änderungen werden synchronisiert sobald online'
+                            ? 'Local changes will sync when online'
                             : syncStatus === 'offline'
-                                ? 'Keine Internetverbindung'
-                                : 'Sync-Status'
+                                ? 'No internet connection'
+                                : 'Sync status'
             }
             className={clsx(
                 'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors select-none',

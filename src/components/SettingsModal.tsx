@@ -149,13 +149,13 @@ export function SettingsModal({
         } catch (e: any) {
             const msg = e?.toString() ?? '';
             if (msg.includes('Invalid login credentials') || msg.includes('invalid_grant')) {
-                setAuthError('E-Mail oder Passwort ist falsch.');
+                setAuthError('Email or password is incorrect.');
             } else if (msg.includes('User already registered')) {
-                setAuthError('Diese E-Mail ist bereits registriert. Melde dich stattdessen an.');
+                setAuthError('This email is already registered. Please sign in instead.');
             } else if (msg.includes('Password should be at least')) {
-                setAuthError('Das Passwort muss mindestens 6 Zeichen lang sein.');
+                setAuthError('Password must be at least 6 characters long.');
             } else {
-                setAuthError('Verbindung fehlgeschlagen. Bitte überprüfe deine Internetverbindung.');
+                setAuthError('Connection failed. Please check your internet connection.');
             }
         } finally {
             setAuthLoading(false);
@@ -229,7 +229,7 @@ export function SettingsModal({
                                             <Cloud className="text-primary-600 dark:text-primary-400" size={20} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">Cloud Sync aktiv</p>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">Cloud Sync active</p>
                                             <p className="text-xs text-gray-500 truncate">{userEmail}</p>
                                         </div>
                                         {syncStatus === 'synced' && !hasPending && <CheckCircle2 className="text-green-500 shrink-0" size={18} />}
@@ -238,7 +238,7 @@ export function SettingsModal({
                                     </div>
                                     {syncStatus === 'pending' && (
                                         <p className="text-xs text-amber-600 dark:text-amber-400">
-                                            Ausstehende Änderungen werden synchronisiert, sobald du online bist.
+                                            Pending changes will sync as soon as you're back online.
                                         </p>
                                     )}
 
@@ -250,16 +250,16 @@ export function SettingsModal({
                                             className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
                                         >
                                             <LogOut size={14} />
-                                            Abmelden
+                                            Sign Out
                                         </button>
                                     )}
                                     {signOutStep === 'ask' && (
                                         <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 flex flex-col gap-2">
-                                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Lokale Dateien nach dem Abmelden behalten?</p>
+                                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Keep local files after signing out?</p>
                                             <div className="flex gap-2">
-                                                <button type="button" onClick={() => setSignOutStep('idle')} className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Abbrechen</button>
-                                                <button type="button" onClick={() => handleSignOutConfirm(false)} disabled={signOutLoading} className="flex-1 px-2 py-1.5 text-xs rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-60">Behalten</button>
-                                                <button type="button" onClick={() => setSignOutStep('confirm-delete')} className="flex-1 px-2 py-1.5 text-xs rounded-md bg-white dark:bg-gray-900 border border-red-300 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Löschen</button>
+                                                <button type="button" onClick={() => setSignOutStep('idle')} className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Cancel</button>
+                                                <button type="button" onClick={() => handleSignOutConfirm(false)} disabled={signOutLoading} className="flex-1 px-2 py-1.5 text-xs rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-60">Keep</button>
+                                                <button type="button" onClick={() => setSignOutStep('confirm-delete')} className="flex-1 px-2 py-1.5 text-xs rounded-md bg-white dark:bg-gray-900 border border-red-300 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">Delete</button>
                                             </div>
                                         </div>
                                     )}
@@ -267,12 +267,12 @@ export function SettingsModal({
                                         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex flex-col gap-2">
                                             <div className="flex items-start gap-2">
                                                 <AlertTriangle size={14} className="text-red-600 shrink-0 mt-0.5" />
-                                                <p className="text-xs text-red-700 dark:text-red-400">Alle lokalen Notizen werden <strong>unwiderruflich gelöscht</strong>. Diese Aktion kann nicht rückgängig gemacht werden.</p>
+                                                <p className="text-xs text-red-700 dark:text-red-400">All local notes will be <strong>permanently deleted</strong>. This action cannot be undone.</p>
                                             </div>
                                             <div className="flex gap-2">
-                                                <button type="button" onClick={() => setSignOutStep('ask')} className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Zurück</button>
+                                                <button type="button" onClick={() => setSignOutStep('ask')} className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Back</button>
                                                 <button type="button" onClick={() => handleSignOutConfirm(true)} disabled={signOutLoading} className="flex-1 px-2 py-1.5 text-xs rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60">
-                                                    {signOutLoading ? 'Wird gelöscht...' : 'Löschen & Abmelden'}
+                                                    {signOutLoading ? 'Deleting...' : 'Delete & Sign Out'}
                                                 </button>
                                             </div>
                                         </div>
@@ -286,19 +286,19 @@ export function SettingsModal({
                                             className="flex items-center justify-center gap-2 w-full px-3 py-2 text-xs font-semibold bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900/50 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
                                         >
                                             <Trash2 size={14} />
-                                            Konto löschen
+                                            Delete Account
                                         </button>
                                     )}
                                     {deleteAccountStep === 'confirm' && (
                                         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex flex-col gap-2">
                                             <div className="flex items-start gap-2">
                                                 <AlertTriangle size={14} className="text-red-600 shrink-0 mt-0.5" />
-                                                <p className="text-xs text-red-700 dark:text-red-400">Dein Konto und <strong>alle gespeicherten Daten werden unwiderruflich gelöscht</strong>. Diese Aktion kann nicht rückgängig gemacht werden.</p>
+                                                <p className="text-xs text-red-700 dark:text-red-400">Your account and <strong>all stored data will be permanently deleted</strong>. This action cannot be undone.</p>
                                             </div>
                                             <div className="flex gap-2">
-                                                <button type="button" onClick={() => setDeleteAccountStep('idle')} className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Abbrechen</button>
+                                                <button type="button" onClick={() => setDeleteAccountStep('idle')} className="flex-1 px-2 py-1.5 text-xs rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">Cancel</button>
                                                 <button type="button" onClick={handleDeleteAccountConfirm} disabled={deleteAccountLoading} className="flex-1 px-2 py-1.5 text-xs rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60">
-                                                    {deleteAccountLoading ? 'Wird gelöscht...' : 'Konto löschen'}
+                                                    {deleteAccountLoading ? 'Deleting...' : 'Delete Account'}
                                                 </button>
                                             </div>
                                         </div>
@@ -313,7 +313,7 @@ export function SettingsModal({
                                         <div>
                                             <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">Cloud Sync</p>
                                             <p className="text-xs text-gray-500">
-                                                Melde dich an, um deine Notizen geräteübergreifend zu synchronisieren.
+                                                Sign in to sync your notes across devices.
                                             </p>
                                         </div>
                                     </div>
@@ -323,24 +323,24 @@ export function SettingsModal({
                                             type="button"
                                             onClick={() => setAuthMode('signin')}
                                             className={`flex-1 py-1.5 transition-colors ${authMode === 'signin' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
-                                        >Anmelden</button>
+                                        >Sign In</button>
                                         <button
                                             type="button"
                                             onClick={() => setAuthMode('signup')}
                                             className={`flex-1 py-1.5 transition-colors ${authMode === 'signup' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'}`}
-                                        >Registrieren</button>
+                                        >Sign Up</button>
                                     </div>
 
                                     <input
                                         type="email"
-                                        placeholder="E-Mail"
+                                        placeholder="Email"
                                         value={authEmail}
                                         onChange={e => setAuthEmail(e.target.value)}
                                         className="w-full px-3 py-2 text-sm rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                     <input
                                         type="password"
-                                        placeholder="Passwort"
+                                        placeholder="Password"
                                         value={authPassword}
                                         onChange={e => setAuthPassword(e.target.value)}
                                         onKeyDown={e => e.key === 'Enter' && handleAuth()}
@@ -358,8 +358,8 @@ export function SettingsModal({
                                         className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
                                     >
                                         {authLoading ? (
-                                            <><RefreshCw size={14} className="animate-spin" /> Bitte warten…</>
-                                        ) : authMode === 'signin' ? 'Anmelden' : 'Konto erstellen'}
+                                            <><RefreshCw size={14} className="animate-spin" /> Please wait…</>
+                                        ) : authMode === 'signin' ? 'Sign In' : 'Create Account'}
                                     </button>
                                 </div>
                             )}
@@ -398,8 +398,8 @@ export function SettingsModal({
                                             <Upload size={16} />
                                         )}
                                         {importState === 'done'
-                                            ? `${importCount} Notizen importiert`
-                                            : 'Ordner importieren'}
+                                            ? `${importCount} notes imported`
+                                            : 'Import Folder'}
                                     </button>
                                 )}
                             </div>
@@ -609,12 +609,12 @@ export function SettingsModal({
                     {isIOS && (
                         <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg mt-3">
                             <div className="flex flex-col">
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Landscape Vollbild</span>
-                                <span className="text-xs text-gray-500">Notiz im Querformat über den ganzen Bildschirm</span>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Landscape Fullscreen</span>
+                                <span className="text-xs text-gray-500">Note in landscape mode across the full screen</span>
                             </div>
                             <button
                                 type="button"
-                                title={landscapeFullscreen ? "Landscape Vollbild deaktivieren" : "Landscape Vollbild aktivieren"}
+                                title={landscapeFullscreen ? "Disable landscape fullscreen" : "Enable landscape fullscreen"}
                                 onClick={() => onToggleLandscapeFullscreen?.(!landscapeFullscreen)}
                                 className={clsx(
                                     "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",

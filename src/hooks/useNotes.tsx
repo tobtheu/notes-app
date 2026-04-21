@@ -327,8 +327,12 @@ export function useNotes() {
     } catch { /* ignore parse errors */ }
   }, [configQuery]);
 
-  // Keep ref in sync for callback access without stale closures
-  metadataRef.current = metadata;
+  // Keep ref in sync for callback access without stale closures.
+  // Must be in an effect (not the render body) so concurrent renders that get
+  // discarded don't leave the ref pointing at a value the UI never committed.
+  useEffect(() => {
+    metadataRef.current = metadata;
+  }, [metadata]);
 
   // Stable notes state — only re-renders when note IDs or content actually change.
   // Prevents Electric batch-sync events from causing multiple list re-renders.
@@ -391,13 +395,14 @@ export function useNotes() {
   const hasPending = (pendingQuery?.rows?.[0]?.count ?? 0) > 0;
 
   useEffect(() => {
+    // Terminal states aren't overridden by pending-queue observations.
     if (syncStatus === 'error' || syncStatus === 'initialising' || syncStatus === 'unauthenticated') return;
     if (hasPending && navigator.onLine) {
       setSyncStatus('pending');
     } else {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline');
     }
-  }, [hasPending]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasPending, syncStatus]);
 
   // ── File Mirror ───────────────────────────────────────────────────────────
   // Write .md files to the filesystem whenever notes change in PGlite.
@@ -409,8 +414,10 @@ export function useNotes() {
     const mirrorFolder = localStorage.getItem('notes-folder');
     if (!mirrorFolder) return;
 
+    const currentIds = new Set<string>();
     notes.forEach(note => {
       const id = getNoteId(note);
+      currentIds.add(id);
       const lastWritten = mirrorWrittenRef.current.get(id);
       if (lastWritten === note.content) return; // No change, skip
 
@@ -419,6 +426,12 @@ export function useNotes() {
         log.warn('[mirror] Failed to write', id, err);
       });
     });
+
+    // Drop entries for notes that have been deleted/renamed so the map doesn't
+    // grow without bound across a long session.
+    for (const id of mirrorWrittenRef.current.keys()) {
+      if (!currentIds.has(id)) mirrorWrittenRef.current.delete(id);
+    }
   }, [notes, getNoteId]);
 
   // ── Core note write helper ────────────────────────────────────────────────
@@ -438,7 +451,7 @@ export function useNotes() {
     // Guard against oversized notes that would fail on Supabase (HTTP 413)
     if (!deleted && new Blob([content]).size > NOTE_SIZE_LIMIT) {
       log.warn(`[useNotes:writeNote] note ${id} exceeds 5MB size limit — write blocked`);
-      throw new Error('Notiz ist zu groß (max. 5 MB). Bitte kürze den Inhalt.');
+      throw new Error('Note is too large (max. 5 MB). Please shorten the content.');
     }
 
     // 1. Write to PGlite immediately (offline-first, UI reacts instantly)
@@ -824,11 +837,23 @@ export function useNotes() {
     }
 
     // Step 2: attempt to flush to Supabase immediately if online.
-    // If this fails (offline, token issue), the queue will retry later —
-    // the local rows are still intact as backup.
+    // flushQueue() only drains ~50 writes per call, so with >50 migrated notes
+    // a single call would leave the queue non-empty. Loop until it's drained.
+    // If any call fails (offline, token issue), keep the local rows as backup.
     if (navigator.onLine) {
       try {
-        await flushQueue(db);
+        const MAX_FLUSH_ROUNDS = 50; // defensive cap — 50 * 50 = 2500 writes
+        for (let i = 0; i < MAX_FLUSH_ROUNDS; i++) {
+          const flushed = await flushQueue(db);
+          if (flushed === 0) break;
+        }
+        const { rows: remaining } = await db.query<{ count: number }>(
+          `SELECT COUNT(*)::int AS count FROM pending_writes`,
+        );
+        if ((remaining[0]?.count ?? 0) > 0) {
+          log.warn('[useNotes:migrateLocalNotes] queue not empty after flush — keeping local rows');
+          return;
+        }
         log.info('[useNotes:migrateLocalNotes] flush succeeded');
       } catch (e) {
         log.warn('[useNotes:migrateLocalNotes] flush failed — local rows kept as backup:', String(e));
@@ -1158,31 +1183,49 @@ export function useNotes() {
     ? (notes.find(n => getNoteId(n) === selectedNoteId) ?? lastValidSelectedNote.current)
     : null;
 
-  if (selectedNote && (!lastValidSelectedNote.current
-    || getNoteId(selectedNote) !== getNoteId(lastValidSelectedNote.current)
-    || selectedNote.content !== lastValidSelectedNote.current.content)) {
-    lastValidSelectedNote.current = selectedNote;
-  }
-  if (!selectedNoteId) lastValidSelectedNote.current = null;
+  // Commit the resolved selection to the ref only after render (not during),
+  // so an aborted render doesn't leave stale data visible on the next commit.
+  useEffect(() => {
+    if (!selectedNoteId) {
+      lastValidSelectedNote.current = null;
+      return;
+    }
+    if (selectedNote && (!lastValidSelectedNote.current
+      || getNoteId(selectedNote) !== getNoteId(lastValidSelectedNote.current)
+      || selectedNote.content !== lastValidSelectedNote.current.content)) {
+      lastValidSelectedNote.current = selectedNote;
+    }
+  }, [selectedNoteId, selectedNote, getNoteId]);
 
   const isLoading = syncStatus === 'initialising';
 
-  const filteredNotes = notes
-    .filter(note => {
-      const searchLower = searchTerm.toLowerCase();
-      if (searchTerm && !note.content.toLowerCase().includes(searchLower) && !note.filename.toLowerCase().includes(searchLower)) return false;
-      if (selectedCategory && normalizeStr(note.folder) !== normalizeStr(selectedCategory)) return false;
-      return true;
-    })
-    .sort((a, b) => {
-      const aPinned = isNotePinned(a);
-      const bPinned = isNotePinned(b);
-      if (aPinned && !bPinned) return -1;
-      if (!aPinned && bPinned) return 1;
-      const timeDiff = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      if (timeDiff !== 0) return timeDiff;
-      return a.filename.localeCompare(b.filename);
-    });
+  // Debounce the search term so every keystroke doesn't trigger a full re-filter
+  // over potentially thousands of notes.
+  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 150);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  const filteredNotes = useMemo(() => {
+    const searchLower = debouncedSearch.toLowerCase();
+    const normalizedCategory = selectedCategory ? normalizeStr(selectedCategory) : null;
+    return notes
+      .filter(note => {
+        if (debouncedSearch && !note.content.toLowerCase().includes(searchLower) && !note.filename.toLowerCase().includes(searchLower)) return false;
+        if (normalizedCategory && normalizeStr(note.folder) !== normalizedCategory) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const aPinned = isNotePinned(a);
+        const bPinned = isNotePinned(b);
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        const timeDiff = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        if (timeDiff !== 0) return timeDiff;
+        return a.filename.localeCompare(b.filename);
+      });
+  }, [notes, debouncedSearch, selectedCategory, isNotePinned]);
 
   // ── Return ────────────────────────────────────────────────────────────────
 

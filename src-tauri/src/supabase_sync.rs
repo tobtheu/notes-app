@@ -5,12 +5,23 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use log::info;
+use std::time::Duration;
 
 // Read from environment at compile time.
 // Values are injected via GitHub Actions secrets (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
 // and locally via the .env file (loaded by build.rs).
 pub const SUPABASE_URL: &str = env!("VITE_SUPABASE_URL");
 pub const SUPABASE_ANON_KEY: &str = env!("VITE_SUPABASE_ANON_KEY");
+
+// Hard ceiling so a hung Supabase endpoint can't freeze sign-in/refresh.
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
+
+fn http_client() -> Result<Client, String> {
+    Client::builder()
+        .timeout(REQUEST_TIMEOUT)
+        .build()
+        .map_err(|e| format!("HTTP client init failed: {}", e))
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,7 +58,7 @@ struct AuthResponse {
 
 /// Sign in with email + password. Returns credentials on success.
 pub async fn sign_in(email: &str, password: &str) -> Result<SupabaseCredentials, String> {
-    let client = Client::new();
+    let client = http_client()?;
     let url = format!("{}/auth/v1/token?grant_type=password", SUPABASE_URL);
 
     let res = client
@@ -84,7 +95,7 @@ pub async fn sign_in(email: &str, password: &str) -> Result<SupabaseCredentials,
 
 /// Sign up with email + password. Returns credentials on success.
 pub async fn sign_up(email: &str, password: &str) -> Result<SupabaseCredentials, String> {
-    let client = Client::new();
+    let client = http_client()?;
     let url = format!("{}/auth/v1/signup", SUPABASE_URL);
 
     let res = client
@@ -121,7 +132,7 @@ pub async fn sign_up(email: &str, password: &str) -> Result<SupabaseCredentials,
 
 /// Refreshes a Supabase session using the stored refresh token.
 pub async fn refresh_session(refresh_token: &str) -> Result<SupabaseCredentials, String> {
-    let client = Client::new();
+    let client = http_client()?;
     let url = format!("{}/auth/v1/token?grant_type=refresh_token", SUPABASE_URL);
 
     let res = client

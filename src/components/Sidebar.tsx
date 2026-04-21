@@ -562,7 +562,7 @@ export function Sidebar({
                                         }}
                                     />
                                     <div className="lg:hidden flex items-center justify-between gap-2">
-                                        <span className="text-xs text-gray-400">oder Enter drücken</span>
+                                        <span className="text-xs text-gray-400">or press Enter</span>
                                         <button
                                             type="submit"
                                             className="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"

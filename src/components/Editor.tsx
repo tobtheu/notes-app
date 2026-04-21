@@ -15,6 +15,20 @@ const extractTitle = (content: string) => {
     return firstLine.replace(/^#\s*/, '').trim();
 };
 
+/**
+ * Escape a string for safe embedding in HTML. Used for PDF export where
+ * user-controlled values (e.g. note title) are interpolated into a template
+ * before being written via innerHTML.
+ */
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 interface EditorProps {
     note: Note;
     allNotes?: Note[];
@@ -68,11 +82,13 @@ export function Editor({
 
     // Tiptap becomes unusably slow with large files. Above this threshold we
     // force plain-text mode regardless of the user's markdownEnabled setting.
-    // Evaluated once on mount (content doesn't change size significantly during a session).
+    // Recomputed only when the initial content of the mounted note changes
+    // (e.g. a big import) — not on every keystroke, since the mounted note's
+    // identity is stable between key-remounts in App.tsx.
+    const initialNoteContent = useRef(note.content);
     const isLargeFile = useMemo(
-        () => new Blob([content]).size > 200 * 1024,
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [], // intentionally only on mount — avoids re-checking on every keystroke
+        () => new Blob([initialNoteContent.current]).size > 200 * 1024,
+        [],
     );
     const effectiveMarkdownEnabled = markdownEnabled && !isLargeFile;
 
@@ -332,12 +348,14 @@ export function Editor({
         } catch (e) {
             console.error('Failed to parse markdown with marked:', e);
             // Fallback: simple newline conversion if marked fails
-            parsedBody = body.replace(/\n/g, '<br>');
+            parsedBody = escapeHtml(body).replace(/\n/g, '<br>');
         }
 
+        // Title is user input → always escape before embedding in HTML.
+        const safeTitle = escapeHtml(title);
         const htmlContent = `
             <div class="note-export">
-                <h1 class="note-title">${title}</h1>
+                <h1 class="note-title">${safeTitle}</h1>
                 <div class="note-body">${parsedBody}</div>
             </div>
             <style>
@@ -554,7 +572,7 @@ export function Editor({
             {/* Large-file notice */}
             {isLargeFile && markdownEnabled && (
                 <div className="mx-8 mb-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs">
-                    Große Datei — Rich-Text-Editor deaktiviert für bessere Performance.
+                    Large file — rich-text editor disabled for better performance.
                 </div>
             )}
 

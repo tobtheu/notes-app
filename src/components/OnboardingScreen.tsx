@@ -50,13 +50,13 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
         } catch (e: any) {
             const msg = e?.toString() ?? '';
             if (msg.includes('Invalid login credentials') || msg.includes('invalid_grant')) {
-                setError('E-Mail oder Passwort ist falsch.');
+                setError('Email or password is incorrect.');
             } else if (msg.includes('User already registered')) {
-                setError('Diese E-Mail ist bereits registriert. Melde dich stattdessen an.');
+                setError('This email is already registered. Please sign in instead.');
             } else if (msg.includes('Password should be at least')) {
-                setError('Das Passwort muss mindestens 6 Zeichen lang sein.');
+                setError('Password must be at least 6 characters long.');
             } else {
-                setError('Verbindung fehlgeschlagen. Bitte überprüfe deine Internetverbindung.');
+                setError('Connection failed. Please check your internet connection.');
             }
         } finally {
             setIsLoading(false);
@@ -72,9 +72,9 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
 
             {screen === 'choice' && (
                 <div className="max-w-sm w-full animate-in slide-in-from-bottom-4 duration-500">
-                    <h1 className="text-4xl font-black mb-3 tracking-tight">Willkommen</h1>
+                    <h1 className="text-4xl font-black mb-3 tracking-tight">Welcome</h1>
                     <p className="mb-10 text-gray-500 dark:text-gray-400 text-lg leading-relaxed">
-                        Deine Gedanken, überall synchronisiert.
+                        Your thoughts, synced everywhere.
                     </p>
 
                     <div className="grid gap-3 w-full">
@@ -88,8 +88,8 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
                                     <Mail className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <div className="font-bold text-lg">Mit Email anmelden</div>
-                                    <div className="text-sm text-gray-500">Cloud-Sync über alle Geräte</div>
+                                    <div className="font-bold text-lg">Sign in with Email</div>
+                                    <div className="text-sm text-gray-500">Cloud sync across all devices</div>
                                 </div>
                             </div>
                             <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-primary-600 transition-colors" />
@@ -110,8 +110,8 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
                                     </svg>
                                 </div>
                                 <div>
-                                    <div className="font-bold text-lg">Mit Google anmelden</div>
-                                    <div className="text-sm text-gray-500">Demnächst verfügbar</div>
+                                    <div className="font-bold text-lg">Sign in with Google</div>
+                                    <div className="text-sm text-gray-500">Coming soon</div>
                                 </div>
                             </div>
                         </button>
@@ -128,8 +128,8 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
                                     </svg>
                                 </div>
                                 <div>
-                                    <div className="font-bold text-lg">Mit Apple anmelden</div>
-                                    <div className="text-sm text-gray-500">Demnächst verfügbar</div>
+                                    <div className="font-bold text-lg">Sign in with Apple</div>
+                                    <div className="text-sm text-gray-500">Coming soon</div>
                                 </div>
                             </div>
                         </button>
@@ -137,7 +137,7 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
                         {/* Divider */}
                         <div className="flex items-center gap-3 my-1">
                             <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                            <span className="text-xs text-gray-400">oder</span>
+                            <span className="text-xs text-gray-400">or</span>
                             <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
                         </div>
 
@@ -152,8 +152,8 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
                                     <FolderOpen className="w-5 h-5" />
                                 </div>
                                 <div>
-                                    <div className="font-semibold">Nur lokal nutzen</div>
-                                    <div className="text-xs text-gray-400">Kein Account erforderlich</div>
+                                    <div className="font-semibold">Use locally only</div>
+                                    <div className="text-xs text-gray-400">No account required</div>
                                 </div>
                             </div>
                         </button>
@@ -168,22 +168,22 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
                         className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-white mb-6 transition-colors"
                     >
                         <ArrowLeft className="w-4 h-4" />
-                        Zurück
+                        Back
                     </button>
 
                     <h2 className="text-2xl font-bold mb-1 text-left">
-                        {authMode === 'signin' ? 'Anmelden' : 'Registrieren'}
+                        {authMode === 'signin' ? 'Sign In' : 'Sign Up'}
                     </h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 text-left">
                         {authMode === 'signin'
-                            ? 'Melde dich mit deinem Lama Notes-Konto an.'
-                            : 'Erstelle ein kostenloses Konto für Cloud-Sync.'}
+                            ? 'Sign in with your Lama Notes account.'
+                            : 'Create a free account for cloud sync.'}
                     </p>
 
                     <form onSubmit={handleEmailAuth} className="flex flex-col gap-3">
                         <input
                             type="email"
-                            placeholder="E-Mail"
+                            placeholder="Email"
                             value={email}
                             onChange={e => setEmail(e.target.value)}
                             required
@@ -192,7 +192,7 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
                         />
                         <input
                             type="password"
-                            placeholder="Passwort"
+                            placeholder="Password"
                             value={password}
                             onChange={e => setPassword(e.target.value)}
                             required
@@ -213,36 +213,36 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
                             {success ? (
                                 <>
                                     <Check className="w-4 h-4" />
-                                    Erfolgreich!
+                                    Success!
                                 </>
                             ) : isLoading ? (
                                 <>
                                     <Loader2 className="w-4 h-4 animate-spin" />
-                                    Bitte warten...
+                                    Please wait...
                                 </>
-                            ) : authMode === 'signin' ? 'Anmelden' : 'Konto erstellen'}
+                            ) : authMode === 'signin' ? 'Sign In' : 'Create Account'}
                         </button>
                     </form>
 
                     <div className="mt-5 text-sm text-gray-500">
                         {authMode === 'signin' ? (
                             <>
-                                Noch kein Konto?{' '}
+                                Don't have an account?{' '}
                                 <button
                                     onClick={() => { setAuthMode('signup'); setError(null); }}
                                     className="text-primary-600 hover:underline font-medium"
                                 >
-                                    Registrieren
+                                    Sign Up
                                 </button>
                             </>
                         ) : (
                             <>
-                                Bereits registriert?{' '}
+                                Already registered?{' '}
                                 <button
                                     onClick={() => { setAuthMode('signin'); setError(null); }}
                                     className="text-primary-600 hover:underline font-medium"
                                 >
-                                    Anmelden
+                                    Sign In
                                 </button>
                             </>
                         )}
