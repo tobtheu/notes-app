@@ -12,6 +12,7 @@ use std::time::Duration;
 // and locally via the .env file (loaded by build.rs).
 pub const SUPABASE_URL: &str = env!("VITE_SUPABASE_URL");
 pub const SUPABASE_ANON_KEY: &str = env!("VITE_SUPABASE_ANON_KEY");
+pub const LAMA_SECRET: &str = env!("VITE_LAMA_SECRET");
 
 // Hard ceiling so a hung Supabase endpoint can't freeze sign-in/refresh.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
@@ -64,6 +65,7 @@ pub async fn sign_in(email: &str, password: &str) -> Result<SupabaseCredentials,
     let res = client
         .post(&url)
         .header("apikey", SUPABASE_ANON_KEY)
+        .header("X-Lama-Secret", LAMA_SECRET)
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({ "email": email, "password": password }))
         .send()
@@ -101,6 +103,7 @@ pub async fn sign_up(email: &str, password: &str) -> Result<SupabaseCredentials,
     let res = client
         .post(&url)
         .header("apikey", SUPABASE_ANON_KEY)
+        .header("X-Lama-Secret", LAMA_SECRET)
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({ "email": email, "password": password }))
         .send()
@@ -138,6 +141,7 @@ pub async fn refresh_session(refresh_token: &str) -> Result<SupabaseCredentials,
     let res = client
         .post(&url)
         .header("apikey", SUPABASE_ANON_KEY)
+        .header("X-Lama-Secret", LAMA_SECRET)
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({ "refresh_token": refresh_token }))
         .send()

@@ -2,12 +2,6 @@ use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct SyncCredentials {
-    pub token: String,
-    pub username: String,
-}
-
 // ---------------------------------------------------------------------------
 // Supabase credentials
 // ---------------------------------------------------------------------------
@@ -41,15 +35,9 @@ pub fn clear_supabase_credentials(app: &AppHandle) {
     }
 }
 
-pub fn get_github_credentials(app: &AppHandle) -> Option<SyncCredentials> {
-    let store = match app.store("settings.json") {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
-
-    let val = store.get("github-sync")?;
-    serde_json::from_value(val).ok()
-}
+// ---------------------------------------------------------------------------
+// GitHub credentials (legacy)
+// ---------------------------------------------------------------------------
 
 pub fn save_github_credentials(app: &AppHandle, token: &str, username: &str) {
     if let Ok(store) = app.store("settings.json") {

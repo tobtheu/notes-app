@@ -19,7 +19,7 @@ fn main() {
             if let Some((key, val)) = line.split_once('=') {
                 let key = key.trim();
                 let val = val.trim();
-                if key == "VITE_SUPABASE_URL" || key == "VITE_SUPABASE_ANON_KEY" {
+                if key == "VITE_SUPABASE_URL" || key == "VITE_SUPABASE_ANON_KEY" || key == "VITE_LAMA_SECRET" {
                     println!("cargo:rustc-env={}={}", key, val);
                 }
             }

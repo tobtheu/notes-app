@@ -66,7 +66,10 @@ export async function startElectricSync(
 
   log.info('[electric] starting shape sync — url:', ELECTRIC_URL, 'userId:', userId);
 
-  const authHeaders = { Authorization: `Bearer ${accessToken}` };
+  const authHeaders = { 
+    Authorization: `Bearer ${accessToken}`,
+    'X-Lama-Secret': import.meta.env.VITE_LAMA_SECRET 
+  };
 
   const handleError = (err: unknown) => {
     log.error('[electric] shape subscription error:', String(err));
