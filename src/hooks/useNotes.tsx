@@ -86,10 +86,6 @@ async function scanAndImportNewFiles(
 
       imported++;
     }
-    // Clear sticky ref when selection is explicitly cleared
-    if (!selectedNoteId) {
-        lastValidSelectedNote.current = null;
-    }
 
     if (imported > 0) {
       log.info(`[scanAndImportNewFiles] imported ${imported} new file(s) for user ${uid}`);

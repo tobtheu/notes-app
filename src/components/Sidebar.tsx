@@ -81,9 +81,6 @@ interface SidebarProps {
     onSelectCategory: (name: string | null) => void;
     onReorderFolders?: (newOrder: string[]) => void;
     onOpenSettings?: () => void;
-    syncStatus?: SyncStatus;
-    syncError?: string | null;
-    onSync?: () => void;
     monochromeIcons?: boolean;
 }
 
@@ -334,7 +331,6 @@ export function Sidebar({
     onOpenSettings,
     onToggleCollapse,
     isIOS = false,
-    onSync,
     monochromeIcons = false,
 }: SidebarProps) {
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
