@@ -36,3 +36,6 @@ docs/
 .env
 features-demo/
 marketing-assets/
+
+# AI Agents
+.agents/

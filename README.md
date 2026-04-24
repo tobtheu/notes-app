@@ -60,5 +60,3 @@ npm run tauri build
 - src-tauri/: Rust backend and Tauri configuration.
 - src-tauri/src/lib.rs: Core file system, Git integration, and metadata logic.
 
----
-Built using Antigravity
