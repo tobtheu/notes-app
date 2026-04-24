@@ -94,7 +94,6 @@ function App() {
     setSearchTerm,
     triggerSync,
     syncStatus,
-    syncError,
     hasPending,
     setupDefaultWorkspace,
     changeFolder,
