@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, CloudOff, Clock, LogOut, Download, Rocket, Upload, Trash2, AlertTriangle, Palette } from 'lucide-react';
+import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, CloudOff, Clock, LogOut, Download, Rocket, Upload, Trash2, AlertTriangle, Palette, Activity, Wifi, Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { SyncStatus } from '../hooks/useNotes';
+import { runDiagnostics } from '../utils/health';
+import type { HealthStatus } from '../utils/health';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -34,6 +36,7 @@ interface SettingsModalProps {
     onSignOut?: (deleteLocal: boolean) => Promise<void>;
     onDeleteAccount?: () => Promise<void>;
     onImportFolder?: () => Promise<number>;
+    onInstallUpdate?: () => Promise<void>;
 }
 
 /**
@@ -71,6 +74,7 @@ export function SettingsModal({
     onSignOut,
     onDeleteAccount,
     onImportFolder,
+    onInstallUpdate,
 }: SettingsModalProps) {
     /**
      * --- LOCAL STATE ---
@@ -82,6 +86,8 @@ export function SettingsModal({
         error?: string;
         version?: string;
     }>({ type: 'idle' });
+    const [diagResults, setDiagResults] = useState<HealthStatus[] | null>(null);
+    const [isDiagnosing, setIsDiagnosing] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [importState, setImportState] = useState<'idle' | 'loading' | 'done'>('idle');
     const [importCount, setImportCount] = useState(0);
@@ -195,8 +201,21 @@ export function SettingsModal({
         window.tauriAPI.downloadUpdate();
     };
 
-    const handleInstallUpdate = () => {
-        window.tauriAPI.quitAndInstall();
+    const handleInstallUpdate = async () => {
+        if (onInstallUpdate) await onInstallUpdate();
+        else window.tauriAPI.quitAndInstall();
+    };
+
+    const handleRunDiagnostics = async () => {
+        setIsDiagnosing(true);
+        try {
+            const results = await runDiagnostics();
+            setDiagResults(results);
+        } catch (err) {
+            console.error('Diagnostics failed:', err);
+        } finally {
+            setIsDiagnosing(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -755,6 +774,63 @@ export function SettingsModal({
                                             <span>Update failed</span>
                                         </div>
                                         <p className="text-[10px] text-red-500 pl-6 break-all">{updateStatus.error}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Connection Diagnostic - Only shown in DEV mode */}
+                        {import.meta.env.DEV && (
+                            <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
+                                <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <Activity size={12} />
+                                    Connection Diagnostic
+                                </h3>
+                                
+                                <button
+                                    onClick={handleRunDiagnostics}
+                                    disabled={isDiagnosing}
+                                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md transition-colors disabled:opacity-50"
+                                >
+                                    {isDiagnosing ? (
+                                        <Loader2 size={14} className="animate-spin" />
+                                    ) : (
+                                        <Wifi size={14} />
+                                    )}
+                                    {isDiagnosing ? 'Checking Connections...' : 'Test Connection Status'}
+                                </button>
+
+                                {diagResults && (
+                                    <div className="mt-4 space-y-2">
+                                        {diagResults.map((res, i) => (
+                                            <div key={i} className="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-900/50">
+                                                <div className="flex items-center gap-2">
+                                                    {res.ok ? (
+                                                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                                                    ) : (
+                                                        <div className="w-2 h-2 rounded-full bg-red-500" />
+                                                    )}
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{res.service}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {res.latency !== undefined && res.latency > 0 && (
+                                                        <span className="text-[10px] text-gray-400">{res.latency}ms</span>
+                                                    )}
+                                                    {res.ok ? (
+                                                        <CheckCircle2 size={14} className="text-green-500" />
+                                                    ) : (
+                                                        <AlertCircle size={14} className="text-red-500" />
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {!diagResults.every(r => r.ok) && (
+                                            <div className="p-2 mt-2 bg-red-50 dark:bg-red-900/20 rounded border border-red-100 dark:border-red-900/30">
+                                                <p className="text-[10px] text-red-600 dark:text-red-400 leading-relaxed">
+                                                    One or more services are unreachable. If you are on iOS, check if the server uses HTTPS.
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
