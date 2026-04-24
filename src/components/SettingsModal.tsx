@@ -34,7 +34,6 @@ interface SettingsModalProps {
     onSignOut?: (deleteLocal: boolean) => Promise<void>;
     onDeleteAccount?: () => Promise<void>;
     onImportFolder?: () => Promise<number>;
-    onTriggerSync?: () => void;
 }
 
 /**
@@ -72,7 +71,6 @@ export function SettingsModal({
     onSignOut,
     onDeleteAccount,
     onImportFolder,
-    onTriggerSync,
 }: SettingsModalProps) {
     /**
      * --- LOCAL STATE ---

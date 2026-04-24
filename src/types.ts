@@ -74,6 +74,8 @@ export interface TauriAPI {
 
     // Assets
     saveAsset: (rootPath: string, filename: string, contentBase64: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+    saveLocalAsset: (filename: string, contentBase64: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+    getLocalAssetsDir: () => Promise<string>;
 
     // App info
     getAppVersion: () => Promise<string>;

@@ -8,7 +8,6 @@ import {
     Microscope, Palette, Film, TreePine, GraduationCap, Bike
 } from 'lucide-react';
 import clsx from 'clsx';
-import { SyncStatusBadge } from './SyncStatusBadge';
 import type { AppMetadata } from '../types';
 import type { SyncStatus } from '../hooks/useNotes';
 import { normalizeStr } from '../utils/path';
@@ -335,8 +334,6 @@ export function Sidebar({
     onOpenSettings,
     onToggleCollapse,
     isIOS = false,
-    syncStatus = 'unauthenticated',
-    syncError = null,
     onSync,
     monochromeIcons = false,
 }: SidebarProps) {
