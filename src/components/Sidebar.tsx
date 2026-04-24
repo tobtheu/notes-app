@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import type { AppMetadata } from '../types';
-import type { SyncStatus } from '../hooks/useNotes';
 import { normalizeStr } from '../utils/path';
 import {
     DndContext,

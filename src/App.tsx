@@ -336,10 +336,6 @@ function App() {
           onSelectCategory={handleSelectCategory}
           onReorderFolders={reorderFolders}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          syncStatus={syncStatus}
-          syncError={syncError}
-
-          onSync={triggerSync}
           isIOS={isIOS}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           monochromeIcons={monochromeIcons}
@@ -377,11 +373,7 @@ function App() {
             onSelectCategory={handleSelectCategory}
             onReorderFolders={reorderFolders}
             onOpenSettings={() => setIsSettingsOpen(true)}
-            syncStatus={syncStatus}
-            syncError={syncError}
-  
-              onSync={triggerSync}
-              monochromeIcons={monochromeIcons}
+            monochromeIcons={monochromeIcons}
           />
         )}
 
