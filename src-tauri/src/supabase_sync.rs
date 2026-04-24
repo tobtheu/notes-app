@@ -10,9 +10,9 @@ use std::time::Duration;
 // Read from environment at compile time.
 // Values are injected via GitHub Actions secrets (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
 // and locally via the .env file (loaded by build.rs).
-pub const SUPABASE_URL: &str = env!("VITE_SUPABASE_URL");
-pub const SUPABASE_ANON_KEY: &str = env!("VITE_SUPABASE_ANON_KEY");
-pub const LAMA_SECRET: &str = env!("VITE_LAMA_SECRET");
+pub const SUPABASE_URL: &str = option_env!("VITE_SUPABASE_URL").unwrap_or("");
+pub const SUPABASE_ANON_KEY: &str = option_env!("VITE_SUPABASE_ANON_KEY").unwrap_or("");
+pub const LAMA_SECRET: &str = option_env!("VITE_LAMA_SECRET").unwrap_or("");
 
 // Hard ceiling so a hung Supabase endpoint can't freeze sign-in/refresh.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
