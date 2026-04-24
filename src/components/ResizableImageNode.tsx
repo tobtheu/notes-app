@@ -8,6 +8,13 @@ export const ResizableImageNode: React.FC<NodeViewProps> = (props) => {
     const { node, updateAttributes, selected, extension } = props;
     const { src, alt, width } = node.attrs;
 
+    const [localAssetsDir, setLocalAssetsDir] = useState<string | null>(null);
+    useEffect(() => {
+        if (window.tauriAPI?.getLocalAssetsDir) {
+            window.tauriAPI.getLocalAssetsDir().then(setLocalAssetsDir).catch(console.error);
+        }
+    }, []);
+
     let finalSrc = src;
     if (finalSrc && finalSrc.startsWith('.assets/')) {
         const workspacePath = extension.options.workspacePathRef?.current;
@@ -17,6 +24,15 @@ export const ResizableImageNode: React.FC<NodeViewProps> = (props) => {
             } catch (e) {
                 console.warn("Could not convert image src to asset URL:", e);
             }
+        }
+    } else if (finalSrc && finalSrc.startsWith('local-asset://')) {
+        try {
+            const filename = finalSrc.replace('local-asset://', '');
+            if (localAssetsDir) {
+                finalSrc = convertFileSrc(`${localAssetsDir}/${filename}`);
+            }
+        } catch (e) {
+            console.warn("Could not convert local image src to asset URL:", e);
         }
     }
 

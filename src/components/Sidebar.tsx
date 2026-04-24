@@ -85,6 +85,7 @@ interface SidebarProps {
     syncStatus?: SyncStatus;
     syncError?: string | null;
     onSync?: () => void;
+    monochromeIcons?: boolean;
 }
 
 interface FolderItemProps {
@@ -94,6 +95,7 @@ interface FolderItemProps {
     isCollapsed: boolean;
     isReorderMode?: boolean;
     isIOS?: boolean;
+    monochromeIcons?: boolean;
     onSelectCategory?: (name: string | null) => void;
     onEditCategory?: (name: string) => void;
     onDeleteCategory?: (name: string) => void;
@@ -114,6 +116,7 @@ interface SortableFolderItemProps {
     isCollapsed: boolean;
     isReorderMode: boolean;
     isIOS?: boolean;
+    monochromeIcons?: boolean;
     onSelectCategory: (name: string | null) => void;
     onEditCategory: (name: string) => void;
     onDeleteCategory: (name: string) => void;
@@ -124,7 +127,7 @@ interface SortableFolderItemProps {
  * Individual folder row inside the sidebar. Handles selection, hover actions (edit/delete), and DnD visual states.
  */
 const FolderItem = ({
-    folder, metadata, selectedCategory, isCollapsed, isReorderMode = false, isIOS = false,
+    folder, metadata, selectedCategory, isCollapsed, isReorderMode = false, isIOS = false, monochromeIcons = false,
     onSelectCategory, onEditCategory, onDeleteCategory,
     isDragging, isOverlay, setNodeRef, attributes, listeners, style
 }: FolderItemProps) => {
@@ -222,11 +225,11 @@ const FolderItem = ({
                 )}
                 <div className={clsx(
                     "p-1 rounded-md transition-colors shrink-0",
-                    isSelected && !isCollapsed ? colorStyles.bg + " " + colorStyles.darkBg : "bg-transparent"
+                    isSelected && !isCollapsed ? (monochromeIcons ? "bg-gray-100 dark:bg-gray-800" : colorStyles.bg + " " + colorStyles.darkBg) : "bg-transparent"
                 )}>
                     <IconComponent
                         size={isCollapsed ? 20 : 18}
-                        className={clsx(colorStyles.text, colorStyles.darkText)}
+                        className={clsx(monochromeIcons ? "text-inherit" : clsx(colorStyles.text, colorStyles.darkText))}
                     />
                 </div>
                 {!isCollapsed && <span className="truncate flex-1 py-0.5">{folder}</span>}
@@ -275,28 +278,6 @@ const FolderItem = ({
                     </button>
                 </div>
             )}
-
-            {/* Reorder mode: edit/delete buttons visible on mobile */}
-            {!isCollapsed && isReorderMode && onEditCategory && onDeleteCategory && (
-                <div className="flex items-center gap-0.5 shrink-0 ml-1">
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onEditCategory(folder); }}
-                        className="p-1.5 text-gray-400 hover:text-primary-500 active:text-primary-500 rounded-md transition-all"
-                        title="Edit"
-                    >
-                        <Pencil size={13} />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onDeleteCategory(folder); }}
-                        className="p-1.5 text-gray-400 hover:text-red-500 active:text-red-500 rounded-md transition-all"
-                        title="Delete"
-                    >
-                        <Trash2 size={13} />
-                    </button>
-                </div>
-            )}
         </div>
     );
 };
@@ -330,6 +311,7 @@ const SortableFolderItem = (props: SortableFolderItemProps) => {
             isDragging={isDragging}
             isReorderMode={props.isReorderMode}
             isIOS={props.isIOS}
+            monochromeIcons={props.monochromeIcons}
         />
     );
 };
@@ -356,6 +338,7 @@ export function Sidebar({
     syncStatus = 'unauthenticated',
     syncError = null,
     onSync,
+    monochromeIcons = false,
 }: SidebarProps) {
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
@@ -523,7 +506,7 @@ export function Sidebar({
                             onClick={() => onSelectCategory(null)}
                             className={clsx(
                                 "w-full flex items-center transition-colors rounded-lg",
-                                isCollapsed ? "justify-center py-1.5" : clsx("px-3 gap-3 text-sm font-medium", isIOS ? "py-2.5" : "py-1.5"),
+                                isCollapsed ? "justify-center py-1.5" : clsx("px-3 gap-3 text-sm font-medium", isIOS ? "py-2.5" : "py-2.5"),
                                 !selectedCategory ? "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100" : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                             )}
                             title="All Notes"
@@ -547,6 +530,7 @@ export function Sidebar({
                                     isCollapsed={isCollapsed}
                                     isReorderMode={isReorderMode}
                                     isIOS={isIOS}
+                                    monochromeIcons={monochromeIcons}
                                     onSelectCategory={onSelectCategory}
                                     onEditCategory={onEditCategory}
                                     onDeleteCategory={onDeleteCategory}
@@ -562,6 +546,7 @@ export function Sidebar({
                                     metadata={metadata}
                                     selectedCategory={selectedCategory}
                                     isCollapsed={isCollapsed}
+                                    monochromeIcons={monochromeIcons}
                                     isOverlay
                                 />
                             ) : null}
@@ -613,7 +598,7 @@ export function Sidebar({
                     onClick={onOpenSettings}
                     className={clsx(
                         "flex items-center text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors",
-                        isCollapsed ? "justify-center p-3" : "flex-1 px-3 py-2 gap-3 text-sm font-medium"
+                        isCollapsed ? "justify-center p-3" : "flex-1 px-3 py-2.5 gap-3 text-sm font-medium"
                     )}
                     title="Settings"
                 >

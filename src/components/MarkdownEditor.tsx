@@ -54,6 +54,7 @@ interface MarkdownEditorProps {
     onNavigate?: (id: string, anchor?: string) => void;
     toolbarVisible?: boolean;
     spellcheckEnabled?: boolean;
+    imageCloudSync?: boolean;
     workspacePath: string;
     header?: React.ReactNode;
     isFocusMode?: boolean;
@@ -522,6 +523,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     toolbarVisible = true,
     spellcheckEnabled = true,
     workspacePath,
+    imageCloudSync = false,
     header,
     isFocusMode = false,
     iosLandscapeFullscreen = false,
@@ -531,6 +533,11 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     /**
      * --- LOCAL STATE ---
      */
+    const [localAssetsDir, setLocalAssetsDir] = useState<string | null>(null);
+
+    useEffect(() => {
+        window.tauriAPI.getLocalAssetsDir().then(setLocalAssetsDir).catch(console.error);
+    }, []);
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [linkModalData, setLinkModalData] = useState<{ url: string; text: string }>({ url: '', text: '' });
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -1012,7 +1019,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                 const extension = extMatch ? extMatch[1] : 'png';
                 const filename = `img-${Date.now()}.${extension}`;
                 try {
-                    const res = await window.tauriAPI.saveAsset(workspacePath, filename, src);
+                    const res = imageCloudSync
+                        ? await window.tauriAPI.saveAsset(workspacePath, filename, src)
+                        : await window.tauriAPI.saveLocalAsset(filename, src);
+
                     if (res.success && res.path) {
                         editor.chain().focus().setImage({ src: res.path, alt: caption }).run();
                     }
@@ -1088,6 +1098,15 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                                     previewSrc = convertFileSrc(`${workspacePath}/${previewSrc}`);
                                 } catch (e) {
                                     console.warn("Could not convert image src to asset URL:", e);
+                                }
+                            } else if (previewSrc && previewSrc.startsWith('local-asset://')) {
+                                try {
+                                    const filename = previewSrc.replace('local-asset://', '');
+                                    if (localAssetsDir) {
+                                        previewSrc = convertFileSrc(`${localAssetsDir}/${filename}`);
+                                    }
+                                } catch (e) {
+                                    console.warn("Could not convert local image src to asset URL:", e);
                                 }
                             }
                             setLightboxImage({ src: previewSrc, caption: attrs.alt });
@@ -1195,7 +1214,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
                                     const filename = `img-${Date.now()}.${extension}`;
 
                                     try {
-                                        const res = await window.tauriAPI.saveAsset(workspacePath, filename, base64);
+                                        const res = imageCloudSync
+                                            ? await window.tauriAPI.saveAsset(workspacePath, filename, base64)
+                                            : await window.tauriAPI.saveLocalAsset(filename, base64);
+
                                         if (res.success && res.path) {
                                             editor.chain().focus().setImage({ src: res.path }).run();
                                         } else {

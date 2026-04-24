@@ -65,6 +65,7 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
 function App() {
   const isQuickNote = appWindow.label === 'quick-note';
   const {
+    userId,
     allNotes,
     folders,
     metadata,
@@ -127,6 +128,8 @@ function App() {
     setToolbarVisible,
     landscapeFullscreen,
     setLandscapeFullscreen,
+    monochromeIcons,
+    setMonochromeIcons,
   } = useSettings(metadata.settings, (_settings) => {
     // metadata.settings is updated via useNotes.saveSettings contextually if needed
   });
@@ -339,6 +342,7 @@ function App() {
           onSync={triggerSync}
           isIOS={isIOS}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          monochromeIcons={monochromeIcons}
         />
       )}
 
@@ -377,6 +381,7 @@ function App() {
             syncError={syncError}
   
               onSync={triggerSync}
+              monochromeIcons={monochromeIcons}
           />
         )}
 
@@ -415,6 +420,7 @@ function App() {
             note={selectedNote}
             allNotes={allNotes}
             workspacePath={currentFolder || ''}
+            imageCloudSync={userId === 'local'}
             onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
             onUpdateLocally={updateNoteLocally}
             markdownEnabled={markdownEnabled}
@@ -457,6 +463,8 @@ function App() {
           onToggleMarkdown={setMarkdownEnabled}
           accentColor={accentColor}
           setAccentColor={setAccentColor}
+          monochromeIcons={monochromeIcons}
+          onToggleMonochromeIcons={setMonochromeIcons}
           fontFamily={fontFamily}
           setFontFamily={setFontFamily}
           fontSize={fontSize}

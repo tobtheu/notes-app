@@ -35,6 +35,13 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [localFileName, setLocalFileName] = useState<string | null>(null);
+    const [localAssetsDir, setLocalAssetsDir] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (window.tauriAPI?.getLocalAssetsDir) {
+            window.tauriAPI.getLocalAssetsDir().then(setLocalAssetsDir).catch(console.error);
+        }
+    }, []);
 
     const previewUrl = useMemo(() => {
         if (url && url.startsWith('.assets/') && workspacePath) {
@@ -42,6 +49,16 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                 return convertFileSrc(`${workspacePath}/${url}`);
             } catch (e) {
                 console.warn("Could not convert asset URL for preview:", e);
+                return url;
+            }
+        } else if (url && url.startsWith('local-asset://')) {
+            try {
+                const filename = url.replace('local-asset://', '');
+                if (localAssetsDir) {
+                    return convertFileSrc(`${localAssetsDir}/${filename}`);
+                }
+            } catch (e) {
+                console.warn("Could not convert local image src for preview:", e);
                 return url;
             }
         }
@@ -172,7 +189,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
                             onClick={() => fileInputRef.current?.click()}
                             className="w-full py-4 px-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex flex-col items-center gap-2 hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all group overflow-hidden"
                         >
-                            {previewUrl && (previewUrl.startsWith('data:') || previewUrl.startsWith('asset://') || previewUrl.startsWith('http')) ? (
+                            {previewUrl && (previewUrl.startsWith('data:') || previewUrl.startsWith('asset://') || previewUrl.startsWith('http') || previewUrl.startsWith('local-asset://') || (url && url.startsWith('local-asset://'))) ? (
                                 <div className="relative w-full aspect-video rounded-md overflow-hidden bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
                                     <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium">Click or drop to change</div>

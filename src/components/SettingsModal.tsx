@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, CloudOff, Clock, LogOut, Download, Rocket, Upload, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Moon, Sun, Monitor, FolderOpen, RefreshCw, CheckCircle2, AlertCircle, Cloud, CloudOff, Clock, LogOut, Download, Rocket, Upload, Trash2, AlertTriangle, Palette } from 'lucide-react';
 import clsx from 'clsx';
 import type { SyncStatus } from '../hooks/useNotes';
 
@@ -15,6 +15,8 @@ interface SettingsModalProps {
     onToggleMarkdown: (enabled: boolean) => void;
     accentColor: string;
     setAccentColor: (color: string) => void;
+    monochromeIcons: boolean;
+    onToggleMonochromeIcons: (v: boolean) => void;
     fontFamily: 'inter' | 'roboto' | 'system';
     setFontFamily: (fontFamily: 'inter' | 'roboto' | 'system') => void;
     fontSize: 'small' | 'medium' | 'large';
@@ -32,6 +34,7 @@ interface SettingsModalProps {
     onSignOut?: (deleteLocal: boolean) => Promise<void>;
     onDeleteAccount?: () => Promise<void>;
     onImportFolder?: () => Promise<number>;
+    onTriggerSync?: () => void;
 }
 
 /**
@@ -51,6 +54,8 @@ export function SettingsModal({
     onToggleMarkdown,
     accentColor,
     setAccentColor,
+    monochromeIcons,
+    onToggleMonochromeIcons,
     fontFamily,
     setFontFamily,
     fontSize,
@@ -67,6 +72,7 @@ export function SettingsModal({
     onSignOut,
     onDeleteAccount,
     onImportFolder,
+    onTriggerSync,
 }: SettingsModalProps) {
     /**
      * --- LOCAL STATE ---
@@ -179,17 +185,6 @@ export function SettingsModal({
             setDeleteAccountStep('idle');
         } finally {
             setDeleteAccountLoading(false);
-        }
-    };
-
-    const handleForceFullSync = async () => {
-        if (!currentPath) return;
-        setSyncStatus('resetting');
-        try {
-            await window.tauriAPI.resetSyncState(currentPath);
-            onTriggerSync?.();
-        } finally {
-            setSyncStatus('idle');
         }
     };
 
@@ -462,9 +457,9 @@ export function SettingsModal({
                         </div>
 
                         {/* Accent Color Selection */}
-                        <div>
+                        <div className="mb-6">
                             <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Accent Color</h4>
-                            <div className="flex items-center gap-3 px-3 py-1 -mx-1">
+                            <div className="flex items-center gap-3 px-3 py-1 -mx-1 mb-4">
                                 {([
                                     ['blue',        '#3b82f6'],
                                     ['purple',      '#a855f7'],
@@ -491,6 +486,30 @@ export function SettingsModal({
                                         )}
                                     </button>
                                 ))}
+                            </div>
+
+                            {/* Monochrome Icons Toggle */}
+                            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg mb-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-gray-500">
+                                        <Palette size={16} />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Monochrome Sidebar Icons</span>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => onToggleMonochromeIcons(!monochromeIcons)}
+                                    className={clsx(
+                                        "w-10 h-5 rounded-full transition-colors relative",
+                                        monochromeIcons ? "bg-primary-600" : "bg-gray-200 dark:bg-gray-700"
+                                    )}
+                                >
+                                    <div className={clsx(
+                                        "absolute top-1 w-3 h-3 rounded-full bg-white transition-transform",
+                                        monochromeIcons ? "translate-x-6" : "translate-x-1"
+                                    )} />
+                                </button>
                             </div>
                         </div>
 

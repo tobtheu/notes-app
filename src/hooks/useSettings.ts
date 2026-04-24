@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
  * useSettings Hook
  * Manages application settings with local storage persistence and cloud metadata synchronization.
  * Distinction:
- * - Sync-able: markdownEnabled, accentColor, toolbarVisible, spellcheckEnabled
+ * - Sync-able: markdownEnabled, accentColor, toolbarVisible, spellcheckEnabled, monochromeIcons
  * - Device-specific (No sync): fontFamily, fontSize
  */
 export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: any) => void) {
@@ -43,6 +43,11 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         return saved === null ? false : saved === 'true';
     });
 
+    const [monochromeIcons, setMonochromeIcons] = useState<boolean>(() => {
+        const saved = localStorage.getItem('monochrome-icons');
+        return saved === 'true';
+    });
+
     // Guard to prevent saving to cloud before metadata has been initially loaded
     const hasLoadedMetadata = useRef(false);
 
@@ -55,6 +60,7 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
             // Note: fontFamily and fontSize are intentionally OMITTED from cloud sync
             if (metadataSettings.toolbarVisible !== undefined) setToolbarVisible(metadataSettings.toolbarVisible);
             if (metadataSettings.spellcheckEnabled !== undefined) setSpellcheckEnabled(metadataSettings.spellcheckEnabled);
+            if (metadataSettings.monochromeIcons !== undefined) setMonochromeIcons(metadataSettings.monochromeIcons);
             hasLoadedMetadata.current = true;
         }
     }, [metadataSettings]);
@@ -69,6 +75,7 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         localStorage.setItem('toolbar-visible', String(toolbarVisible));
         localStorage.setItem('spellcheck-enabled', String(spellcheckEnabled));
         localStorage.setItem('landscape-fullscreen', String(landscapeFullscreen));
+        localStorage.setItem('monochrome-icons', String(monochromeIcons));
 
         // Sync with cloud metadata if callback provided AND we have already finished the initial load
         if (onSaveSettings && hasLoadedMetadata.current) {
@@ -77,9 +84,10 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
                 accentColor,
                 toolbarVisible,
                 spellcheckEnabled,
+                monochromeIcons,
             });
         }
-    }, [markdownEnabled, accentColor, fontFamily, fontSize, toolbarVisible, spellcheckEnabled, landscapeFullscreen, onSaveSettings]);
+    }, [markdownEnabled, accentColor, fontFamily, fontSize, toolbarVisible, spellcheckEnabled, landscapeFullscreen, monochromeIcons, onSaveSettings]);
 
     return {
         markdownEnabled,
@@ -96,5 +104,7 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         setSpellcheckEnabled,
         landscapeFullscreen,
         setLandscapeFullscreen,
+        monochromeIcons,
+        setMonochromeIcons,
     };
 }

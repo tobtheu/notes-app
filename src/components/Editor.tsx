@@ -43,6 +43,7 @@ interface EditorProps {
     isFocusMode: boolean;
     onToggleFocus: () => void;
     onSync?: () => void;
+    imageCloudSync?: boolean;
     isIOS?: boolean;
     iosLandscapeFullscreen?: boolean;
     className?: string;
@@ -71,6 +72,7 @@ export function Editor({
     isFocusMode,
     onToggleFocus,
     onSync,
+    imageCloudSync = false,
     isIOS = false,
     iosLandscapeFullscreen = false,
     className
@@ -102,16 +104,6 @@ export function Editor({
 
     // Tracks the last version committed to disk to avoid redundant saves
     const lastSavedContent = useRef(stripFrontmatter(note.content));
-
-    // Throttle sync-on-blur: don't trigger more than once per 10s to avoid constant syncing
-    const lastSyncTime = useRef(0);
-    const throttledSync = useCallback(() => {
-        const now = Date.now();
-        if (now - lastSyncTime.current > 10000) {
-            lastSyncTime.current = now;
-            onSync?.();
-        }
-    }, [onSync]);
 
     // Throttle sync-on-blur: don't trigger more than once per 10s to avoid constant syncing
     const lastSyncTime = useRef(0);
@@ -593,6 +585,7 @@ export function Editor({
                     content={body}
                     allNotes={allNotes}
                     workspacePath={workspacePath}
+                    imageCloudSync={imageCloudSync}
                     onChange={handleBodyChange}
                     onNavigate={onNavigate}
                     toolbarVisible={toolbarVisible}

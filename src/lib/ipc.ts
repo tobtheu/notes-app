@@ -48,6 +48,9 @@ export const tauriAPI: TauriAPI = {
     // Assets
     saveAsset: (rootPath: string, filename: string, contentBase64: string) =>
         invoke<{ success: boolean; path?: string; error?: string }>('save_asset', { rootPath, filename, contentBase64 }),
+    saveLocalAsset: (filename: string, contentBase64: string) =>
+        invoke<{ success: boolean; path?: string; error?: string }>('save_local_asset', { filename, contentBase64 }),
+    getLocalAssetsDir: () => invoke<string>('get_local_assets_dir'),
 
     // App info
     getAppVersion: () => invoke<string>('get_app_version'),
