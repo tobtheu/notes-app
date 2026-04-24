@@ -37,5 +37,10 @@ docs/
 features-demo/
 marketing-assets/
 
-# AI Agents
+# AI Agents & Assistants
 .agents/
+.claude/
+.antigravity/
+
+# Temporary Migration Files
+migration_temp/
