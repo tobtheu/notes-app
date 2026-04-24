@@ -113,6 +113,16 @@ export function Editor({
         }
     }, [onSync]);
 
+    // Throttle sync-on-blur: don't trigger more than once per 10s to avoid constant syncing
+    const lastSyncTime = useRef(0);
+    const throttledSync = useCallback(() => {
+        const now = Date.now();
+        if (now - lastSyncTime.current > 10000) {
+            lastSyncTime.current = now;
+            onSync?.();
+        }
+    }, [onSync]);
+
     // Tracks if we have unsaved/unflushed modifications (prevents parent overwriting our typing)
     const isDirty = useRef(false);
 

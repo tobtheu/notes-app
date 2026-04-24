@@ -275,6 +275,28 @@ const FolderItem = ({
                     </button>
                 </div>
             )}
+
+            {/* Reorder mode: edit/delete buttons visible on mobile */}
+            {!isCollapsed && isReorderMode && onEditCategory && onDeleteCategory && (
+                <div className="flex items-center gap-0.5 shrink-0 ml-1">
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onEditCategory(folder); }}
+                        className="p-1.5 text-gray-400 hover:text-primary-500 active:text-primary-500 rounded-md transition-all"
+                        title="Edit"
+                    >
+                        <Pencil size={13} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onDeleteCategory(folder); }}
+                        className="p-1.5 text-gray-400 hover:text-red-500 active:text-red-500 rounded-md transition-all"
+                        title="Delete"
+                    >
+                        <Trash2 size={13} />
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

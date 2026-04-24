@@ -182,6 +182,17 @@ export function SettingsModal({
         }
     };
 
+    const handleForceFullSync = async () => {
+        if (!currentPath) return;
+        setSyncStatus('resetting');
+        try {
+            await window.tauriAPI.resetSyncState(currentPath);
+            onTriggerSync?.();
+        } finally {
+            setSyncStatus('idle');
+        }
+    };
+
     const handleCheckForUpdates = () => {
         setUpdateStatus({ type: 'checking' });
         window.tauriAPI.checkForUpdates();

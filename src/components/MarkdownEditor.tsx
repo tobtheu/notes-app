@@ -787,6 +787,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
         onBlur: () => {
             onBlurRef.current?.();
         },
+        onBlur: () => {
+            onBlurRef.current?.();
+        },
     }, []); // Empty dependency array ensures stability
 
     useImperativeHandle(ref, () => ({
