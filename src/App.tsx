@@ -30,36 +30,46 @@ void getDb(); // Kick off PGlite init early
 // Global handlers log async errors that would otherwise be swallowed
 // outside React's render cycle (unhandled promise rejections, window errors).
 if (typeof window !== 'undefined') {
-    window.addEventListener('error', (event) => {
-        console.error('[window.onerror]', event.error || event.message);
-    });
-    window.addEventListener('unhandledrejection', (event) => {
-        console.error('[unhandledrejection]', event.reason);
-    });
+  window.addEventListener('error', (event) => {
+    console.error('[window.onerror]', event.error || event.message);
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('[unhandledrejection]', event.reason);
+  });
+  (window as any).dumpNotes = async () => {
+    const { supabase } = await import('./lib/supabaseClient');
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log('Current Session User ID:', session?.user?.id);
+
+    const db = await getDb();
+    const { rows } = await db.query('SELECT id, user_id, updated_at, deleted FROM notes');
+    console.table(rows);
+    return rows;
+  };
 }
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-    constructor(props: { children: ReactNode }) {
-        super(props);
-        this.state = { error: null };
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 p-8 text-center gap-4">
+          <p className="font-bold text-lg">Something went wrong</p>
+          <p className="text-sm text-gray-500 font-mono max-w-sm break-all">{this.state.error.message}</p>
+          <button type="button" className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm" onClick={() => window.location.reload()}>
+            Reload app
+          </button>
+        </div>
+      );
     }
-    static getDerivedStateFromError(error: Error) {
-        return { error };
-    }
-    render() {
-        if (this.state.error) {
-            return (
-                <div className="fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 p-8 text-center gap-4">
-                    <p className="font-bold text-lg">Something went wrong</p>
-                    <p className="text-sm text-gray-500 font-mono max-w-sm break-all">{this.state.error.message}</p>
-                    <button type="button" className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm" onClick={() => window.location.reload()}>
-                        Reload app
-                    </button>
-                </div>
-            );
-        }
-        return this.props.children;
-    }
+    return this.props.children;
+  }
 }
 
 function App() {
@@ -136,7 +146,7 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   useEffect(() => { if (syncStatus === 'unauthenticated') setIsSettingsOpen(false); }, [syncStatus]);
   const [isIOS, setIsIOS] = useState(false);
-  useEffect(() => { try { setIsIOS(platform() === 'ios'); } catch {} }, []);
+  useEffect(() => { try { setIsIOS(platform() === 'ios'); } catch { } }, []);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [isFocusMode, setIsFocusMode] = useState(false);
@@ -310,8 +320,9 @@ function App() {
 
   return (
     <div
-      className="absolute inset-0 flex bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-100 overflow-hidden"
+      className="absolute inset-0 flex text-gray-700 dark:text-gray-100 overflow-hidden transition-colors duration-500"
       style={{
+        backgroundColor: 'var(--app-bg)',
         fontFamily: fontFamily === 'inter' ? "'Inter', sans-serif" : fontFamily === 'roboto' ? "'Roboto', sans-serif" : "ui-sans-serif, system-ui, sans-serif",
         flexDirection: isIOS ? 'row' : 'column',
         borderRadius: '12px',
@@ -344,101 +355,101 @@ function App() {
       {/* Right column (iOS) or full layout (desktop): TitleBar + content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-      {!isFocusMode && (
-        <TitleBar
-          isSidebarCollapsed={isSidebarCollapsed}
-          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          activeView={activeView}
-          onBack={() => setActiveView('notelist')}
-        />
-      )}
-
-      <div className="flex-1 flex overflow-hidden">
-        {/* Desktop sidebar inside content row */}
-        {!isIOS && !isFocusMode && (
-          <Sidebar
-            className={clsx(
-              "md:flex",
-              activeView === 'editor' ? "hidden md:flex" : "flex"
-            )}
-            folders={folders}
-            metadata={metadata}
-            selectedCategory={selectedCategory}
-            isCollapsed={isSidebarCollapsed}
-            onCreateNote={handleCreateNote}
-            onCreateFolder={createFolder}
-            onDeleteCategory={setCategoryToDelete}
-            onEditCategory={setEditingCategory}
-            onSelectCategory={handleSelectCategory}
-            onReorderFolders={reorderFolders}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-            monochromeIcons={monochromeIcons}
-          />
-        )}
-
-        {/* NOTELIST — visible when not in sidebar-only or editor view */}
         {!isFocusMode && (
-          <NoteList
-            className={clsx(
-              "flex-1 min-w-0 md:flex-none md:w-80 md:shrink-0 transition-all duration-300 ease-in-out",
-              activeView === 'editor' ? (isIOS && isLandscape && !landscapeFullscreen ? "flex" : "hidden md:flex") :
-                activeView === 'sidebar' ? "hidden md:flex" : "flex"
-            )}
-            notes={notes}
-            selectedNote={activeView === 'editor' ? selectedNote : null}
-            onSelectNote={handleSelectNote}
-            onDeleteNote={deleteNote}
-            onMoveNote={moveNote}
-            onTogglePin={togglePinNote}
-            isNotePinned={isNotePinned}
-            getNoteId={getNoteId}
-            searchTerm={searchTerm}
-            onSearchChange={setSearchTerm}
-            folders={folders}
-            selectedCategory={selectedCategory}
-            isIOS={isIOS}
+          <TitleBar
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            activeView={activeView}
+            onBack={() => setActiveView('notelist')}
           />
         )}
 
-        {/* EDITOR — takes full width on mobile, hides sidebar + notelist */}
-        {selectedNote ? (
-          <Editor
-            key={selectionCount}
-            className={clsx(
-              "flex-1",
+        <div className="flex-1 flex overflow-hidden">
+          {/* Desktop sidebar inside content row */}
+          {!isIOS && !isFocusMode && (
+            <Sidebar
+              className={clsx(
+                "md:flex",
+                activeView === 'editor' ? "hidden md:flex" : "flex"
+              )}
+              folders={folders}
+              metadata={metadata}
+              selectedCategory={selectedCategory}
+              isCollapsed={isSidebarCollapsed}
+              onCreateNote={handleCreateNote}
+              onCreateFolder={createFolder}
+              onDeleteCategory={setCategoryToDelete}
+              onEditCategory={setEditingCategory}
+              onSelectCategory={handleSelectCategory}
+              onReorderFolders={reorderFolders}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              monochromeIcons={monochromeIcons}
+            />
+          )}
+
+          {/* NOTELIST — visible when not in sidebar-only or editor view */}
+          {!isFocusMode && (
+            <NoteList
+              className={clsx(
+                "flex-1 min-w-0 md:flex-none md:w-80 md:shrink-0 transition-all duration-300 ease-in-out",
+                activeView === 'editor' ? (isIOS && isLandscape && !landscapeFullscreen ? "flex" : "hidden md:flex") :
+                  activeView === 'sidebar' ? "hidden md:flex" : "flex"
+              )}
+              notes={notes}
+              selectedNote={activeView === 'editor' ? selectedNote : null}
+              onSelectNote={handleSelectNote}
+              onDeleteNote={deleteNote}
+              onMoveNote={moveNote}
+              onTogglePin={togglePinNote}
+              isNotePinned={isNotePinned}
+              getNoteId={getNoteId}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              folders={folders}
+              selectedCategory={selectedCategory}
+              isIOS={isIOS}
+            />
+          )}
+
+          {/* EDITOR — takes full width on mobile, hides sidebar + notelist */}
+          {selectedNote ? (
+            <Editor
+              key={selectionCount}
+              className={clsx(
+                "flex-1",
+                activeView === 'editor' ? "flex" : "hidden md:flex"
+              )}
+              note={selectedNote}
+              allNotes={allNotes}
+              workspacePath={currentFolder || ''}
+              imageCloudSync={userId === 'local'}
+              onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
+              onUpdateLocally={updateNoteLocally}
+              markdownEnabled={markdownEnabled}
+              toolbarVisible={toolbarVisible}
+              setToolbarVisible={setToolbarVisible}
+              spellcheckEnabled={spellcheckEnabled}
+              isFocusMode={isFocusMode}
+              onToggleFocus={() => setIsFocusMode(!isFocusMode)}
+              onSync={triggerSync}
+              onNavigate={(id, _anchor) => handleNavigate(id)}
+              isIOS={isIOS}
+              iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
+            />
+          ) : (
+            <div className={clsx(
+              "flex-1 items-center justify-center text-gray-400",
               activeView === 'editor' ? "flex" : "hidden md:flex"
-            )}
-            note={selectedNote}
-            allNotes={allNotes}
-            workspacePath={currentFolder || ''}
-            imageCloudSync={userId === 'local'}
-            onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
-            onUpdateLocally={updateNoteLocally}
-            markdownEnabled={markdownEnabled}
-            toolbarVisible={toolbarVisible}
-            setToolbarVisible={setToolbarVisible}
-            spellcheckEnabled={spellcheckEnabled}
-            isFocusMode={isFocusMode}
-            onToggleFocus={() => setIsFocusMode(!isFocusMode)}
-            onSync={triggerSync}
-            onNavigate={(id, _anchor) => handleNavigate(id)}
-            isIOS={isIOS}
-            iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
-          />
-        ) : (
-          <div className={clsx(
-            "flex-1 items-center justify-center text-gray-400 bg-white dark:bg-gray-900",
-            activeView === 'editor' ? "flex" : "hidden md:flex"
-          )}>
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
-                <Book className="text-gray-300 dark:text-gray-600" size={32} />
+            )} style={{ backgroundColor: 'var(--app-bg)' }}>
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
+                  <Book className="text-gray-300 dark:text-gray-600" size={32} />
+                </div>
+                <p className="text-sm font-medium">Select a note to start editing</p>
               </div>
-              <p className="text-sm font-medium">Select a note to start editing</p>
             </div>
-          </div>
-        )}
-      </div>{/* end inner content row */}
+          )}
+        </div>{/* end inner content row */}
       </div>{/* end right column */}
 
       {isSettingsOpen && (
@@ -517,26 +528,26 @@ function App() {
 // We initialise the db lazily (getDb returns a singleton promise) and pass
 // it to the provider once resolved.
 function PGliteWrapper({ children }: { children: ReactNode }) {
-    const [db, setDb] = useState<PGliteWithLive | null>(null);
-    useEffect(() => {
-        getDb().then(setDb).catch(console.error);
-    }, []);
+  const [db, setDb] = useState<PGliteWithLive | null>(null);
+  useEffect(() => {
+    getDb().then(setDb).catch(console.error);
+  }, []);
 
-    if (!db) return (
-        <div className="flex items-center justify-center w-full h-full min-h-screen bg-white dark:bg-gray-900">
-            <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
-        </div>
-    );
+  if (!db) return (
+    <div className="flex items-center justify-center w-full h-full min-h-screen bg-white dark:bg-gray-900">
+      <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+    </div>
+  );
 
-    return <PGliteProvider db={db}>{children}</PGliteProvider>;
+  return <PGliteProvider db={db}>{children}</PGliteProvider>;
 }
 
 export default function AppWithErrorBoundary() {
-    return (
-        <AppErrorBoundary>
-            <PGliteWrapper>
-                <App />
-            </PGliteWrapper>
-        </AppErrorBoundary>
-    );
+  return (
+    <AppErrorBoundary>
+      <PGliteWrapper>
+        <App />
+      </PGliteWrapper>
+    </AppErrorBoundary>
+  );
 }

@@ -1040,10 +1040,11 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
     return (
         <div
             className={clsx(
-                "flex flex-col flex-1 w-full bg-white dark:bg-gray-900 relative overflow-hidden",
+                "flex flex-col flex-1 w-full relative overflow-hidden",
                 isScrolling && "is-scrolling"
             )}
             onMouseLeave={() => setHoveredLink(null)}
+            style={{ backgroundColor: 'var(--app-bg)' }}
         >
             <UrlInputModal
                 isOpen={isLinkModalOpen}
@@ -1252,10 +1253,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             {toolbarVisible && !isIOS && (
                 <div
                     ref={toolbarRef}
-                    className="px-2 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex items-center justify-center w-full box-content"
+                    className="px-2 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex items-center justify-center w-full box-content"
                     style={keyboardHeight > 0
-                        ? { position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9998, paddingTop: 4, paddingBottom: 4 }
-                        : { paddingTop: 8, paddingBottom: 'calc(8px + var(--safe-bottom, 0vh))' }
+                        ? { backgroundColor: 'var(--app-bg)', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9998, paddingTop: 4, paddingBottom: 4 }
+                        : { backgroundColor: 'var(--app-bg)', paddingTop: 8, paddingBottom: 'calc(8px + var(--safe-bottom, 0vh))' }
                     }
                 >
                     <EditorToolbar

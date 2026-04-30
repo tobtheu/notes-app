@@ -63,7 +63,7 @@ async function ensureFreshToken(): Promise<void> {
         await setSupabaseSession(refreshed.accessToken, refreshed.refreshToken);
         log.info('[offlineQueue] token refreshed ✓');
       } else {
-        log.warn('[offlineQueue] token refresh failed — proceeding with existing token');
+        log.error('[offlineQueue] token refresh FAILED (400 or network) — session may be dead. Please sign out and sign in again if sync stays pending.');
       }
     }
   } catch (e) {
@@ -87,7 +87,11 @@ async function upsertWithTimeout(
       .from(table)
       .upsert(payload as any, { onConflict: conflictCol })
       .abortSignal(controller.signal);
-    if (error) throw new Error(error.message);
+
+    if (error) {
+      log.error(`[offlineQueue] upsert error for ${table}:`, error);
+      throw new Error(error.message);
+    }
   } finally {
     clearTimeout(timer);
   }
@@ -146,6 +150,12 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
   if (!navigator.onLine) return 0;
 
   // Refresh token before starting — avoids 401 mid-flush
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    log.warn('[offlineQueue] flush aborted — no active session');
+    return 0;
+  }
+  log.info(`[offlineQueue] flush starting — user: ${session.user.id}`);
   await ensureFreshToken();
 
   const { rows } = await db.query<{

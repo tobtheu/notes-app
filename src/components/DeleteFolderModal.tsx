@@ -15,7 +15,7 @@ interface DeleteFolderModalProps {
 export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFolderModalProps) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--app-bg)' }}>
                 {/* --- HEADER --- */}
                 <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
                     <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">Delete Category</h3>

@@ -226,7 +226,7 @@ export function SettingsModal({
             style={isIOS && window.innerWidth < 768 ? { paddingTop: 'max(env(safe-area-inset-top, 0px), 24px)' } : undefined}
             onClick={onClose}
         >
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md p-6 relative animate-in fade-in zoom-in duration-200 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+            <div className="rounded-xl shadow-xl w-full max-w-md p-6 relative animate-in fade-in zoom-in duration-200 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--app-bg)' }}>
                 <button
                     onClick={onClose}
                     className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors z-10"
@@ -478,14 +478,14 @@ export function SettingsModal({
                             <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Accent Color</h4>
                             <div className="flex items-center gap-3 px-3 py-1 -mx-1 mb-4">
                                 {([
-                                    ['blue',        '#3b82f6'],
-                                    ['purple',      '#a855f7'],
-                                    ['green',       '#59FFA0'],
-                                    ['red',         '#ef4444'],
-                                    ['orange',      '#f97316'],
-                                    ['jasmine',     '#FFD972'],
-                                    ['periwinkle',  '#B4ADEA'],
-                                    ['watermelon',  '#E84855'],
+                                    ['blue', '#3b82f6'],
+                                    ['purple', '#a855f7'],
+                                    ['green', '#59FFA0'],
+                                    ['red', '#ef4444'],
+                                    ['orange', '#f97316'],
+                                    ['jasmine', '#FFD972'],
+                                    ['periwinkle', '#B4ADEA'],
+                                    ['watermelon', '#E84855'],
                                 ] as [string, string][]).map(([color, hex]) => (
                                     <button
                                         key={color}
@@ -503,6 +503,43 @@ export function SettingsModal({
                                         )}
                                     </button>
                                 ))}
+                            </div>
+
+                            {/* Premium Themes Selection */}
+                            <div className="mb-6">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Premium Themes</h4>
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 uppercase tracking-wider">Pro</span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    {([
+                                        ['terracotta', '#8c4a4a', '#f2ebe1', 'Terracotta'],
+                                        ['sage', '#5d6d5d', '#ecebe4', 'Sage & Stone'],
+                                        ['indigo', '#3f4d71', '#f1f1f1', 'Lava & Indigo'],
+                                    ] as [string, string, string, string][]).map(([color, primary, bg, label]) => (
+                                        <button
+                                            key={color}
+                                            onClick={() => setAccentColor(color)}
+                                            className={clsx(
+                                                "relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all overflow-hidden group",
+                                                accentColor === color
+                                                    ? "border-[var(--primary-500)] shadow-md shadow-[var(--primary-500)]/20"
+                                                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm"
+                                            )}
+                                            style={{ backgroundColor: theme === 'dark' ? '#111' : bg }}
+                                        >
+                                            <div
+                                                className="w-10 h-10 rounded-full mb-2 flex items-center justify-center shadow-sm"
+                                                style={{ backgroundColor: primary }}
+                                            >
+                                                {accentColor === color && <div className="w-3 h-3 bg-white rounded-full" />}
+                                            </div>
+                                            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                                {label}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             {/* Monochrome Icons Toggle */}
@@ -786,7 +823,7 @@ export function SettingsModal({
                                     <Activity size={12} />
                                     Connection Diagnostic
                                 </h3>
-                                
+
                                 <button
                                     onClick={handleRunDiagnostics}
                                     disabled={isDiagnosing}

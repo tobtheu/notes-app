@@ -207,8 +207,9 @@ const NoteListItem = memo(({
                         isSnapping && "transition-transform duration-200",
                         isSelected
                             ? "bg-primary-50 dark:bg-primary-950 border-primary-500 shadow-sm"
-                            : "bg-white dark:bg-gray-900 hover:bg-gray-50 border-transparent dark:hover:bg-gray-800"
+                            : "hover:bg-gray-100 border-transparent dark:hover:bg-gray-800"
                     )}
+                    style={!isSelected ? { backgroundColor: 'var(--app-bg)' } : undefined}
                 >
                     <div className="flex flex-col min-w-0 gap-1.5 w-full pointer-events-none sm:pointer-events-auto">
                         <div className="flex items-start justify-between min-w-0 gap-2 w-full">
@@ -293,8 +294,8 @@ const NoteListItem = memo(({
 
                 {dropdownOpenId === noteId && (
                     <div
-                        className="absolute right-2 top-10 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-50 pointer-events-auto origin-top-right"
-                        style={{ maxHeight: '12rem' }}
+                        className="absolute right-2 top-10 mt-2 w-48 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-50 pointer-events-auto origin-top-right"
+                        style={{ maxHeight: '12rem', backgroundColor: 'var(--app-bg)' }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-700">
@@ -424,9 +425,9 @@ export function NoteList({
 
     return (
         <div className={clsx(
-            "flex flex-col h-full w-full bg-white dark:bg-gray-900 md:border-r border-gray-100 dark:border-gray-800",
+            "flex flex-col h-full w-full md:border-r border-gray-100 dark:border-gray-800 transition-colors duration-300",
             className
-        )}>
+        )} style={{ backgroundColor: 'var(--app-bg)' }}>
 
             {/* --- HEADER: SEARCH & FILTER --- */}
             <div>

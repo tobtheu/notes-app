@@ -406,11 +406,12 @@ export function Sidebar({
     return (
         <div
             className={clsx(
-                "flex flex-col h-full bg-gray-50 dark:bg-gray-950 border-r border-gray-100 dark:border-gray-800 transition-all duration-300 shrink-0 overflow-x-hidden",
+                "flex flex-col h-full border-r border-gray-100 dark:border-gray-800 transition-all duration-300 shrink-0 overflow-x-hidden",
                 // Configuration Point: Sidebar Widths
                 isCollapsed ? "w-16" : "w-64",
                 className
             )}
+            style={{ backgroundColor: 'var(--sidebar-bg)' }}
         >
             {/* --- ACTIONS HEADER --- */}
             <div className="px-2 pb-2" style={isIOS ? { paddingTop: 'var(--safe-top, 16px)' } : { paddingTop: '1rem' }}>

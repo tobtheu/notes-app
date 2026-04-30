@@ -73,6 +73,10 @@
   --primary-800: #1e40af;
   --primary-900: #1e3a8a;
   --primary-950: #172554;
+
+  /* Background defaults (overridden by premium themes) */
+  --app-bg: #ffffff;
+  --sidebar-bg: #f9fafb;
 }
 
 [data-accent="purple"] {
@@ -173,9 +177,69 @@
   --primary-950: #3d0a0e;
 }
 
+/* Premium Themes */
+[data-accent="terracotta"] {
+  --primary-50: #fdf8f6;
+  --primary-100: #f2e8e5;
+  --primary-200: #eaddd8;
+  --primary-300: #e0cec7;
+  --primary-400: #d2bab0;
+  --primary-500: #8c4a4a;
+  --primary-600: #7a3e3e;
+  --primary-700: #663434;
+  --primary-800: #522a2a;
+  --primary-900: #3e2020;
+  --primary-950: #251212;
+  --app-bg: #fcfbf9;
+  --sidebar-bg: #f5f2ee;
+}
+html.dark[data-accent="terracotta"] {
+  --app-bg: #1f1b1a;
+  --sidebar-bg: #171413;
+}
+
+[data-accent="sage"] {
+  --primary-50: #f6f8f6;
+  --primary-100: #e9ece9;
+  --primary-200: #d3d9d3;
+  --primary-300: #bbc5bb;
+  --primary-400: #a2afa2;
+  --primary-500: #5d6d5d;
+  --primary-600: #4a574a;
+  --primary-700: #3d483d;
+  --primary-800: #313a31;
+  --primary-900: #262d26;
+  --primary-950: #151a15;
+  --app-bg: #fbfbf9;
+  --sidebar-bg: #f2f3ef;
+}
+html.dark[data-accent="sage"] {
+  --app-bg: #181c18;
+  --sidebar-bg: #111411;
+}
+
+[data-accent="indigo"] {
+  --primary-50: #f0f2f7;
+  --primary-100: #dee3ef;
+  --primary-200: #c2cde2;
+  --primary-300: #9badcf;
+  --primary-400: #6d85b6;
+  --primary-500: #3f4d71;
+  --primary-600: #333d5a;
+  --primary-700: #2a3249;
+  --primary-800: #212839;
+  --primary-900: #191e2b;
+  --primary-950: #0d1018;
+  --app-bg: #f8f9fc;
+  --sidebar-bg: #f0f2f8;
+}
+html.dark[data-accent="indigo"] {
+  --app-bg: #0f111a;
+  --sidebar-bg: #0a0b12;
+}
+
 /* Base Styles */
 :root {
-  --app-bg: #ffffff;
 
   /* Safe area insets — kept in plain :root so env() resolves correctly at runtime.
      Tailwind @theme processes values at build time and may not preserve env() functions. */
@@ -185,8 +249,9 @@
   --safe-right: env(safe-area-inset-right);
 }
 
-.dark {
-  --app-bg: #1a1a1a;
+html.dark {
+  --app-bg: #111827;
+  --sidebar-bg: #030712;
 }
 
 html,
@@ -345,9 +410,9 @@ body {
 }
 
 .prose li p,
-.prose li > p,
-.prose li > p:first-child,
-.prose li > p:last-child,
+.prose li>p,
+.prose li>p:first-child,
+.prose li>p:last-child,
 :where(.prose-sm, .prose-base, .prose-lg, .prose-xl, .prose-2xl) :where(li) p {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
@@ -356,9 +421,9 @@ body {
 /* Tiptap wraps long list items in <p>.
    Zero all spacing AND inherit font/line-height from <li> so wrapped items
    look identical to non-wrapped items (both use the prose-{size} inherited value). */
-.ProseMirror li > p,
-.ProseMirror li > p:first-child,
-.ProseMirror li > p:last-child {
+.ProseMirror li>p,
+.ProseMirror li>p:first-child,
+.ProseMirror li>p:last-child {
   margin: 0 !important;
   padding: 0 !important;
   font-size: inherit !important;
@@ -603,6 +668,7 @@ body {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -618,6 +684,7 @@ body {
     transform: scale(0.98) translateY(10px);
     filter: blur(10px);
   }
+
   100% {
     opacity: 1;
     transform: scale(1) translateY(0);
@@ -631,22 +698,22 @@ body {
 
 /* Focus Mode Specialized Styles */
 .focus-mode-active {
-    @apply flex flex-col py-12 px-8 overflow-y-auto overflow-x-hidden transition-all duration-700;
-    scroll-behavior: smooth;
+  @apply flex flex-col py-12 px-8 overflow-y-auto overflow-x-hidden transition-all duration-700;
+  scroll-behavior: smooth;
 }
 
 .focus-mode-active .tiptap {
-    @apply max-w-3xl mx-auto w-full min-h-max transition-all duration-500;
+  @apply max-w-3xl mx-auto w-full min-h-max transition-all duration-500;
 }
 
 /* Ensure the editor container takes full width/height in focus mode */
 .focus-mode-active .ProseMirror {
-    @apply outline-none pt-4 pb-24;
+  @apply outline-none pt-4 pb-24;
 }
 
 /* Hide line numbers or other distractors if any exist in the future */
 .focus-mode-active .editor-gutter {
-    display: none !important;
+  display: none !important;
 }
 
 @keyframes zoom-in {
@@ -680,10 +747,21 @@ body {
 
 /* Long-press radial ripple — plays over 500ms matching the press timer */
 @keyframes longpress-ripple {
-  0%   { transform: scale(0.7);  opacity: 0.55; }
-  60%  { opacity: 0.3; }
-  100% { transform: scale(1.15); opacity: 0; }
+  0% {
+    transform: scale(0.7);
+    opacity: 0.55;
+  }
+
+  60% {
+    opacity: 0.3;
+  }
+
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
 }
+
 .animate-longpress {
   animation: longpress-ripple 500ms ease-out forwards;
 }

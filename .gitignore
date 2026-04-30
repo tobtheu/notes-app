@@ -41,6 +41,7 @@ marketing-assets/
 .agents/
 .claude/
 .antigravity/
+AGENTS.md
 
 # Temporary Migration Files
 migration_temp/

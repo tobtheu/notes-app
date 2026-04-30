@@ -89,9 +89,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
 
     return (
         <div className={clsx(
-            "flex items-center gap-1 p-1 bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 rounded-lg animate-in fade-in zoom-in duration-200 w-full md:w-fit max-w-[calc(100vw-2rem)] overflow-x-auto no-scrollbar shrink-0",
+            "flex items-center gap-1 p-1 shadow-xl border border-gray-200 dark:border-gray-700 rounded-lg animate-in fade-in zoom-in duration-200 w-full md:w-fit max-w-[calc(100vw-2rem)] overflow-x-auto no-scrollbar shrink-0",
             isCompact ? "bg-opacity-90 backdrop-blur-sm" : ""
-        )}>
+        )} style={{ backgroundColor: 'var(--app-bg)' }}>
             {/* --- BASIC FORMATTING --- */}
             <Btn
                 icon={Bold}

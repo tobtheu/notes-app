@@ -20,7 +20,9 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON
     autoRefreshToken: false, // Token refresh handled by Tauri backend
   },
   global: {
-    headers: { 'X-Lama-Secret': import.meta.env.VITE_LAMA_SECRET },
+    headers: import.meta.env.VITE_LAMA_SECRET 
+      ? { 'X-Lama-Secret': import.meta.env.VITE_LAMA_SECRET as string }
+      : {},
   },
 });
 

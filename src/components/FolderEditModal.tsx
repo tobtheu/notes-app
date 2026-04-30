@@ -122,7 +122,7 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
 
     return (
         <div className="fixed inset-0 z-10000 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+            <div className="rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--app-bg)' }}>
 
                 {/* Header with Preview */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 shrink-0">
