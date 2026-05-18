@@ -66,6 +66,7 @@ const COLOR_MAP: Record<string, any> = {
 };
 
 interface SidebarProps {
+    sidebarRef?: React.RefObject<HTMLDivElement | null>;
     className?: string;
     folders?: string[];
     metadata: AppMetadata;
@@ -331,6 +332,7 @@ const SortableFolderItem = (props: SortableFolderItemProps) => {
  * Primary navigation column. Contains the search/creation header and the scrollable folder list.
  */
 export function Sidebar({
+    sidebarRef,
     className,
     folders = [],
     metadata,
@@ -420,10 +422,11 @@ export function Sidebar({
 
     return (
         <div
+            ref={sidebarRef}
             className={clsx(
-                "flex flex-col h-full border-r border-gray-100 dark:border-gray-800 transition-all duration-300 shrink-0 overflow-x-hidden",
-                // Configuration Point: Sidebar Widths
-                isCollapsed ? "w-16" : "w-64",
+                "flex flex-col h-full border-r border-gray-100 dark:border-gray-800 shrink-0 overflow-x-hidden transition-all duration-300",
+                "fixed md:relative md:translate-x-0 top-0 bottom-0 left-0 z-50 w-72 md:w-64 shadow-2xl md:shadow-none",
+                isCollapsed ? "-translate-x-full md:w-16 md:translate-x-0 md:shadow-none" : "translate-x-0",
                 className
             )}
             style={{ backgroundColor: 'var(--sidebar-bg)' }}

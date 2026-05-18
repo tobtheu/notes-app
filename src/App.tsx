@@ -4,6 +4,7 @@ import { PGliteProvider } from '@electric-sql/pglite-react';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
+import { MobileSwipeContainer } from './components/MobileSwipeContainer';
 import { TitleBar } from './components/TitleBar';
 import { SettingsModal } from './components/SettingsModal';
 import { DeleteFolderModal } from './components/DeleteFolderModal';
@@ -161,6 +162,130 @@ function App() {
   }>({ type: 'idle' });
 
 
+
+  // Sidebar Gesture refs
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const sidebarStartX = useRef(0);
+  const sidebarCurrentX = useRef(0);
+  const isSidebarDragging = useRef(false);
+
+  const handleSidebarTouchStart = (e: React.TouchEvent) => {
+    if (activeView === 'editor' || isFocusMode) return;
+    const touch = e.touches[0];
+    
+    // If sidebar is collapsed (closed): start dragging only from the very left edge (< 35px)
+    if (isSidebarCollapsed) {
+      if (touch.clientX < 35) {
+        sidebarStartX.current = touch.clientX;
+        sidebarCurrentX.current = touch.clientX;
+        isSidebarDragging.current = true;
+        if (sidebarRef.current) {
+          sidebarRef.current.style.transition = 'none';
+          sidebarRef.current.style.transform = 'translate3d(-100%, 0, 0)';
+        }
+        if (backdropRef.current) {
+          backdropRef.current.style.display = 'block';
+          backdropRef.current.style.transition = 'none';
+          backdropRef.current.style.opacity = '0';
+        }
+      }
+    } else {
+      // If sidebar is open: start dragging from anywhere (to swipe it closed)
+      sidebarStartX.current = touch.clientX;
+      sidebarCurrentX.current = touch.clientX;
+      isSidebarDragging.current = true;
+      if (sidebarRef.current) sidebarRef.current.style.transition = 'none';
+      if (backdropRef.current) {
+        backdropRef.current.style.transition = 'none';
+      }
+    }
+  };
+
+  const handleSidebarTouchMove = (e: React.TouchEvent) => {
+    if (!isSidebarDragging.current) return;
+    const touch = e.touches[0];
+    sidebarCurrentX.current = touch.clientX;
+    
+    if (isSidebarCollapsed) {
+      // Pulling the sidebar OPEN (drag from left to right)
+      const deltaX = Math.min(288, Math.max(0, sidebarCurrentX.current - sidebarStartX.current));
+      if (sidebarRef.current) {
+        sidebarRef.current.style.transform = `translate3d(calc(-100% + ${deltaX}px), 0, 0)`;
+      }
+      if (backdropRef.current) {
+        backdropRef.current.style.opacity = `${(deltaX / 288) * 0.4}`;
+      }
+    } else {
+      // Pulling the sidebar CLOSED (drag from right to left)
+      const deltaX = Math.min(0, Math.max(-288, sidebarCurrentX.current - sidebarStartX.current));
+      if (sidebarRef.current) {
+        sidebarRef.current.style.transform = `translate3d(${deltaX}px, 0, 0)`;
+      }
+      if (backdropRef.current) {
+        backdropRef.current.style.opacity = `${0.4 + (deltaX / 288) * 0.4}`;
+      }
+    }
+  };
+
+  const handleSidebarTouchEnd = () => {
+    if (!isSidebarDragging.current) return;
+    isSidebarDragging.current = false;
+    
+    const deltaX = sidebarCurrentX.current - sidebarStartX.current;
+    
+    if (sidebarRef.current) {
+      sidebarRef.current.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+    }
+    if (backdropRef.current) {
+      backdropRef.current.style.transition = 'opacity 0.3s';
+    }
+
+    if (isSidebarCollapsed) {
+      // Snapping logic for opening
+      if (deltaX > 80) {
+        setIsSidebarCollapsed(false);
+        if (sidebarRef.current) sidebarRef.current.style.transform = 'translate3d(0, 0, 0)';
+        if (backdropRef.current) backdropRef.current.style.opacity = '0.4';
+      } else {
+        if (sidebarRef.current) sidebarRef.current.style.transform = 'translate3d(-100%, 0, 0)';
+        if (backdropRef.current) {
+          backdropRef.current.style.opacity = '0';
+          setTimeout(() => {
+            if (backdropRef.current) backdropRef.current.style.display = 'none';
+          }, 300);
+        }
+      }
+    } else {
+      // Snapping logic for closing
+      if (deltaX < -80) {
+        setIsSidebarCollapsed(true);
+        if (sidebarRef.current) sidebarRef.current.style.transform = 'translate3d(-100%, 0, 0)';
+        if (backdropRef.current) {
+          backdropRef.current.style.opacity = '0';
+          setTimeout(() => {
+            if (backdropRef.current) backdropRef.current.style.display = 'none';
+          }, 300);
+        }
+      } else {
+        if (sidebarRef.current) sidebarRef.current.style.transform = 'translate3d(0, 0, 0)';
+        if (backdropRef.current) backdropRef.current.style.opacity = '0.4';
+      }
+    }
+  };
+
+  // Reset touch state and update display styles on collapse status change
+  useEffect(() => {
+    if (sidebarRef.current) {
+      sidebarRef.current.style.transform = '';
+      sidebarRef.current.style.transition = '';
+    }
+    if (backdropRef.current) {
+      backdropRef.current.style.opacity = '';
+      backdropRef.current.style.transition = '';
+      backdropRef.current.style.display = isSidebarCollapsed ? 'none' : 'block';
+    }
+  }, [isSidebarCollapsed]);
 
   // Mobile View Management
   const [_isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -346,6 +471,7 @@ function App() {
       {/* iOS only: Sidebar as first column spanning full height */}
       {isIOS && !isFocusMode && (
         <Sidebar
+          sidebarRef={sidebarRef}
           className={clsx(
             "flex",
             activeView === 'editor' ? (isLandscape && !landscapeFullscreen ? "flex" : "hidden") : "flex"
@@ -368,10 +494,27 @@ function App() {
           />
         )}
 
-        <div className="flex-1 flex overflow-hidden">
+        <div 
+          className="flex-1 flex overflow-hidden relative"
+          onTouchStart={handleSidebarTouchStart}
+          onTouchMove={handleSidebarTouchMove}
+          onTouchEnd={handleSidebarTouchEnd}
+        >
+          {/* Mobile Sidebar backdrop */}
+          <div
+            ref={backdropRef}
+            onClick={() => setIsSidebarCollapsed(true)}
+            className={clsx(
+              "fixed inset-0 bg-black/40 z-[45] md:hidden transition-opacity duration-300",
+              isSidebarCollapsed ? "pointer-events-none" : "pointer-events-auto"
+            )}
+            style={{ display: isSidebarCollapsed ? 'none' : 'block', opacity: isSidebarCollapsed ? 0 : 0.4 }}
+          />
+
           {/* Desktop sidebar inside content row */}
           {!isIOS && !isFocusMode && (
             <Sidebar
+              sidebarRef={sidebarRef}
               className={clsx(
                 "md:flex",
                 activeView === 'editor' ? "hidden md:flex" : "flex"
@@ -385,7 +528,7 @@ function App() {
             <NoteList
               className={clsx(
                 "flex-1 min-w-0 md:flex-none md:w-80 md:shrink-0 transition-all duration-300 ease-in-out",
-                activeView === 'editor' ? (isIOS && isLandscape && !landscapeFullscreen ? "flex" : "hidden md:flex") :
+                activeView === 'editor' ? (isIOS && isLandscape && !landscapeFullscreen ? "flex" : "flex") :
                   activeView === 'sidebar' ? "hidden md:flex" : "flex"
               )}
               notes={notes}
@@ -406,29 +549,35 @@ function App() {
 
           {/* EDITOR — takes full width on mobile, hides sidebar + notelist */}
           {selectedNote ? (
-            <Editor
-              key={selectionCount}
-              className={clsx(
-                "flex-1",
-                activeView === 'editor' ? "flex" : "hidden md:flex"
-              )}
-              note={selectedNote}
-              allNotes={allNotes}
-              workspacePath={currentFolder || ''}
-              imageCloudSync={userId === 'local'}
-              onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
-              onUpdateLocally={updateNoteLocally}
-              markdownEnabled={markdownEnabled}
-              toolbarVisible={toolbarVisible}
-              setToolbarVisible={setToolbarVisible}
-              spellcheckEnabled={spellcheckEnabled}
-              isFocusMode={isFocusMode}
-              onToggleFocus={() => setIsFocusMode(!isFocusMode)}
-              onSync={triggerSync}
-              onNavigate={(id, _anchor) => handleNavigate(id)}
-              isIOS={isIOS}
-              iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
-            />
+            <MobileSwipeContainer
+              active={activeView === 'editor'}
+              onBack={() => setActiveView('notelist')}
+              className="flex-1 flex"
+            >
+              <Editor
+                key={selectionCount}
+                className={clsx(
+                  "flex-1",
+                  activeView === 'editor' ? "flex" : "hidden md:flex"
+                )}
+                note={selectedNote}
+                allNotes={allNotes}
+                workspacePath={currentFolder || ''}
+                imageCloudSync={userId === 'local'}
+                onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
+                onUpdateLocally={updateNoteLocally}
+                markdownEnabled={markdownEnabled}
+                toolbarVisible={toolbarVisible}
+                setToolbarVisible={setToolbarVisible}
+                spellcheckEnabled={spellcheckEnabled}
+                isFocusMode={isFocusMode}
+                onToggleFocus={() => setIsFocusMode(!isFocusMode)}
+                onSync={triggerSync}
+                onNavigate={(id, _anchor) => handleNavigate(id)}
+                isIOS={isIOS}
+                iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
+              />
+            </MobileSwipeContainer>
           ) : (
             <div className={clsx(
               "flex-1 items-center justify-center text-gray-400",
