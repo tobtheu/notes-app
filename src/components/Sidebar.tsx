@@ -425,8 +425,7 @@ export function Sidebar({
             ref={sidebarRef}
             className={clsx(
                 "flex flex-col h-full border-r border-gray-100 dark:border-gray-800 shrink-0 overflow-x-hidden transition-all duration-300",
-                "fixed md:relative md:translate-x-0 top-0 bottom-0 left-0 z-50 w-72 md:w-64 shadow-2xl md:shadow-none",
-                isCollapsed ? "-translate-x-full md:w-16 md:translate-x-0 md:shadow-none" : "translate-x-0",
+                isCollapsed ? "w-16" : "w-64",
                 className
             )}
             style={{ backgroundColor: 'var(--sidebar-bg)' }}

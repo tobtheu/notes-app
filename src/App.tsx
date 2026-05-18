@@ -165,7 +165,6 @@ function App() {
 
   // Sidebar Gesture refs
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const backdropRef = useRef<HTMLDivElement>(null);
   const sidebarStartX = useRef(0);
   const sidebarCurrentX = useRef(0);
   const isSidebarDragging = useRef(false);
@@ -174,116 +173,79 @@ function App() {
     if (activeView === 'editor' || isFocusMode) return;
     const touch = e.touches[0];
     
-    // If sidebar is collapsed (closed): start dragging only from the very left edge (< 35px)
+    // If collapsed: drag starts anywhere within first 100px (covers the 64px collapsed sidebar + 36px edge of NoteList)
     if (isSidebarCollapsed) {
-      if (touch.clientX < 35) {
+      if (touch.clientX < 100) {
         sidebarStartX.current = touch.clientX;
         sidebarCurrentX.current = touch.clientX;
         isSidebarDragging.current = true;
         if (sidebarRef.current) {
           sidebarRef.current.style.transition = 'none';
-          sidebarRef.current.style.transform = 'translate3d(-100%, 0, 0)';
-        }
-        if (backdropRef.current) {
-          backdropRef.current.style.display = 'block';
-          backdropRef.current.style.transition = 'none';
-          backdropRef.current.style.opacity = '0';
         }
       }
     } else {
-      // If sidebar is open: start dragging from anywhere (to swipe it closed)
-      sidebarStartX.current = touch.clientX;
-      sidebarCurrentX.current = touch.clientX;
-      isSidebarDragging.current = true;
-      if (sidebarRef.current) sidebarRef.current.style.transition = 'none';
-      if (backdropRef.current) {
-        backdropRef.current.style.transition = 'none';
+      // If open (256px wide): start drag within the first 300px to fold it back
+      if (touch.clientX < 300) {
+        sidebarStartX.current = touch.clientX;
+        sidebarCurrentX.current = touch.clientX;
+        isSidebarDragging.current = true;
+        if (sidebarRef.current) {
+          sidebarRef.current.style.transition = 'none';
+        }
       }
     }
   };
 
   const handleSidebarTouchMove = (e: React.TouchEvent) => {
-    if (!isSidebarDragging.current) return;
+    if (!isSidebarDragging.current || !sidebarRef.current) return;
     const touch = e.touches[0];
     sidebarCurrentX.current = touch.clientX;
     
+    const deltaX = sidebarCurrentX.current - sidebarStartX.current;
+    
     if (isSidebarCollapsed) {
-      // Pulling the sidebar OPEN (drag from left to right)
-      const deltaX = Math.min(288, Math.max(0, sidebarCurrentX.current - sidebarStartX.current));
-      if (sidebarRef.current) {
-        sidebarRef.current.style.transform = `translate3d(calc(-100% + ${deltaX}px), 0, 0)`;
-      }
-      if (backdropRef.current) {
-        backdropRef.current.style.opacity = `${(deltaX / 288) * 0.4}`;
-      }
+      // Pulling open (dragging right)
+      const newWidth = Math.min(256, Math.max(64, 64 + deltaX));
+      sidebarRef.current.style.width = `${newWidth}px`;
     } else {
-      // Pulling the sidebar CLOSED (drag from right to left)
-      const deltaX = Math.min(0, Math.max(-288, sidebarCurrentX.current - sidebarStartX.current));
-      if (sidebarRef.current) {
-        sidebarRef.current.style.transform = `translate3d(${deltaX}px, 0, 0)`;
-      }
-      if (backdropRef.current) {
-        backdropRef.current.style.opacity = `${0.4 + (deltaX / 288) * 0.4}`;
-      }
+      // Pulling closed (dragging left)
+      const newWidth = Math.min(256, Math.max(64, 256 + deltaX));
+      sidebarRef.current.style.width = `${newWidth}px`;
     }
   };
 
   const handleSidebarTouchEnd = () => {
-    if (!isSidebarDragging.current) return;
+    if (!isSidebarDragging.current || !sidebarRef.current) return;
     isSidebarDragging.current = false;
     
     const deltaX = sidebarCurrentX.current - sidebarStartX.current;
     
-    if (sidebarRef.current) {
-      sidebarRef.current.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
-    }
-    if (backdropRef.current) {
-      backdropRef.current.style.transition = 'opacity 0.3s';
-    }
+    sidebarRef.current.style.transition = 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
 
     if (isSidebarCollapsed) {
       // Snapping logic for opening
       if (deltaX > 80) {
         setIsSidebarCollapsed(false);
-        if (sidebarRef.current) sidebarRef.current.style.transform = 'translate3d(0, 0, 0)';
-        if (backdropRef.current) backdropRef.current.style.opacity = '0.4';
+        sidebarRef.current.style.width = '256px';
       } else {
-        if (sidebarRef.current) sidebarRef.current.style.transform = 'translate3d(-100%, 0, 0)';
-        if (backdropRef.current) {
-          backdropRef.current.style.opacity = '0';
-          setTimeout(() => {
-            if (backdropRef.current) backdropRef.current.style.display = 'none';
-          }, 300);
-        }
+        sidebarRef.current.style.width = '64px';
       }
     } else {
       // Snapping logic for closing
       if (deltaX < -80) {
         setIsSidebarCollapsed(true);
-        if (sidebarRef.current) sidebarRef.current.style.transform = 'translate3d(-100%, 0, 0)';
-        if (backdropRef.current) {
-          backdropRef.current.style.opacity = '0';
-          setTimeout(() => {
-            if (backdropRef.current) backdropRef.current.style.display = 'none';
-          }, 300);
-        }
+        sidebarRef.current.style.width = '64px';
       } else {
-        if (sidebarRef.current) sidebarRef.current.style.transform = 'translate3d(0, 0, 0)';
-        if (backdropRef.current) backdropRef.current.style.opacity = '0.4';
+        sidebarRef.current.style.width = '256px';
       }
     }
   };
 
-  // Reset touch state and update display styles on collapse status change
+  // Reset touch overrides when isSidebarCollapsed state is updated
   useEffect(() => {
     if (sidebarRef.current) {
-      sidebarRef.current.style.transform = '';
+      sidebarRef.current.style.width = '';
       sidebarRef.current.style.transition = '';
-    }
-    if (backdropRef.current) {
-      backdropRef.current.style.opacity = '';
-      backdropRef.current.style.transition = '';
-      backdropRef.current.style.display = isSidebarCollapsed ? 'none' : 'block';
     }
   }, [isSidebarCollapsed]);
 
@@ -500,17 +462,6 @@ function App() {
           onTouchMove={handleSidebarTouchMove}
           onTouchEnd={handleSidebarTouchEnd}
         >
-          {/* Mobile Sidebar backdrop */}
-          <div
-            ref={backdropRef}
-            onClick={() => setIsSidebarCollapsed(true)}
-            className={clsx(
-              "fixed inset-0 bg-black/40 z-[45] md:hidden transition-opacity duration-300",
-              isSidebarCollapsed ? "pointer-events-none" : "pointer-events-auto"
-            )}
-            style={{ display: isSidebarCollapsed ? 'none' : 'block', opacity: isSidebarCollapsed ? 0 : 0.4 }}
-          />
-
           {/* Desktop sidebar inside content row */}
           {!isIOS && !isFocusMode && (
             <Sidebar

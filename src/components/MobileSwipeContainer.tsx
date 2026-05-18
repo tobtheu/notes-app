@@ -100,7 +100,7 @@ export function MobileSwipeContainer({ active, onBack, children, className }: Mo
         <div
             ref={containerRef}
             className={clsx(
-                "fixed inset-0 z-40 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden",
+                "absolute inset-0 z-40 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden",
                 className
             )}
             onTouchStart={handleTouchStart}
