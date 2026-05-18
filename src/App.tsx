@@ -457,7 +457,10 @@ function App() {
         )}
 
         <div 
-          className="flex-1 flex overflow-hidden relative"
+          className={clsx(
+            "flex-1 flex overflow-hidden",
+            _isMobile && "relative"
+          )}
           onTouchStart={handleSidebarTouchStart}
           onTouchMove={handleSidebarTouchMove}
           onTouchEnd={handleSidebarTouchEnd}
@@ -500,11 +503,37 @@ function App() {
 
           {/* EDITOR — takes full width on mobile, hides sidebar + notelist */}
           {selectedNote ? (
-            <MobileSwipeContainer
-              active={activeView === 'editor'}
-              onBack={() => setActiveView('notelist')}
-              className="flex-1 flex"
-            >
+            _isMobile ? (
+              <MobileSwipeContainer
+                active={activeView === 'editor'}
+                onBack={() => setActiveView('notelist')}
+                className="flex-1 flex"
+              >
+                <Editor
+                  key={selectionCount}
+                  className={clsx(
+                    "flex-1",
+                    activeView === 'editor' ? "flex" : "hidden md:flex"
+                  )}
+                  note={selectedNote}
+                  allNotes={allNotes}
+                  workspacePath={currentFolder || ''}
+                  imageCloudSync={userId === 'local'}
+                  onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
+                  onUpdateLocally={updateNoteLocally}
+                  markdownEnabled={markdownEnabled}
+                  toolbarVisible={toolbarVisible}
+                  setToolbarVisible={setToolbarVisible}
+                  spellcheckEnabled={spellcheckEnabled}
+                  isFocusMode={isFocusMode}
+                  onToggleFocus={() => setIsFocusMode(!isFocusMode)}
+                  onSync={triggerSync}
+                  onNavigate={(id, _anchor) => handleNavigate(id)}
+                  isIOS={isIOS}
+                  iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
+                />
+              </MobileSwipeContainer>
+            ) : (
               <Editor
                 key={selectionCount}
                 className={clsx(
@@ -528,7 +557,7 @@ function App() {
                 isIOS={isIOS}
                 iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
               />
-            </MobileSwipeContainer>
+            )
           ) : (
             <div className={clsx(
               "flex-1 items-center justify-center text-gray-400",
