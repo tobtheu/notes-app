@@ -3,6 +3,7 @@ import { X, Upload, Search, FileText, ChevronRight, Hash, ExternalLink, Link as 
 import type { Note } from '../types';
 import clsx from 'clsx';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { useLocalAssetsDir } from '../hooks/useLocalAssetsDir';
 
 interface UrlInputModalProps {
     isOpen: boolean;
@@ -35,13 +36,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = ({ isOpen, type, init
     const inputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [localFileName, setLocalFileName] = useState<string | null>(null);
-    const [localAssetsDir, setLocalAssetsDir] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (window.tauriAPI?.getLocalAssetsDir) {
-            window.tauriAPI.getLocalAssetsDir().then(setLocalAssetsDir).catch(console.error);
-        }
-    }, []);
+    const localAssetsDir = useLocalAssetsDir();
 
     const previewUrl = useMemo(() => {
         if (url && url.startsWith('.assets/') && workspacePath) {

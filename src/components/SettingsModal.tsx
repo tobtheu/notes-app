@@ -261,7 +261,9 @@ export function SettingsModal({
                                     </div>
                                     {syncStatus === 'pending' && (
                                         <p className="text-xs text-amber-600 dark:text-amber-400">
-                                            Pending changes will sync as soon as you're back online.
+                                            {navigator.onLine
+                                                ? "Syncing pending changes in the background..."
+                                                : "Pending changes will sync as soon as you're back online."}
                                         </p>
                                     )}
 

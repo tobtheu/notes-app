@@ -3,17 +3,13 @@ import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
 import clsx from 'clsx';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { MoveDiagonal2 } from 'lucide-react';
+import { useLocalAssetsDir } from '../hooks/useLocalAssetsDir';
 
 export const ResizableImageNode: React.FC<NodeViewProps> = (props) => {
     const { node, updateAttributes, selected, extension } = props;
     const { src, alt, width } = node.attrs;
 
-    const [localAssetsDir, setLocalAssetsDir] = useState<string | null>(null);
-    useEffect(() => {
-        if (window.tauriAPI?.getLocalAssetsDir) {
-            window.tauriAPI.getLocalAssetsDir().then(setLocalAssetsDir).catch(console.error);
-        }
-    }, []);
+    const localAssetsDir = useLocalAssetsDir();
 
     let finalSrc = src;
     if (finalSrc && finalSrc.startsWith('.assets/')) {

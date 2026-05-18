@@ -201,7 +201,10 @@ const NoteListItem = memo(({
                             isSwipedRef.current = false;
                         }
                     }}
-                    style={{ transform: `translateX(${swipeOffset}px)` }}
+                    style={{ 
+                        transform: `translateX(${swipeOffset}px)`,
+                        backgroundColor: !isSelected ? 'var(--app-bg)' : undefined
+                    }}
                     className={clsx(
                         "group relative p-2.5 rounded-xl cursor-pointer z-10 w-full border-2 overflow-hidden",
                         isSnapping && "transition-transform duration-200",
@@ -209,7 +212,6 @@ const NoteListItem = memo(({
                             ? "bg-primary-50 dark:bg-primary-950 border-primary-500 shadow-sm"
                             : "hover:bg-gray-100 border-transparent dark:hover:bg-gray-800"
                     )}
-                    style={!isSelected ? { backgroundColor: 'var(--app-bg)' } : undefined}
                 >
                     <div className="flex flex-col min-w-0 gap-1.5 w-full pointer-events-none sm:pointer-events-auto">
                         <div className="flex items-start justify-between min-w-0 gap-2 w-full">

@@ -13,23 +13,33 @@ export interface HealthStatus {
 /**
  * Pings a URL to check if it's reachable.
  */
-async function ping(url: string): Promise<{ ok: boolean; latency: number; error?: string }> {
+async function ping(url: string, options: { useSecret?: boolean; noCors?: boolean } = {}): Promise<{ ok: boolean; latency: number; error?: string }> {
   const start = Date.now();
   try {
     // We use 'no-cache' and a short timeout to avoid hanging
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
+    const headers: Record<string, string> = {};
+    if (options.useSecret) {
+      const secret = import.meta.env.VITE_LAMA_SECRET;
+      if (secret) {
+        headers['X-Lama-Secret'] = secret as string;
+      }
+    }
+
     await fetch(url, { 
       method: 'HEAD', 
-      mode: 'no-cors', // Important for cross-origin pings if no CORS headers
+      mode: options.noCors ? 'no-cors' : 'cors',
       cache: 'no-cache',
+      headers,
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
     return { ok: true, latency: Date.now() - start };
   } catch (err) {
+    console.error(`[health] ping failed for ${url}:`, err);
     return { 
       ok: false, 
       latency: -1, 
@@ -48,12 +58,12 @@ export async function runDiagnostics(): Promise<HealthStatus[]> {
   const results: HealthStatus[] = [];
 
   // 1. Internet Check
-  const googlePing = await ping('https://www.google.com');
+  const googlePing = await ping('https://www.google.com', { noCors: true });
   results.push({ service: 'Internet', ok: googlePing.ok, error: googlePing.error });
 
   // 2. Supabase Check
   if (supabaseUrl) {
-    const sPing = await ping(supabaseUrl);
+    const sPing = await ping(supabaseUrl, { useSecret: true });
     results.push({ 
       service: 'Supabase', 
       ok: sPing.ok, 
@@ -66,7 +76,7 @@ export async function runDiagnostics(): Promise<HealthStatus[]> {
   // 3. Electric Check
   if (electricUrl) {
     // Electric health check endpoint is usually /v1/health or just the root
-    const ePing = await ping(`${electricUrl}/v1/health`);
+    const ePing = await ping(`${electricUrl}/v1/health`, { useSecret: true });
     results.push({ 
       service: 'Electric', 
       ok: ePing.ok, 

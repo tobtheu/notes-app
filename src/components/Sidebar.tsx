@@ -117,6 +117,41 @@ interface SortableFolderItemProps {
     onDeleteCategory: (name: string) => void;
 }
 
+const CategoryActionButtons = ({
+    folder,
+    onEditCategory,
+    onDeleteCategory,
+    containerClass,
+    buttonClass,
+    deleteButtonClass
+}: {
+    folder: string;
+    onEditCategory: (name: string) => void;
+    onDeleteCategory: (name: string) => void;
+    containerClass: string;
+    buttonClass: string;
+    deleteButtonClass: string;
+}) => (
+    <div className={containerClass}>
+        <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onEditCategory(folder); }}
+            className={buttonClass}
+            title="Edit"
+        >
+            <Pencil size={16} />
+        </button>
+        <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDeleteCategory(folder); }}
+            className={deleteButtonClass}
+            title="Delete"
+        >
+            <Trash2 size={16} />
+        </button>
+    </div>
+);
+
 /**
  * FolderItem Component
  * Individual folder row inside the sidebar. Handles selection, hover actions (edit/delete), and DnD visual states.
@@ -232,46 +267,26 @@ const FolderItem = ({
 
             {/* Desktop hover actions */}
             {!isCollapsed && !isReorderMode && onEditCategory && onDeleteCategory && (
-                <div className="absolute right-1.5 px-1 py-1 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-md shadow-sm border border-gray-100/50 dark:border-gray-700/50 z-20 hidden lg:flex">
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onEditCategory(folder); }}
-                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary-500 rounded transition-all outline-none"
-                        title="Edit Category"
-                    >
-                        <Pencil size={16} />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onDeleteCategory(folder); }}
-                        className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-500 hover:text-red-500 rounded transition-all outline-none"
-                        title="Delete Category"
-                    >
-                        <Trash2 size={16} />
-                    </button>
-                </div>
+                <CategoryActionButtons
+                    folder={folder}
+                    onEditCategory={onEditCategory}
+                    onDeleteCategory={onDeleteCategory}
+                    containerClass="absolute right-1.5 px-1 py-1 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-md shadow-sm border border-gray-100/50 dark:border-gray-700/50 z-20 hidden lg:flex"
+                    buttonClass="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary-500 rounded transition-all outline-none"
+                    deleteButtonClass="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-500 hover:text-red-500 rounded transition-all outline-none"
+                />
             )}
 
             {/* Reorder mode: edit/delete buttons visible on mobile */}
             {!isCollapsed && isReorderMode && onEditCategory && onDeleteCategory && (
-                <div className="flex items-center gap-0.5 shrink-0 ml-1">
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onEditCategory(folder); }}
-                        className="p-2 text-gray-400 hover:text-primary-500 active:text-primary-500 rounded-md transition-all"
-                        title="Edit"
-                    >
-                        <Pencil size={16} />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onDeleteCategory(folder); }}
-                        className="p-2 text-gray-400 hover:text-red-500 active:text-red-500 rounded-md transition-all"
-                        title="Delete"
-                    >
-                        <Trash2 size={16} />
-                    </button>
-                </div>
+                <CategoryActionButtons
+                    folder={folder}
+                    onEditCategory={onEditCategory}
+                    onDeleteCategory={onDeleteCategory}
+                    containerClass="flex items-center gap-0.5 shrink-0 ml-1"
+                    buttonClass="p-2 text-gray-400 hover:text-primary-500 active:text-primary-500 rounded-md transition-all"
+                    deleteButtonClass="p-2 text-gray-400 hover:text-red-500 active:text-red-500 rounded-md transition-all"
+                />
             )}
         </div>
     );

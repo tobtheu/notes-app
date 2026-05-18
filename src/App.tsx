@@ -318,6 +318,21 @@ function App() {
     );
   }
 
+  const sharedSidebarProps = {
+    folders,
+    metadata,
+    selectedCategory,
+    isCollapsed: isSidebarCollapsed,
+    onCreateNote: handleCreateNote,
+    onCreateFolder: createFolder,
+    onDeleteCategory: setCategoryToDelete,
+    onEditCategory: setEditingCategory,
+    onSelectCategory: handleSelectCategory,
+    onReorderFolders: reorderFolders,
+    onOpenSettings: () => setIsSettingsOpen(true),
+    monochromeIcons,
+  };
+
   return (
     <div
       className="absolute inset-0 flex text-gray-700 dark:text-gray-100 overflow-hidden transition-colors duration-500"
@@ -335,20 +350,9 @@ function App() {
             "flex",
             activeView === 'editor' ? (isLandscape && !landscapeFullscreen ? "flex" : "hidden") : "flex"
           )}
-          folders={folders}
-          metadata={metadata}
-          selectedCategory={selectedCategory}
-          isCollapsed={isSidebarCollapsed}
-          onCreateNote={handleCreateNote}
-          onCreateFolder={createFolder}
-          onDeleteCategory={setCategoryToDelete}
-          onEditCategory={setEditingCategory}
-          onSelectCategory={handleSelectCategory}
-          onReorderFolders={reorderFolders}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+          {...sharedSidebarProps}
           isIOS={isIOS}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          monochromeIcons={monochromeIcons}
         />
       )}
 
@@ -372,18 +376,7 @@ function App() {
                 "md:flex",
                 activeView === 'editor' ? "hidden md:flex" : "flex"
               )}
-              folders={folders}
-              metadata={metadata}
-              selectedCategory={selectedCategory}
-              isCollapsed={isSidebarCollapsed}
-              onCreateNote={handleCreateNote}
-              onCreateFolder={createFolder}
-              onDeleteCategory={setCategoryToDelete}
-              onEditCategory={setEditingCategory}
-              onSelectCategory={handleSelectCategory}
-              onReorderFolders={reorderFolders}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-              monochromeIcons={monochromeIcons}
+              {...sharedSidebarProps}
             />
           )}
 
