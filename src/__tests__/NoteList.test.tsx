@@ -176,4 +176,28 @@ describe('NoteList Swipe Gesture', () => {
         // The click action (selecting the note card) should NOT have been called!
         expect(onSelectNote).not.toHaveBeenCalled();
     });
+
+    it('prevents swipe action buttons from bleeding to the left by enforcing max-width', async () => {
+        const { container } = render(
+            <NoteList
+                notes={mockNotes}
+                folders={[]}
+                selectedNote={null}
+                onSelectNote={vi.fn()}
+                searchTerm=""
+                onSearchChange={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onMoveNote={vi.fn()}
+                onTogglePin={vi.fn()}
+                isNotePinned={() => false}
+                getNoteId={(n) => n.filename}
+                selectedCategory={null}
+            />
+        );
+
+        // Find the background swipe actions container
+        const backgroundContainer = container.querySelector('.absolute.inset-y-\\[2px\\]') as HTMLElement;
+        expect(backgroundContainer).not.toBeNull();
+        expect(backgroundContainer.className).toContain('max-w-[calc(100%-4px)]');
+    });
 });
