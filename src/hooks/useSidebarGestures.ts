@@ -26,6 +26,7 @@ export function useSidebarGestures({
   const sidebarCurrentX = useRef(0);
   const isSidebarDragging = useRef(false);
   const hasDecidedGesture = useRef(false);
+  const isGestureStarted = useRef(false);
 
   // Keep latest parameters in refs so listeners always access the correct values
   const isSidebarCollapsedRef = useRef(isSidebarCollapsed);
@@ -42,7 +43,11 @@ export function useSidebarGestures({
     if (!containerElement) return;
 
     const handleTouchStart = (e: TouchEvent) => {
+      isGestureStarted.current = false;
       if (activeViewRef.current === 'editor' || isFocusModeRef.current) return;
+      
+      // Prevent sidebar swipe-reveal when touching note list items or other restricted elements
+      if ((e.target as HTMLElement).closest?.('.no-sidebar-drag')) return;
       
       const touch = e.touches[0];
       if (!touch) return;
@@ -56,6 +61,7 @@ export function useSidebarGestures({
       const isEligibleStart = isCollapsed ? clientX < 100 : clientX < 300;
       
       if (isEligibleStart) {
+        isGestureStarted.current = true;
         sidebarStartX.current = clientX;
         sidebarStartY.current = clientY;
         sidebarCurrentX.current = clientX;
@@ -69,6 +75,7 @@ export function useSidebarGestures({
     };
 
     const handleTouchMove = (e: TouchEvent) => {
+      if (!isGestureStarted.current) return;
       const touch = e.touches[0];
       if (!touch) return;
 
@@ -116,6 +123,9 @@ export function useSidebarGestures({
     };
 
     const handleTouchEnd = () => {
+      if (!isGestureStarted.current) return;
+      isGestureStarted.current = false;
+      
       if (!isSidebarDragging.current || !sidebarRef.current) {
         isSidebarDragging.current = false;
         hasDecidedGesture.current = false;
