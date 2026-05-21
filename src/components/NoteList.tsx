@@ -219,7 +219,7 @@ const NoteListItem = memo(({
                     <div className="relative">
                         <button
                             onClick={(e) => { e.stopPropagation(); setDropdownOpenId(dropdownOpenId === noteId ? null : noteId); }}
-                            className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                            className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors folder-dropdown-trigger"
                             title="Move to Folder"
                         >
                             <FolderTree size={18} />
@@ -323,7 +323,7 @@ const NoteListItem = memo(({
                                         setDropdownOpenId(dropdownOpenId === noteId ? null : noteId);
                                     }}
                                     className={clsx(
-                                        "p-1 rounded transition-all pointer-events-auto",
+                                        "p-1 rounded transition-all pointer-events-auto folder-dropdown-trigger",
                                         dropdownOpenId === noteId
                                             ? "bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400 opacity-100"
                                             : "opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
@@ -349,7 +349,7 @@ const NoteListItem = memo(({
 
                 {dropdownOpenId === noteId && (
                     <div
-                        className="absolute right-2 top-10 mt-2 w-48 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-50 pointer-events-auto origin-top-right"
+                        className="absolute right-2 top-10 mt-2 w-48 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-50 pointer-events-auto origin-top-right folder-dropdown-menu"
                         style={{ maxHeight: '12rem', backgroundColor: 'var(--app-bg)' }}
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -436,6 +436,25 @@ export function NoteList({
 
     // Tracks which note's folder selection menu is currently open
     const [dropdownOpenId, setDropdownOpenId] = useState<string | null>(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.folder-dropdown-trigger') && !target.closest('.folder-dropdown-menu')) {
+                setDropdownOpenId(null);
+            }
+        };
+        
+        if (dropdownOpenId) {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('touchstart', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
+    }, [dropdownOpenId]);
 
     // On iOS, search bar is hidden by default and revealed by scrolling up.
     // isIOS starts as false (async detection in App.tsx), so we init to true and
