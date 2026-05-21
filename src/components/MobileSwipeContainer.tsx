@@ -82,16 +82,15 @@ export function MobileSwipeContainer({ active, onBack, children, className }: Mo
         const deltaX = currentX.current - startX.current;
         const threshold = window.innerWidth * 0.3; // 30% of screen width
 
-        containerRef.current.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
         if (deltaX > threshold) {
-            // Animate completely off-screen, then navigate back
-            containerRef.current.style.transform = 'translate3d(100%, 0, 0)';
-            containerRef.current.style.pointerEvents = 'none';
-            setTimeout(() => {
-                onBack();
-            }, 300);
+            // Invoke onBack immediately. This changes activeView to 'notelist' in App.tsx.
+            // App.tsx re-renders, setting active to false on this container.
+            // The useEffect on `active` handles the rest: it applies the 0.3s transition
+            // to translate3d(100%, 0, 0), disables pointer-events, and schedules visibility: hidden.
+            onBack();
         } else {
             // Snap cleanly back to full screen
+            containerRef.current.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
             containerRef.current.style.transform = 'translate3d(0px, 0, 0)';
         }
     };
@@ -100,7 +99,7 @@ export function MobileSwipeContainer({ active, onBack, children, className }: Mo
         <div
             ref={containerRef}
             className={clsx(
-                "absolute inset-0 z-40 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden",
+                "fixed inset-0 z-40 bg-white dark:bg-gray-900 shadow-2xl overflow-hidden",
                 className
             )}
             onTouchStart={handleTouchStart}

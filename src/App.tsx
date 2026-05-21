@@ -130,10 +130,8 @@ function App() {
   // Sidebar gestures logic
   const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('notelist');
   const {
+    containerRef,
     sidebarRef,
-    handleSidebarTouchStart,
-    handleSidebarTouchMove,
-    handleSidebarTouchEnd,
   } = useSidebarGestures({
     isSidebarCollapsed,
     setIsSidebarCollapsed,
@@ -238,6 +236,7 @@ function App() {
 
   return (
     <div
+      ref={containerRef}
       className="absolute inset-0 flex text-gray-700 dark:text-gray-100 overflow-hidden transition-colors duration-500"
       style={{
         backgroundColor: 'var(--app-bg)',
@@ -252,7 +251,7 @@ function App() {
           sidebarRef={sidebarRef}
           className={clsx(
             "flex",
-            activeView === 'editor' ? (isLandscape && !landscapeFullscreen ? "flex" : "hidden") : "flex"
+            activeView === 'editor' ? (_isMobile ? "flex" : (isLandscape && !landscapeFullscreen ? "flex" : "hidden")) : "flex"
           )}
           {...sharedSidebarProps}
           isIOS={isIOS}
@@ -277,9 +276,6 @@ function App() {
             "flex-1 flex overflow-hidden",
             _isMobile && "relative"
           )}
-          onTouchStart={handleSidebarTouchStart}
-          onTouchMove={handleSidebarTouchMove}
-          onTouchEnd={handleSidebarTouchEnd}
         >
           {/* Desktop sidebar inside content row */}
           {!isIOS && !isFocusMode && (
