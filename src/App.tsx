@@ -1,6 +1,4 @@
-import { useState, useEffect, useRef, Component } from 'react';
-import type { ReactNode } from 'react';
-import { PGliteProvider } from '@electric-sql/pglite-react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
@@ -20,58 +18,21 @@ import { Loader2, Book } from 'lucide-react';
 import clsx from 'clsx';
 import { platform } from '@tauri-apps/plugin-os';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { PGliteWithLive } from '@electric-sql/pglite/live';
+
+import { initGlobalHandlers } from './utils/initGlobalHandlers';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
+import { PGliteWrapper } from './components/PGliteWrapper';
+import { useSidebarGestures } from './hooks/useSidebarGestures';
+import { useTauriUpdater } from './hooks/useTauriUpdater';
+import { useViewport } from './hooks/useViewport';
 
 const appWindow = getCurrentWindow();
 
 // Kick off PGlite init immediately at module load time so it's ready
-// (or nearly ready) by the time React renders PGliteWrapper.
-void getDb(); // Kick off PGlite init early
+void getDb();
 
-// Global handlers log async errors that would otherwise be swallowed
-// outside React's render cycle (unhandled promise rejections, window errors).
-if (typeof window !== 'undefined') {
-  window.addEventListener('error', (event) => {
-    console.error('[window.onerror]', event.error || event.message);
-  });
-  window.addEventListener('unhandledrejection', (event) => {
-    console.error('[unhandledrejection]', event.reason);
-  });
-  (window as any).dumpNotes = async () => {
-    const { supabase } = await import('./lib/supabaseClient');
-    const { data: { session } } = await supabase.auth.getSession();
-    console.log('Current Session User ID:', session?.user?.id);
-
-    const db = await getDb();
-    const { rows } = await db.query('SELECT id, user_id, updated_at, deleted FROM notes');
-    console.table(rows);
-    return rows;
-  };
-}
-
-class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  constructor(props: { children: ReactNode }) {
-    super(props);
-    this.state = { error: null };
-  }
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="fixed inset-0 flex flex-col items-center justify-center bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 p-8 text-center gap-4">
-          <p className="font-bold text-lg">Something went wrong</p>
-          <p className="text-sm text-gray-500 font-mono max-w-sm break-all">{this.state.error.message}</p>
-          <button type="button" className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm" onClick={() => window.location.reload()}>
-            Reload app
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+// Setup global error and helper window methods
+initGlobalHandlers();
 
 function App() {
   const isQuickNote = appWindow.label === 'quick-note';
@@ -118,7 +79,6 @@ function App() {
   } = useNotes();
 
   // If this Webview is the Quick Note window, display only the QuickNote component rather than the full app.
-  // This prevents hooks like `useNotes` from trying to run full filesystem syncs across two windows.
   if (isQuickNote) {
     return <div className="h-screen w-screen bg-transparent flex items-center justify-center text-white"><p>Quick Note</p></div>;
   }
@@ -140,9 +100,7 @@ function App() {
     setLandscapeFullscreen,
     monochromeIcons,
     setMonochromeIcons,
-  } = useSettings(metadata.settings, (_settings) => {
-    // metadata.settings is updated via useNotes.saveSettings contextually if needed
-  });
+  } = useSettings(metadata.settings, () => {});
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   useEffect(() => { if (syncStatus === 'unauthenticated') setIsSettingsOpen(false); }, [syncStatus]);
@@ -152,109 +110,40 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [isFocusMode, setIsFocusMode] = useState(false);
 
-  // Update logic
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
-  const [updateStatus, setUpdateStatus] = useState<{
-    type: 'idle' | 'available' | 'downloading' | 'error' | 'downloaded';
-    progress?: number;
-    error?: string;
-  }>({ type: 'idle' });
+  // Tauri updater hook logic
+  const {
+    isUpdateModalOpen,
+    setIsUpdateModalOpen,
+    updateVersion,
+    updateStatus,
+    handleUpdate,
+    handleInstallUpdate,
+    handleSkipUpdate,
+  } = useTauriUpdater();
 
+  // Viewport custom hook logic
+  const {
+    isMobile: _isMobile,
+    isLandscape,
+  } = useViewport(isSidebarCollapsed, setIsSidebarCollapsed);
 
-
-  // Sidebar Gesture refs
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const sidebarStartX = useRef(0);
-  const sidebarCurrentX = useRef(0);
-  const isSidebarDragging = useRef(false);
-
-  const handleSidebarTouchStart = (e: React.TouchEvent) => {
-    if (activeView === 'editor' || isFocusMode) return;
-    const touch = e.touches[0];
-    
-    // If collapsed: drag starts anywhere within first 100px (covers the 64px collapsed sidebar + 36px edge of NoteList)
-    if (isSidebarCollapsed) {
-      if (touch.clientX < 100) {
-        sidebarStartX.current = touch.clientX;
-        sidebarCurrentX.current = touch.clientX;
-        isSidebarDragging.current = true;
-        if (sidebarRef.current) {
-          sidebarRef.current.style.transition = 'none';
-        }
-      }
-    } else {
-      // If open (256px wide): start drag within the first 300px to fold it back
-      if (touch.clientX < 300) {
-        sidebarStartX.current = touch.clientX;
-        sidebarCurrentX.current = touch.clientX;
-        isSidebarDragging.current = true;
-        if (sidebarRef.current) {
-          sidebarRef.current.style.transition = 'none';
-        }
-      }
-    }
-  };
-
-  const handleSidebarTouchMove = (e: React.TouchEvent) => {
-    if (!isSidebarDragging.current || !sidebarRef.current) return;
-    const touch = e.touches[0];
-    sidebarCurrentX.current = touch.clientX;
-    
-    const deltaX = sidebarCurrentX.current - sidebarStartX.current;
-    
-    if (isSidebarCollapsed) {
-      // Pulling open (dragging right)
-      const newWidth = Math.min(256, Math.max(64, 64 + deltaX));
-      sidebarRef.current.style.width = `${newWidth}px`;
-    } else {
-      // Pulling closed (dragging left)
-      const newWidth = Math.min(256, Math.max(64, 256 + deltaX));
-      sidebarRef.current.style.width = `${newWidth}px`;
-    }
-  };
-
-  const handleSidebarTouchEnd = () => {
-    if (!isSidebarDragging.current || !sidebarRef.current) return;
-    isSidebarDragging.current = false;
-    
-    const deltaX = sidebarCurrentX.current - sidebarStartX.current;
-    
-    sidebarRef.current.style.transition = 'width 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
-
-    if (isSidebarCollapsed) {
-      // Snapping logic for opening
-      if (deltaX > 80) {
-        setIsSidebarCollapsed(false);
-        sidebarRef.current.style.width = '256px';
-      } else {
-        sidebarRef.current.style.width = '64px';
-      }
-    } else {
-      // Snapping logic for closing
-      if (deltaX < -80) {
-        setIsSidebarCollapsed(true);
-        sidebarRef.current.style.width = '64px';
-      } else {
-        sidebarRef.current.style.width = '256px';
-      }
-    }
-  };
-
-  // Reset touch overrides when isSidebarCollapsed state is updated
-  useEffect(() => {
-    if (sidebarRef.current) {
-      sidebarRef.current.style.width = '';
-      sidebarRef.current.style.transition = '';
-    }
-  }, [isSidebarCollapsed]);
-
-  // Mobile View Management
-  const [_isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
-  const [isLandscape, setIsLandscape] = useState(() => window.innerWidth > window.innerHeight);
+  // Sidebar gestures logic
   const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('notelist');
+  const {
+    sidebarRef,
+    handleSidebarTouchStart,
+    handleSidebarTouchMove,
+    handleSidebarTouchEnd,
+  } = useSidebarGestures({
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    activeView,
+    isFocusMode,
+  });
+
   const [selectionCount, setSelectionCount] = useState(0);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
+
   // Hide native iOS toolbar accessory bar whenever the user leaves the editor view
   useEffect(() => {
     if (isIOS && activeView !== 'editor') {
@@ -263,35 +152,6 @@ function App() {
   }, [isIOS, activeView]);
 
   const { theme, setTheme } = useTheme();
-  const lastWidth = useRef(window.innerWidth);
-
-  // Responsive Behavior: Auto-collapse and Mobile View transitions
-  useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      const prev = lastWidth.current;
-
-      // Auto-collapse/expand when crossing the desktop/tablet threshold (1024px)
-      if (width < 1024 && prev >= 1024) {
-        setIsSidebarCollapsed(true);
-      } else if (width >= 1024 && prev < 1024) {
-        setIsSidebarCollapsed(false);
-      }
-
-      setIsMobile(width < 768);
-      lastWidth.current = width;
-    };
-
-    const handleOrientationChange = () => {
-      setIsLandscape(window.innerWidth > window.innerHeight);
-    };
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('resize', handleOrientationChange);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('resize', handleOrientationChange);
-    };
-  }, [isSidebarCollapsed]);
 
   // Apply font size to <html> so all rem-based Tailwind classes scale with it
   useEffect(() => {
@@ -303,49 +163,6 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-accent', accentColor);
   }, [accentColor]);
-
-  useEffect(() => {
-    const checkForUpdates = async () => {
-      try {
-        const p = await platform();
-        if (p === 'ios' || p === 'android') return;
-        const { check } = await import('@tauri-apps/plugin-updater');
-        const update = await check();
-        if (update) {
-          setUpdateVersion(update.version);
-          setUpdateStatus({ type: 'available' });
-          setIsUpdateModalOpen(true);
-        }
-      } catch (error) {
-        console.error('Failed to check for updates:', error);
-      }
-    };
-    checkForUpdates();
-  }, []);
-
-  const handleUpdate = async () => {
-    try {
-      setUpdateStatus({ type: 'downloading' });
-      const { check } = await import('@tauri-apps/plugin-updater');
-      const update = await check();
-      if (update) {
-        await update.downloadAndInstall();
-        setUpdateStatus({ type: 'downloaded' });
-      }
-    } catch (error) {
-      console.error('Update failed:', error);
-      setUpdateStatus({ type: 'error', error: String(error) });
-    }
-  };
-
-  const handleInstallUpdate = async () => {
-    const { relaunch } = await import('@tauri-apps/plugin-process');
-    await relaunch();
-  };
-
-  const handleSkipUpdate = () => {
-    setIsUpdateModalOpen(false);
-  };
 
   const handleSelectCategory = (category: string | null) => {
     setSelectedCategory(category);
@@ -378,7 +195,6 @@ function App() {
     // 1. Rename on disk if needed
     if (newName !== oldName) {
       await renameFolder(oldName, newName);
-      // Only update if the modal hasn't been closed (set to null) in the meantime
       setEditingCategory(prev => prev === oldName ? newName : prev);
     }
 
@@ -571,8 +387,8 @@ function App() {
               </div>
             </div>
           )}
-        </div>{/* end inner content row */}
-      </div>{/* end right column */}
+        </div>
+      </div>
 
       {isSettingsOpen && (
         <SettingsModal
@@ -644,24 +460,6 @@ function App() {
       )}
     </div>
   );
-}
-
-// PGliteProvider must wrap the entire tree so useLiveQuery works everywhere.
-// We initialise the db lazily (getDb returns a singleton promise) and pass
-// it to the provider once resolved.
-function PGliteWrapper({ children }: { children: ReactNode }) {
-  const [db, setDb] = useState<PGliteWithLive | null>(null);
-  useEffect(() => {
-    getDb().then(setDb).catch(console.error);
-  }, []);
-
-  if (!db) return (
-    <div className="flex items-center justify-center w-full h-full min-h-screen bg-white dark:bg-gray-900">
-      <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
-    </div>
-  );
-
-  return <PGliteProvider db={db}>{children}</PGliteProvider>;
 }
 
 export default function AppWithErrorBoundary() {
