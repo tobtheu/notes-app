@@ -99,6 +99,47 @@ const NoteListItem = memo(({
     const swipeOffsetRef = useRef(0);
     const rafIdRef = useRef<number | null>(null);
 
+    const [dragY, setDragY] = useState(0);
+    const dragStartY = useRef<number | null>(null);
+
+    const handleDragStart = (e: React.TouchEvent) => {
+        dragStartY.current = e.touches[0].clientY;
+    };
+
+    const handleDragMove = (e: React.TouchEvent) => {
+        if (dragStartY.current === null) return;
+        const currentY = e.touches[0].clientY;
+        const diffY = currentY - dragStartY.current;
+        if (diffY > 0) {
+            setDragY(diffY);
+        }
+    };
+
+    const handleDragEnd = () => {
+        if (dragStartY.current === null) return;
+        if (dragY > 80) {
+            setDropdownOpenId(null);
+        }
+        setDragY(0);
+        dragStartY.current = null;
+    };
+
+    const closeSwipe = () => {
+        isSwipedRef.current = false;
+        swipeOffsetRef.current = 0;
+        if (cardRef.current) {
+            cardRef.current.style.transition = 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
+            cardRef.current.style.transform = 'translate3d(0px, 0px, 0px)';
+        }
+        setTimeout(() => {
+            setSwipeOffset(0);
+            if (cardRef.current) {
+                cardRef.current.style.transition = '';
+                cardRef.current.style.willChange = '';
+            }
+        }, 200);
+    };
+
     // Sync React state updates back to mutable refs & clear manual styles if reset to 0
     useEffect(() => {
         swipeOffsetRef.current = swipeOffset;
@@ -208,9 +249,9 @@ const NoteListItem = memo(({
         <div>
             <div className="relative mb-0.5 rounded-xl border-2 border-transparent overflow-visible">
                 {/* Swipe Actions (Behind) */}
-                <div className="absolute inset-y-0 right-0 flex items-center justify-end bg-gray-100 dark:bg-gray-800/80 w-full z-0 h-full rounded-xl pointer-events-auto overflow-hidden">
+                <div className="absolute inset-y-[2px] right-[2px] flex items-center justify-end bg-gray-100 dark:bg-gray-800/80 w-[192px] z-0 h-[calc(100%-4px)] rounded-r-[10px] pointer-events-auto overflow-hidden">
                     <button
-                        onClick={(e) => { e.stopPropagation(); onTogglePin(note); setSwipeOffset(0); isSwipedRef.current = false; }}
+                        onClick={(e) => { e.stopPropagation(); onTogglePin(note); closeSwipe(); }}
                         className={clsx(
                             "flex items-center justify-center w-16 h-full text-white transition-colors shrink-0",
                             isPinned ? "bg-primary-600 hover:bg-primary-700" : "bg-gray-400 hover:bg-gray-500 dark:bg-gray-600 dark:hover:bg-gray-500"
@@ -220,15 +261,15 @@ const NoteListItem = memo(({
                         <Pin size={18} fill={isPinned ? "currentColor" : "none"} />
                     </button>
                     <button
-                        onClick={(e) => { e.stopPropagation(); setDropdownOpenId(dropdownOpenId === noteId ? null : noteId); }}
+                        onClick={(e) => { e.stopPropagation(); setDropdownOpenId(dropdownOpenId === noteId ? null : noteId); closeSwipe(); }}
                         className="flex items-center justify-center w-16 h-full bg-blue-500 hover:bg-blue-600 text-white transition-colors shrink-0 folder-dropdown-trigger"
                         title="Move to Folder"
                     >
                         <FolderTree size={18} />
                     </button>
                     <button
-                        onClick={(e) => { e.stopPropagation(); onDeleteNote(noteId); setSwipeOffset(0); isSwipedRef.current = false; }}
-                        className="flex items-center justify-center w-16 h-full bg-red-500 hover:bg-red-600 text-white transition-colors shrink-0"
+                        onClick={(e) => { e.stopPropagation(); onDeleteNote(noteId); closeSwipe(); }}
+                        className="flex items-center justify-center w-16 h-full bg-red-500 hover:bg-red-600 text-white transition-colors shrink-0 rounded-r-[10px]"
                         title="Delete Note"
                     >
                         <Trash2 size={18} />
@@ -350,6 +391,15 @@ const NoteListItem = memo(({
 
                 {dropdownOpenId === noteId && (
                     <>
+                        {/* Desktop click-interception backdrop */}
+                        <div
+                            className="hidden md:block fixed inset-0 z-40 bg-transparent"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setDropdownOpenId(null);
+                            }}
+                        />
+
                         {/* Desktop Dropdown */}
                         <div
                             className="hidden md:block absolute right-2 top-10 mt-2 w-48 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-50 pointer-events-auto origin-top-right folder-dropdown-menu"
@@ -408,14 +458,24 @@ const NoteListItem = memo(({
                         {/* Mobile Bottom Sheet Drawer */}
                         <div
                             className="fixed inset-x-0 bottom-0 bg-white dark:bg-gray-900 rounded-t-3xl shadow-2xl p-6 pb-[calc(1.5rem+var(--safe-bottom,0vh))] z-50 md:hidden border-t border-gray-100 dark:border-gray-800 folder-dropdown-menu max-h-[80vh] flex flex-col animate-in slide-in-from-bottom duration-300 origin-bottom"
+                            style={{
+                                transform: `translate3d(0, ${dragY}px, 0)`,
+                                transition: dragStartY.current === null ? 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)' : 'none'
+                            }}
                             onClick={(e) => e.stopPropagation()}
                         >
-                            {/* Drag handle */}
-                            <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-4 shrink-0" />
-
-                            <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-4 shrink-0 text-center">
-                                Move Note to Folder
-                            </h3>
+                            {/* Drag handle area with touch gesture handlers */}
+                            <div
+                                onTouchStart={handleDragStart}
+                                onTouchMove={handleDragMove}
+                                onTouchEnd={handleDragEnd}
+                                className="w-full pt-1 pb-3 cursor-grab active:cursor-grabbing shrink-0 select-none touch-none"
+                            >
+                                <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-3" />
+                                <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 text-center">
+                                    Move Note to Folder
+                                </h3>
+                            </div>
 
                             <div className="flex-1 overflow-y-auto space-y-2 py-1 pr-1 custom-scrollbar">
                                 <button
