@@ -145,9 +145,9 @@ const NoteListItem = memo(({
 
         let newOffset = 0;
         if (diffX < 0 && !isSwipedRef.current) {
-            newOffset = Math.max(diffX, -160);
+            newOffset = Math.max(diffX, -192);
         } else if (diffX > 0 && isSwipedRef.current) {
-            newOffset = Math.min(-160 + diffX, 0);
+            newOffset = Math.min(-192 + diffX, 0);
         } else {
             return;
         }
@@ -171,8 +171,8 @@ const NoteListItem = memo(({
         }
 
         if (touchStartX.current !== null) {
-            const finalOffset = swipeOffsetRef.current < -60 ? -160 : 0;
-            isSwipedRef.current = finalOffset === -160;
+            const finalOffset = swipeOffsetRef.current < -70 ? -192 : 0;
+            isSwipedRef.current = finalOffset === -192;
             swipeOffsetRef.current = finalOffset;
 
             if (cardRef.current) {
@@ -208,26 +208,27 @@ const NoteListItem = memo(({
         <div>
             <div className="relative mb-0.5 rounded-xl border-2 border-transparent overflow-visible">
                 {/* Swipe Actions (Behind) */}
-                <div className="absolute inset-y-0 right-0 flex items-center justify-end px-3 gap-2 bg-gray-100 dark:bg-gray-800/80 w-full z-0 h-full rounded-xl pointer-events-auto overflow-hidden">
+                <div className="absolute inset-y-0 right-0 flex items-center justify-end bg-gray-100 dark:bg-gray-800/80 w-full z-0 h-full rounded-xl pointer-events-auto overflow-hidden">
                     <button
                         onClick={(e) => { e.stopPropagation(); onTogglePin(note); setSwipeOffset(0); isSwipedRef.current = false; }}
-                        className={clsx("p-2 rounded-lg text-white font-medium transition-colors", isPinned ? "bg-primary-600 hover:bg-primary-700" : "bg-gray-400 hover:bg-gray-500 dark:bg-gray-600 dark:hover:bg-gray-500")}
+                        className={clsx(
+                            "flex items-center justify-center w-16 h-full text-white transition-colors shrink-0",
+                            isPinned ? "bg-primary-600 hover:bg-primary-700" : "bg-gray-400 hover:bg-gray-500 dark:bg-gray-600 dark:hover:bg-gray-500"
+                        )}
                         title={isPinned ? "Unpin Note" : "Pin Note"}
                     >
                         <Pin size={18} fill={isPinned ? "currentColor" : "none"} />
                     </button>
-                    <div className="relative">
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setDropdownOpenId(dropdownOpenId === noteId ? null : noteId); }}
-                            className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors folder-dropdown-trigger"
-                            title="Move to Folder"
-                        >
-                            <FolderTree size={18} />
-                        </button>
-                    </div>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setDropdownOpenId(dropdownOpenId === noteId ? null : noteId); }}
+                        className="flex items-center justify-center w-16 h-full bg-blue-500 hover:bg-blue-600 text-white transition-colors shrink-0 folder-dropdown-trigger"
+                        title="Move to Folder"
+                    >
+                        <FolderTree size={18} />
+                    </button>
                     <button
                         onClick={(e) => { e.stopPropagation(); onDeleteNote(noteId); setSwipeOffset(0); isSwipedRef.current = false; }}
-                        className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                        className="flex items-center justify-center w-16 h-full bg-red-500 hover:bg-red-600 text-white transition-colors shrink-0"
                         title="Delete Note"
                     >
                         <Trash2 size={18} />
@@ -348,50 +349,119 @@ const NoteListItem = memo(({
                 </div>
 
                 {dropdownOpenId === noteId && (
-                    <div
-                        className="absolute right-2 top-10 mt-2 w-48 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-50 pointer-events-auto origin-top-right folder-dropdown-menu"
-                        style={{ maxHeight: '12rem', backgroundColor: 'var(--app-bg)' }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-700">
-                            Move to...
-                        </div>
-                        <button
-                            className={clsx(
-                                "w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2",
-                                !note.folder ? "text-primary-600 dark:text-primary-400 font-medium bg-primary-50/30 dark:bg-primary-900/10" : "text-gray-600 dark:text-gray-300"
-                            )}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onMoveNote(noteId, null);
-                                setDropdownOpenId(null);
-                                setSwipeOffset(0);
-                                isSwipedRef.current = false;
-                            }}
+                    <>
+                        {/* Desktop Dropdown */}
+                        <div
+                            className="hidden md:block absolute right-2 top-10 mt-2 w-48 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2 duration-200 z-50 pointer-events-auto origin-top-right folder-dropdown-menu"
+                            style={{ maxHeight: '12rem', backgroundColor: 'var(--app-bg)' }}
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            <FolderTree size={12} className="opacity-50" />
-                            Root (No Folder)
-                        </button>
-                        {folders.map(folder => (
+                            <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider sticky top-0 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border-b border-gray-100 dark:border-gray-700">
+                                Move to...
+                            </div>
                             <button
-                                key={folder}
                                 className={clsx(
                                     "w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2",
-                                    note.folder === folder ? "text-primary-600 dark:text-primary-400 font-medium bg-primary-50/30 dark:bg-primary-900/10" : "text-gray-600 dark:text-gray-300"
+                                    !note.folder ? "text-primary-600 dark:text-primary-400 font-medium bg-primary-50/30 dark:bg-primary-900/10" : "text-gray-600 dark:text-gray-300"
                                 )}
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    onMoveNote(noteId, folder);
+                                    onMoveNote(noteId, null);
                                     setDropdownOpenId(null);
                                     setSwipeOffset(0);
                                     isSwipedRef.current = false;
                                 }}
                             >
-                                <div className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
-                                <span className="truncate">{folder}</span>
+                                <FolderTree size={12} className="opacity-50" />
+                                Root (No Folder)
                             </button>
-                        ))}
-                    </div>
+                            {folders.map(folder => (
+                                <button
+                                    key={folder}
+                                    className={clsx(
+                                        "w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2",
+                                        note.folder === folder ? "text-primary-600 dark:text-primary-400 font-medium bg-primary-50/30 dark:bg-primary-900/10" : "text-gray-600 dark:text-gray-300"
+                                    )}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onMoveNote(noteId, folder);
+                                        setDropdownOpenId(null);
+                                        setSwipeOffset(0);
+                                        isSwipedRef.current = false;
+                                    }}
+                                >
+                                    <div className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600 shrink-0" />
+                                    <span className="truncate">{folder}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Mobile Bottom Sheet Backdrop */}
+                        <div
+                            className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50 md:hidden animate-in fade-in duration-200"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setDropdownOpenId(null);
+                            }}
+                        />
+
+                        {/* Mobile Bottom Sheet Drawer */}
+                        <div
+                            className="fixed inset-x-0 bottom-0 bg-white dark:bg-gray-900 rounded-t-3xl shadow-2xl p-6 pb-[calc(1.5rem+var(--safe-bottom,0vh))] z-50 md:hidden border-t border-gray-100 dark:border-gray-800 folder-dropdown-menu max-h-[80vh] flex flex-col animate-in slide-in-from-bottom duration-300 origin-bottom"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {/* Drag handle */}
+                            <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-4 shrink-0" />
+
+                            <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-4 shrink-0 text-center">
+                                Move Note to Folder
+                            </h3>
+
+                            <div className="flex-1 overflow-y-auto space-y-2 py-1 pr-1 custom-scrollbar">
+                                <button
+                                    className={clsx(
+                                        "w-full text-left px-4 py-3.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-xl transition-all flex items-center gap-3 border border-transparent active:scale-[0.99]",
+                                        !note.folder
+                                            ? "text-primary-600 dark:text-primary-400 font-semibold bg-primary-50 dark:bg-primary-950/40 border-primary-100 dark:border-primary-900/30"
+                                            : "text-gray-600 dark:text-gray-300 border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-800/20"
+                                    )}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onMoveNote(noteId, null);
+                                        setDropdownOpenId(null);
+                                        setSwipeOffset(0);
+                                        isSwipedRef.current = false;
+                                    }}
+                                >
+                                    <FolderTree size={16} className={clsx(!note.folder ? "text-primary-500" : "text-gray-400 dark:text-gray-500")} />
+                                    <span className="flex-1">Root (No Folder)</span>
+                                    {!note.folder && <div className="w-2 h-2 rounded-full bg-primary-500" />}
+                                </button>
+                                {folders.map(folder => (
+                                    <button
+                                        key={folder}
+                                        className={clsx(
+                                            "w-full text-left px-4 py-3.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-xl transition-all flex items-center gap-3 border border-transparent active:scale-[0.99]",
+                                            note.folder === folder
+                                                ? "text-primary-600 dark:text-primary-400 font-semibold bg-primary-50 dark:bg-primary-950/40 border-primary-100 dark:border-primary-900/30"
+                                                : "text-gray-600 dark:text-gray-300 border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-gray-800/20"
+                                        )}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onMoveNote(noteId, folder);
+                                            setDropdownOpenId(null);
+                                            setSwipeOffset(0);
+                                            isSwipedRef.current = false;
+                                        }}
+                                    >
+                                        <FolderTree size={16} className={clsx(note.folder === folder ? "text-primary-500" : "text-gray-400 dark:text-gray-500")} />
+                                        <span className="flex-1 truncate">{folder}</span>
+                                        {note.folder === folder && <div className="w-2 h-2 rounded-full bg-primary-500" />}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </>
                 )}
             </div>
             {isNextSelected !== undefined && (
