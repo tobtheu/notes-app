@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import clsx from 'clsx';
+import { TitleBar } from './TitleBar';
 
 interface MobileSwipeContainerProps {
     active: boolean;
@@ -247,9 +248,17 @@ export function MobileSwipeContainer({ active, onBack, children, className, isIO
                 visibility: 'hidden',
                 pointerEvents: 'none',
                 WebkitOverflowScrolling: 'touch',
-                paddingTop: isIOS ? 'calc(24px + var(--safe-top, 0vh))' : '40px'
+                paddingTop: isIOS ? 'calc(40px + var(--safe-top, 0vh))' : '40px'
             }}
         >
+            <div className="absolute top-0 left-0 right-0 z-50 no-drag">
+                <TitleBar
+                    isSidebarCollapsed={true}
+                    onToggleCollapse={() => {}}
+                    activeView="editor"
+                    onBack={onBack}
+                />
+            </div>
             {children}
         </div>
     );

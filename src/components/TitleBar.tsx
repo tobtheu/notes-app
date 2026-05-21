@@ -48,10 +48,10 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
         <div
             id="titlebar"
             onMouseDown={handleMouseDown}
-            style={{ borderTopRightRadius: '12px', backgroundColor: isIOS ? 'var(--app-bg)' : 'var(--sidebar-bg)' }}
+            style={{ borderTopRightRadius: '12px', backgroundColor: (isIOS || activeView === 'editor') ? 'var(--app-bg)' : 'var(--sidebar-bg)' }}
             className={clsx(
                 "pt-[var(--safe-top,0vh)] flex items-stretch justify-between select-none relative z-[9999] box-content",
-                isIOS && activeView !== 'editor' ? "h-0 min-h-0 overflow-hidden" : isIOS ? "h-6 min-h-[24px]" : "h-10 min-h-[40px]"
+                isIOS && activeView !== 'editor' ? "h-0 min-h-0 overflow-hidden" : "h-10 min-h-[40px]"
             )}
         >
             {/* Sidebar / Back Button Area */}

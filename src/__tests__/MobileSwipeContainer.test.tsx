@@ -74,7 +74,7 @@ describe('MobileSwipeContainer', () => {
       const containerEl = container.firstElementChild as HTMLElement;
       expect(containerEl).not.toBeNull();
       // Should have iOS padding-top style applied
-      expect(containerEl.style.paddingTop).toBe('calc(24px + var(--safe-top, 0vh))');
+      expect(containerEl.style.paddingTop).toBe('calc(40px + var(--safe-top, 0vh))');
 
       // Simulate dragging
       fireEvent.touchStart(containerEl, {
@@ -137,6 +137,23 @@ describe('MobileSwipeContainer', () => {
     expect(containerEl.className).toContain('test-desktop-class');
     expect(containerEl.className).not.toContain('fixed');
     expect(containerEl.style.transform).toBe('');
+  });
+
+  it('renders the TitleBar topbar inside the container and triggers onBack when back button is clicked', () => {
+    const onBack = vi.fn();
+    const { getByText } = render(
+      <MobileSwipeContainer active={true} onBack={onBack}>
+        <div>Editor Content</div>
+      </MobileSwipeContainer>
+    );
+
+    // Should render the Back button inside the TitleBar top bar
+    const backButton = getByText('Back');
+    expect(backButton).not.toBeNull();
+
+    // Clicking back button should trigger onBack callback
+    fireEvent.click(backButton);
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });
 
