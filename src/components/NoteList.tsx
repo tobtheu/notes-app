@@ -259,7 +259,7 @@ const NoteListItem = memo(({
                         backgroundColor: !isSelected ? 'var(--app-bg)' : undefined
                     }}
                     className={clsx(
-                        "group relative p-2.5 rounded-xl cursor-pointer z-10 w-full border-2 overflow-hidden",
+                        "group relative p-2.5 rounded-xl cursor-pointer z-10 w-full border-2 overflow-hidden no-sidebar-drag",
                         isSnapping && "transition-transform duration-200",
                         isSelected
                             ? "bg-primary-50 dark:bg-primary-950 border-primary-500 shadow-sm"
