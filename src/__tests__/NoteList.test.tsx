@@ -127,10 +127,53 @@ describe('NoteList Swipe Gesture', () => {
         const dropdown = container.querySelector('.folder-dropdown-menu') as HTMLElement;
         expect(dropdown).not.toBeNull();
 
-        // Click outside on the document body
+        // Click outside on the document body (mousedown + click sequence)
         fireEvent.mouseDown(document.body);
+        fireEvent.click(document.body);
 
         // Dropdown menu should now be closed
         expect(container.querySelector('.folder-dropdown-menu')).toBeNull();
+    });
+
+    it('blocks subsequent click actions on outside click', async () => {
+        const onSelectNote = vi.fn();
+        const { container } = render(
+            <NoteList
+                notes={mockNotes}
+                folders={['Work', 'Personal']}
+                selectedNote={null}
+                onSelectNote={onSelectNote}
+                searchTerm=""
+                onSearchChange={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onMoveNote={vi.fn()}
+                onTogglePin={vi.fn()}
+                isNotePinned={() => false}
+                getNoteId={(n) => n.filename}
+                selectedCategory={null}
+            />
+        );
+
+        // Open dropdown by clicking folder trigger
+        const trigger = container.querySelector('[title="Move to Folder"]') as HTMLElement;
+        expect(trigger).not.toBeNull();
+        fireEvent.click(trigger);
+
+        // Dropdown menu should be visible
+        const dropdown = container.querySelector('.folder-dropdown-menu') as HTMLElement;
+        expect(dropdown).not.toBeNull();
+
+        // Target: a note card (foreground card)
+        const foregroundCard = container.querySelector('.group.relative.p-2\\.5') as HTMLElement;
+        expect(foregroundCard).not.toBeNull();
+
+        // Simulate click sequence: mousedown outside (on foreground card), then click outside (on foreground card)
+        fireEvent.mouseDown(foregroundCard);
+        fireEvent.click(foregroundCard);
+
+        // Dropdown should be closed
+        expect(container.querySelector('.folder-dropdown-menu')).toBeNull();
+        // The click action (selecting the note card) should NOT have been called!
+        expect(onSelectNote).not.toHaveBeenCalled();
     });
 });

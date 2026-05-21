@@ -391,14 +391,6 @@ const NoteListItem = memo(({
 
                 {dropdownOpenId === noteId && (
                     <>
-                        {/* Desktop click-interception backdrop */}
-                        <div
-                            className="hidden md:block fixed inset-0 z-40 bg-transparent"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setDropdownOpenId(null);
-                            }}
-                        />
 
                         {/* Desktop Dropdown */}
                         <div
@@ -573,16 +565,33 @@ export function NoteList({
             const target = event.target as HTMLElement;
             if (!target.closest('.folder-dropdown-trigger') && !target.closest('.folder-dropdown-menu')) {
                 setDropdownOpenId(null);
+                // Intercept click: dismiss dropdown and prevent secondary actions underneath
+                event.stopPropagation();
+                event.preventDefault();
+
+                // Create a temporary click blocker to absorb the subsequent 'click' event
+                // that is fired on mouseup/touchend.
+                const blockClick = (clickEvent: MouseEvent) => {
+                    clickEvent.stopPropagation();
+                    clickEvent.preventDefault();
+                    document.removeEventListener('click', blockClick, { capture: true });
+                };
+                document.addEventListener('click', blockClick, { capture: true });
+
+                // Safety fallback to clean up listener in case click event is never fired
+                setTimeout(() => {
+                    document.removeEventListener('click', blockClick, { capture: true });
+                }, 1000);
             }
         };
         
         if (dropdownOpenId) {
-            document.addEventListener('mousedown', handleClickOutside);
-            document.addEventListener('touchstart', handleClickOutside);
+            document.addEventListener('mousedown', handleClickOutside, { capture: true });
+            document.addEventListener('touchstart', handleClickOutside, { capture: true });
         }
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-            document.removeEventListener('touchstart', handleClickOutside);
+            document.removeEventListener('mousedown', handleClickOutside, { capture: true });
+            document.removeEventListener('touchstart', handleClickOutside, { capture: true });
         };
     }, [dropdownOpenId]);
 
