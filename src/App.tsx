@@ -245,107 +245,83 @@ function App() {
         borderRadius: '12px',
       }}
     >
-      {/* iOS only: Sidebar as first column spanning full height */}
-      {isIOS && !isFocusMode && (
-        <Sidebar
-          sidebarRef={sidebarRef}
-          className={clsx(
-            "flex",
-            activeView === 'editor' ? (_isMobile ? "flex" : (isLandscape && !landscapeFullscreen ? "flex" : "hidden")) : "flex"
-          )}
-          {...sharedSidebarProps}
-          isIOS={isIOS}
-          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        />
-      )}
-
-      {/* Right column (iOS) or full layout (desktop): TitleBar + content */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
-        {!isFocusMode && (
-          <TitleBar
-            isSidebarCollapsed={isSidebarCollapsed}
+      <div
+        id="app-background"
+        className="flex-1 flex overflow-hidden w-full h-full"
+        style={{
+          flexDirection: isIOS ? 'row' : 'column',
+        }}
+      >
+        {/* iOS only: Sidebar as first column spanning full height */}
+        {isIOS && !isFocusMode && (
+          <Sidebar
+            sidebarRef={sidebarRef}
+            className={clsx(
+              "flex",
+              activeView === 'editor' ? (_isMobile ? "flex" : (isLandscape && !landscapeFullscreen ? "flex" : "hidden")) : "flex"
+            )}
+            {...sharedSidebarProps}
+            isIOS={isIOS}
             onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            activeView={activeView}
-            onBack={() => setActiveView('notelist')}
           />
         )}
 
-        <div 
-          className={clsx(
-            "flex-1 flex overflow-hidden",
-            _isMobile && "relative"
-          )}
-        >
-          {/* Desktop sidebar inside content row */}
-          {!isIOS && !isFocusMode && (
-            <Sidebar
-              sidebarRef={sidebarRef}
-              className={clsx(
-                "md:flex",
-                activeView === 'editor' ? "hidden md:flex" : "flex"
-              )}
-              {...sharedSidebarProps}
-            />
-          )}
+        {/* Right column (iOS) or full layout (desktop): TitleBar + content */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-          {/* NOTELIST — visible when not in sidebar-only or editor view */}
           {!isFocusMode && (
-            <NoteList
-              className={clsx(
-                "flex-1 min-w-0 md:flex-none md:w-80 md:shrink-0 transition-all duration-300 ease-in-out",
-                activeView === 'editor' ? (isIOS && isLandscape && !landscapeFullscreen ? "flex" : "flex") :
-                  activeView === 'sidebar' ? "hidden md:flex" : "flex"
-              )}
-              notes={notes}
-              selectedNote={activeView === 'editor' ? selectedNote : null}
-              onSelectNote={handleSelectNote}
-              onDeleteNote={deleteNote}
-              onMoveNote={moveNote}
-              onTogglePin={togglePinNote}
-              isNotePinned={isNotePinned}
-              getNoteId={getNoteId}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              folders={folders}
-              selectedCategory={selectedCategory}
-              isIOS={isIOS}
+            <TitleBar
+              isSidebarCollapsed={isSidebarCollapsed}
+              onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              activeView={activeView}
+              onBack={() => setActiveView('notelist')}
             />
           )}
 
-          {/* EDITOR — takes full width on mobile, hides sidebar + notelist */}
-          {selectedNote ? (
-            _isMobile ? (
-              <MobileSwipeContainer
-                active={activeView === 'editor'}
-                onBack={() => setActiveView('notelist')}
-                className="flex-1 flex"
-              >
-                <Editor
-                  key={selectionCount}
-                  className={clsx(
-                    "flex-1",
-                    activeView === 'editor' ? "flex" : "hidden md:flex"
-                  )}
-                  note={selectedNote}
-                  allNotes={allNotes}
-                  workspacePath={currentFolder || ''}
-                  imageCloudSync={userId === 'local'}
-                  onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
-                  onUpdateLocally={updateNoteLocally}
-                  markdownEnabled={markdownEnabled}
-                  toolbarVisible={toolbarVisible}
-                  setToolbarVisible={setToolbarVisible}
-                  spellcheckEnabled={spellcheckEnabled}
-                  isFocusMode={isFocusMode}
-                  onToggleFocus={() => setIsFocusMode(!isFocusMode)}
-                  onSync={triggerSync}
-                  onNavigate={(id, _anchor) => handleNavigate(id)}
-                  isIOS={isIOS}
-                  iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
-                />
-              </MobileSwipeContainer>
-            ) : (
+          <div 
+            className={clsx(
+              "flex-1 flex overflow-hidden",
+              _isMobile && "relative"
+            )}
+          >
+            {/* Desktop sidebar inside content row */}
+            {!isIOS && !isFocusMode && (
+              <Sidebar
+                sidebarRef={sidebarRef}
+                className={clsx(
+                  "md:flex",
+                  activeView === 'editor' ? "hidden md:flex" : "flex"
+                )}
+                {...sharedSidebarProps}
+              />
+            )}
+
+            {/* NOTELIST — visible when not in sidebar-only or editor view */}
+            {!isFocusMode && (
+              <NoteList
+                className={clsx(
+                  "flex-1 min-w-0 md:flex-none md:w-80 md:shrink-0 transition-all duration-300 ease-in-out",
+                  activeView === 'editor' ? (isIOS && isLandscape && !landscapeFullscreen ? "flex" : "flex") :
+                    activeView === 'sidebar' ? "hidden md:flex" : "flex"
+                )}
+                notes={notes}
+                selectedNote={activeView === 'editor' ? selectedNote : null}
+                onSelectNote={handleSelectNote}
+                onDeleteNote={deleteNote}
+                onMoveNote={moveNote}
+                onTogglePin={togglePinNote}
+                isNotePinned={isNotePinned}
+                getNoteId={getNoteId}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                folders={folders}
+                selectedCategory={selectedCategory}
+                isIOS={isIOS}
+              />
+            )}
+
+            {/* EDITOR — on desktop, it is rendered inline */}
+            {selectedNote && !_isMobile && (
               <Editor
                 key={selectionCount}
                 className={clsx(
@@ -369,22 +345,55 @@ function App() {
                 isIOS={isIOS}
                 iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
               />
-            )
-          ) : (
-            <div className={clsx(
-              "flex-1 items-center justify-center text-gray-400",
-              activeView === 'editor' ? "flex" : "hidden md:flex"
-            )} style={{ backgroundColor: 'var(--app-bg)' }}>
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
-                  <Book className="text-gray-300 dark:text-gray-600" size={32} />
+            )}
+
+            {!selectedNote && (
+              <div className={clsx(
+                "flex-1 items-center justify-center text-gray-400",
+                activeView === 'editor' ? "flex" : "hidden md:flex"
+              )} style={{ backgroundColor: 'var(--app-bg)' }}>
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
+                    <Book className="text-gray-300 dark:text-gray-600" size={32} />
+                  </div>
+                  <p className="text-sm font-medium">Select a note to start editing</p>
                 </div>
-                <p className="text-sm font-medium">Select a note to start editing</p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
+
+      {/* EDITOR on mobile: floating overlay sibling */}
+      {selectedNote && _isMobile && (
+        <MobileSwipeContainer
+          active={activeView === 'editor'}
+          onBack={() => setActiveView('notelist')}
+          className="flex-1 flex"
+          isIOS={isIOS}
+        >
+          <Editor
+            key={selectionCount}
+            className="flex-1 flex"
+            note={selectedNote}
+            allNotes={allNotes}
+            workspacePath={currentFolder || ''}
+            imageCloudSync={userId === 'local'}
+            onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
+            onUpdateLocally={updateNoteLocally}
+            markdownEnabled={markdownEnabled}
+            toolbarVisible={toolbarVisible}
+            setToolbarVisible={setToolbarVisible}
+            spellcheckEnabled={spellcheckEnabled}
+            isFocusMode={isFocusMode}
+            onToggleFocus={() => setIsFocusMode(!isFocusMode)}
+            onSync={triggerSync}
+            onNavigate={(id, _anchor) => handleNavigate(id)}
+            isIOS={isIOS}
+            iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
+          />
+        </MobileSwipeContainer>
+      )}
 
       {isSettingsOpen && (
         <SettingsModal

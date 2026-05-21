@@ -6,9 +6,10 @@ interface MobileSwipeContainerProps {
     onBack: () => void;
     children: React.ReactNode;
     className?: string;
+    isIOS?: boolean;
 }
 
-export function MobileSwipeContainer({ active, onBack, children, className }: MobileSwipeContainerProps) {
+export function MobileSwipeContainer({ active, onBack, children, className, isIOS }: MobileSwipeContainerProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const startX = useRef(0);
     const currentX = useRef(0);
@@ -26,22 +27,46 @@ export function MobileSwipeContainer({ active, onBack, children, className }: Mo
     useEffect(() => {
         if (!isMobile || !containerRef.current) return;
         const el = containerRef.current;
+        const bg = document.getElementById('app-background');
+
         if (active) {
             el.style.transition = 'none';
             el.style.transform = 'translate3d(100%, 0, 0)';
             el.style.visibility = 'visible';
             el.style.pointerEvents = 'auto';
+
+            if (bg) {
+                bg.style.transition = 'none';
+                bg.style.transform = 'translate3d(-100px, 0, 0)';
+            }
+
             // Force reflow to commit transition state
             el.offsetHeight;
+
             el.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
             el.style.transform = 'translate3d(0px, 0, 0)';
+
+            if (bg) {
+                bg.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+                bg.style.transform = 'translate3d(-100px, 0, 0)';
+            }
         } else {
             el.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
             el.style.transform = 'translate3d(100%, 0, 0)';
             el.style.pointerEvents = 'none';
+
+            if (bg) {
+                bg.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+                bg.style.transform = 'translate3d(0px, 0, 0)';
+            }
+
             const timer = setTimeout(() => {
                 if (!active && containerRef.current) {
                     containerRef.current.style.visibility = 'hidden';
+                }
+                if (!active && bg) {
+                    bg.style.transform = '';
+                    bg.style.transition = '';
                 }
             }, 300);
             return () => clearTimeout(timer);
@@ -63,6 +88,10 @@ export function MobileSwipeContainer({ active, onBack, children, className }: Mo
             if (containerRef.current) {
                 containerRef.current.style.transition = 'none';
             }
+            const bg = document.getElementById('app-background');
+            if (bg) {
+                bg.style.transition = 'none';
+            }
         }
     };
 
@@ -74,6 +103,14 @@ export function MobileSwipeContainer({ active, onBack, children, className }: Mo
         
         // Follow the finger exactly with hardware-accelerated translate3d
         containerRef.current.style.transform = `translate3d(${deltaX}px, 0, 0)`;
+
+        // Slide the background into view with a parallax translation (-100px to 0px)
+        const bg = document.getElementById('app-background');
+        if (bg) {
+            const width = window.innerWidth;
+            const bgDeltaX = -100 + (deltaX / width) * 100;
+            bg.style.transform = `translate3d(${bgDeltaX}px, 0, 0)`;
+        }
     };
 
     const handleTouchEnd = () => {
@@ -81,14 +118,19 @@ export function MobileSwipeContainer({ active, onBack, children, className }: Mo
         isDragging.current = false;
         const deltaX = currentX.current - startX.current;
         const threshold = window.innerWidth * 0.3; // 30% of screen width
+        const bg = document.getElementById('app-background');
 
         if (deltaX > threshold) {
-            // Invoke onBack immediately. This changes activeView to 'notelist' in App.tsx.
-            // App.tsx re-renders, setting active to false on this container.
-            // The useEffect on `active` handles the rest: it applies the 0.3s transition
-            // to translate3d(100%, 0, 0), disables pointer-events, and schedules visibility: hidden.
+            if (bg) {
+                bg.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+                bg.style.transform = 'translate3d(0px, 0, 0)';
+            }
             onBack();
         } else {
+            if (bg) {
+                bg.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+                bg.style.transform = 'translate3d(-100px, 0, 0)';
+            }
             // Snap cleanly back to full screen
             containerRef.current.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
             containerRef.current.style.transform = 'translate3d(0px, 0, 0)';
@@ -109,7 +151,8 @@ export function MobileSwipeContainer({ active, onBack, children, className }: Mo
                 transform: 'translate3d(100%, 0, 0)',
                 visibility: 'hidden',
                 pointerEvents: 'none',
-                WebkitOverflowScrolling: 'touch'
+                WebkitOverflowScrolling: 'touch',
+                paddingTop: isIOS ? 'calc(24px + var(--safe-top, 0vh))' : '40px'
             }}
         >
             {children}

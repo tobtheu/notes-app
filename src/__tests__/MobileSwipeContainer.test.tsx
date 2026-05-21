@@ -50,5 +50,41 @@ describe('MobileSwipeContainer', () => {
     expect(containerEl.className).toContain('fixed');
     expect(containerEl.className).not.toContain('absolute');
   });
+
+  it('applies correct iOS paddingTop style and handles background parallax translation', () => {
+    // 1. Setup mock `#app-background` element in JSDOM
+    const appBg = document.createElement('div');
+    appBg.id = 'app-background';
+    document.body.appendChild(appBg);
+
+    try {
+      const { container } = render(
+        <MobileSwipeContainer active={true} onBack={vi.fn()} isIOS={true}>
+          <div>Editor Content</div>
+        </MobileSwipeContainer>
+      );
+
+      const containerEl = container.firstElementChild as HTMLElement;
+      expect(containerEl).not.toBeNull();
+      // Should have iOS padding-top style applied
+      expect(containerEl.style.paddingTop).toBe('calc(24px + var(--safe-top, 0vh))');
+
+      // Simulate dragging
+      fireEvent.touchStart(containerEl, {
+        touches: [{ clientX: 10, clientY: 100 }],
+      });
+
+      // Drag to right by 100px (100px out of 375px is 26.6% swipe)
+      fireEvent.touchMove(containerEl, {
+        touches: [{ clientX: 110, clientY: 100 }],
+      });
+
+      // Background translation should be updated with parallax: -100 + (100 / 375) * 100 = -73.33px
+      expect(appBg.style.transform).toContain('translate3d');
+      expect(appBg.style.transform).not.toBe('');
+    } finally {
+      document.body.removeChild(appBg);
+    }
+  });
 });
 
