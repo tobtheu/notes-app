@@ -249,7 +249,7 @@ const NoteListItem = memo(({
         <div>
             <div className="relative mb-0.5 rounded-xl border-2 border-transparent overflow-visible">
                 {/* Swipe Actions (Behind) */}
-                <div className="absolute inset-y-[2px] right-[2px] flex items-center justify-end bg-gray-100 dark:bg-gray-800/80 w-[192px] max-w-[calc(100%-4px)] z-0 h-[calc(100%-4px)] rounded-r-[10px] pointer-events-auto overflow-hidden">
+                <div className="absolute inset-y-[2px] right-[2px] left-[2px] ml-auto flex items-center justify-end bg-gray-100 dark:bg-gray-800/80 max-w-[192px] z-0 h-[calc(100%-4px)] rounded-r-[10px] pointer-events-auto overflow-hidden">
                     <button
                         onClick={(e) => { e.stopPropagation(); onTogglePin(note); closeSwipe(); }}
                         className={clsx(

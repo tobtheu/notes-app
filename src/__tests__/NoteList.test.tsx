@@ -198,6 +198,8 @@ describe('NoteList Swipe Gesture', () => {
         // Find the background swipe actions container
         const backgroundContainer = container.querySelector('.absolute.inset-y-\\[2px\\]') as HTMLElement;
         expect(backgroundContainer).not.toBeNull();
-        expect(backgroundContainer.className).toContain('max-w-[calc(100%-4px)]');
+        expect(backgroundContainer.className).toContain('left-[2px]');
+        expect(backgroundContainer.className).toContain('ml-auto');
+        expect(backgroundContainer.className).toContain('max-w-[192px]');
     });
 });
