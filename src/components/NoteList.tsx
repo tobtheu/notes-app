@@ -95,12 +95,34 @@ const NoteListItem = memo(({
     const touchStartY = useRef<number | null>(null);
     const isSwipedRef = useRef(false);
 
+    const cardRef = useRef<HTMLDivElement>(null);
+    const swipeOffsetRef = useRef(0);
+    const rafIdRef = useRef<number | null>(null);
+
+    // Sync React state updates back to mutable refs & clear manual styles if reset to 0
+    useEffect(() => {
+        swipeOffsetRef.current = swipeOffset;
+        if (swipeOffset === 0 && cardRef.current) {
+            cardRef.current.style.transform = '';
+        }
+    }, [swipeOffset]);
+
     const handleTouchStart = (e: React.TouchEvent) => {
         touchStartX.current = e.touches[0].clientX;
         touchStartY.current = e.touches[0].clientY;
         isDraggingRef.current = false;
         setIsDragging(false);
         setIsSnapping(false);
+
+        if (cardRef.current) {
+            cardRef.current.style.transition = 'none';
+            cardRef.current.style.willChange = 'transform';
+        }
+
+        if (rafIdRef.current !== null) {
+            cancelAnimationFrame(rafIdRef.current);
+            rafIdRef.current = null;
+        }
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
@@ -121,24 +143,54 @@ const NoteListItem = memo(({
 
         if (!isDraggingRef.current) return;
 
+        let newOffset = 0;
         if (diffX < 0 && !isSwipedRef.current) {
-            setSwipeOffset(Math.max(diffX, -160));
+            newOffset = Math.max(diffX, -160);
         } else if (diffX > 0 && isSwipedRef.current) {
-            setSwipeOffset(Math.min(-160 + diffX, 0));
+            newOffset = Math.min(-160 + diffX, 0);
+        } else {
+            return;
+        }
+
+        swipeOffsetRef.current = newOffset;
+
+        if (rafIdRef.current === null) {
+            rafIdRef.current = requestAnimationFrame(() => {
+                rafIdRef.current = null;
+                if (cardRef.current) {
+                    cardRef.current.style.transform = `translate3d(${swipeOffsetRef.current}px, 0px, 0px)`;
+                }
+            });
         }
     };
 
     const handleTouchEnd = () => {
-        if (touchStartX.current !== null) {
-            setIsSnapping(true);
-            if (swipeOffset < -60) {
-                setSwipeOffset(-160);
-                isSwipedRef.current = true;
-            } else {
-                setSwipeOffset(0);
-                isSwipedRef.current = false;
-            }
+        if (rafIdRef.current !== null) {
+            cancelAnimationFrame(rafIdRef.current);
+            rafIdRef.current = null;
         }
+
+        if (touchStartX.current !== null) {
+            const finalOffset = swipeOffsetRef.current < -60 ? -160 : 0;
+            isSwipedRef.current = finalOffset === -160;
+            swipeOffsetRef.current = finalOffset;
+
+            if (cardRef.current) {
+                // Apply hardware accelerated transition directly to the element
+                cardRef.current.style.transition = 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
+                cardRef.current.style.transform = `translate3d(${finalOffset}px, 0px, 0px)`;
+            }
+
+            // Sync React state after animation finishes
+            setTimeout(() => {
+                setSwipeOffset(finalOffset);
+                if (cardRef.current) {
+                    cardRef.current.style.transition = '';
+                    cardRef.current.style.willChange = '';
+                }
+            }, 200);
+        }
+
         setTimeout(() => setIsDragging(false), 50);
         touchStartX.current = null;
         touchStartY.current = null;
@@ -184,6 +236,7 @@ const NoteListItem = memo(({
 
                 {/* Foreground Card */}
                 <div
+                    ref={cardRef}
                     onClick={() => {
                         if (isSwipedRef.current) {
                             setSwipeOffset(0);
@@ -202,7 +255,7 @@ const NoteListItem = memo(({
                         }
                     }}
                     style={{ 
-                        transform: `translateX(${swipeOffset}px)`,
+                        transform: `translate3d(${swipeOffset}px, 0px, 0px)`,
                         backgroundColor: !isSelected ? 'var(--app-bg)' : undefined
                     }}
                     className={clsx(

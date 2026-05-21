@@ -5,11 +5,10 @@ import type { Note } from '../types';
 
 const mockNotes: Note[] = [
     {
-        id: 'note-1',
         filename: 'note1.md',
         content: '# Test Title\nSome content',
         updatedAt: new Date().toISOString(),
-        folder: null,
+        folder: '',
     }
 ];
 
@@ -48,7 +47,7 @@ describe('NoteList Swipe Gesture', () => {
                 onMoveNote={vi.fn()}
                 onTogglePin={vi.fn()}
                 isNotePinned={() => false}
-                getNoteId={(n) => n.id}
+                getNoteId={(n) => n.filename}
                 selectedCategory={null}
             />
         );
