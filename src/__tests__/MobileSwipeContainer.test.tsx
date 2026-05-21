@@ -7,6 +7,13 @@ describe('MobileSwipeContainer', () => {
     // Mock window.innerWidth to return a standard mobile size (375px)
     vi.stubGlobal('innerWidth', 375);
     window.dispatchEvent(new Event('resize'));
+
+    // Stub requestAnimationFrame and cancelAnimationFrame for JSDOM
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0);
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => {});
   });
 
   it('triggers onBack immediately when drag is released beyond the 30% threshold', () => {
@@ -85,6 +92,51 @@ describe('MobileSwipeContainer', () => {
     } finally {
       document.body.removeChild(appBg);
     }
+  });
+
+  it('calls preventDefault on touchmove to lock vertical scroll when dragging horizontally', () => {
+    const { container } = render(
+      <MobileSwipeContainer active={true} onBack={vi.fn()}>
+        <div>Editor Content</div>
+      </MobileSwipeContainer>
+    );
+
+    const containerEl = container.firstElementChild as HTMLElement;
+    expect(containerEl).not.toBeNull();
+
+    // 1. Start Touch at eligible boundary (clientX < 35)
+    fireEvent.touchStart(containerEl, {
+      touches: [{ clientX: 10, clientY: 100 }],
+    });
+
+    // 2. Dispatch cancelable touchmove event and capture preventDefault call
+    const moveEvent = new TouchEvent('touchmove', {
+      touches: [{ clientX: 50, clientY: 100 } as any],
+      cancelable: true,
+    });
+    const preventDefaultSpy = vi.spyOn(moveEvent, 'preventDefault');
+    containerEl.dispatchEvent(moveEvent);
+
+    expect(preventDefaultSpy).toHaveBeenCalled();
+  });
+
+  it('renders a plain div fallback on desktop screen', () => {
+    // 1. Mock window.innerWidth to return a desktop size (1024px)
+    vi.stubGlobal('innerWidth', 1024);
+    window.dispatchEvent(new Event('resize'));
+
+    const { container } = render(
+      <MobileSwipeContainer active={true} onBack={vi.fn()} className="test-desktop-class">
+        <div>Editor Content</div>
+      </MobileSwipeContainer>
+    );
+
+    const containerEl = container.firstElementChild as HTMLElement;
+    expect(containerEl).not.toBeNull();
+    // Desktop layout should render standard container without 'fixed' or translate style overrides
+    expect(containerEl.className).toContain('test-desktop-class');
+    expect(containerEl.className).not.toContain('fixed');
+    expect(containerEl.style.transform).toBe('');
   });
 });
 
