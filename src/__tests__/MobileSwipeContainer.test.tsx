@@ -20,7 +20,7 @@ describe('MobileSwipeContainer', () => {
     const onBack = vi.fn();
     
     const { container } = render(
-      <MobileSwipeContainer active={true} onBack={onBack}>
+      <MobileSwipeContainer active={true} onBack={onBack} isMobile={true}>
         <div>Editor Content</div>
       </MobileSwipeContainer>
     );
@@ -47,7 +47,7 @@ describe('MobileSwipeContainer', () => {
 
   it('renders with fixed positioning on mobile screen', () => {
     const { container } = render(
-      <MobileSwipeContainer active={true} onBack={vi.fn()}>
+      <MobileSwipeContainer active={true} onBack={vi.fn()} isMobile={true}>
         <div>Editor Content</div>
       </MobileSwipeContainer>
     );
@@ -66,7 +66,7 @@ describe('MobileSwipeContainer', () => {
 
     try {
       const { container } = render(
-        <MobileSwipeContainer active={true} onBack={vi.fn()} isIOS={true}>
+        <MobileSwipeContainer active={true} onBack={vi.fn()} isIOS={true} isMobile={true}>
           <div>Editor Content</div>
         </MobileSwipeContainer>
       );
@@ -96,7 +96,7 @@ describe('MobileSwipeContainer', () => {
 
   it('calls preventDefault on touchmove to lock vertical scroll when dragging horizontally', () => {
     const { container } = render(
-      <MobileSwipeContainer active={true} onBack={vi.fn()}>
+      <MobileSwipeContainer active={true} onBack={vi.fn()} isMobile={true}>
         <div>Editor Content</div>
       </MobileSwipeContainer>
     );
@@ -126,7 +126,7 @@ describe('MobileSwipeContainer', () => {
     window.dispatchEvent(new Event('resize'));
 
     const { container } = render(
-      <MobileSwipeContainer active={true} onBack={vi.fn()} className="test-desktop-class">
+      <MobileSwipeContainer active={true} onBack={vi.fn()} className="test-desktop-class" isMobile={false}>
         <div>Editor Content</div>
       </MobileSwipeContainer>
     );
@@ -142,7 +142,7 @@ describe('MobileSwipeContainer', () => {
   it('renders the TitleBar topbar inside the container and triggers onBack when back button is clicked', () => {
     const onBack = vi.fn();
     const { getByText } = render(
-      <MobileSwipeContainer active={true} onBack={onBack}>
+      <MobileSwipeContainer active={true} onBack={onBack} isMobile={true}>
         <div>Editor Content</div>
       </MobileSwipeContainer>
     );

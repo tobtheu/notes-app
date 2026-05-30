@@ -371,6 +371,7 @@ function App() {
           onBack={() => setActiveView('notelist')}
           className="flex-1 flex"
           isIOS={isIOS}
+          isMobile={_isMobile}
         >
           <Editor
             key={selectionCount}

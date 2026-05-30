@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import clsx from 'clsx';
 import { TitleBar } from './TitleBar';
 
@@ -8,14 +8,14 @@ interface MobileSwipeContainerProps {
     children: React.ReactNode;
     className?: string;
     isIOS?: boolean;
+    isMobile: boolean; // Add this prop!
 }
 
-export function MobileSwipeContainer({ active, onBack, children, className, isIOS }: MobileSwipeContainerProps) {
+export function MobileSwipeContainer({ active, onBack, children, className, isIOS, isMobile }: MobileSwipeContainerProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const startX = useRef(0);
     const currentX = useRef(0);
     const isDragging = useRef(false);
-    const [isMobile, setIsMobile] = useState(false);
 
     const pendingDeltaX = useRef<number | null>(null);
     const rafId = useRef<number | null>(null);
@@ -28,16 +28,6 @@ export function MobileSwipeContainer({ active, onBack, children, className, isIO
         activeRef.current = active;
         onBackRef.current = onBack;
     }, [active, onBack]);
-
-    useEffect(() => {
-        const checkMobile = () => {
-            windowWidth.current = window.innerWidth;
-            setIsMobile(window.innerWidth < 768);
-        };
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
 
     const updateTransforms = () => {
         if (pendingDeltaX.current === null) {
