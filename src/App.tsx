@@ -12,6 +12,7 @@ import { OnboardingScreen } from './components/OnboardingScreen';
 import { useNotes } from './hooks/useNotes';
 import { useSettings } from './hooks/useSettings';
 import { useTheme } from './hooks/useTheme';
+import { useSessionExpiryHandler } from './hooks/useSessionExpiryHandler';
 import { getDb } from './lib/electric';
 import type { Note } from './types';
 import { Loader2, Book } from 'lucide-react';
@@ -66,6 +67,7 @@ function App() {
     setSearchTerm,
     triggerSync,
     syncStatus,
+    syncError,
     hasPending,
     setupDefaultWorkspace,
     changeFolder,
@@ -104,6 +106,13 @@ function App() {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   useEffect(() => { if (syncStatus === 'unauthenticated') setIsSettingsOpen(false); }, [syncStatus]);
+
+  useSessionExpiryHandler({
+    syncStatus,
+    syncError,
+    signOut,
+    setIsSettingsOpen,
+  });
   const [isIOS, setIsIOS] = useState(false);
   useEffect(() => { try { setIsIOS(platform() === 'ios'); } catch { } }, []);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);

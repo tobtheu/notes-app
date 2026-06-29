@@ -45,3 +45,8 @@ AGENTS.md
 
 # Temporary Migration Files
 migration_temp/
+
+# Satisfactory Server Setup files
+satisfactory-setup.sh
+satisfactory-server-guide.md
+

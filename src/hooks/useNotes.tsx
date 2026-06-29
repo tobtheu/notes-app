@@ -173,6 +173,43 @@ export function useNotes() {
         // Wire up supabase-js client with the stored tokens
         await setSupabaseSession(stored.accessToken, stored.refreshToken);
         log.info('[useNotes:init] Supabase session set');
+
+        let tokenValid = true;
+        let freshAccessToken = stored.accessToken;
+        let freshRefreshToken = stored.refreshToken;
+
+        try {
+          const { data } = await supabase.auth.getSession();
+          const expiresAt = data.session?.expires_at;
+          const secondsLeft = expiresAt ? expiresAt - Math.floor(Date.now() / 1000) : 0;
+          
+          if (secondsLeft < 300) {
+            log.info('[useNotes:init] Token expired or expiring soon, refreshing...');
+            const refreshed = await window.tauriAPI.refreshSupabaseToken().catch(() => null);
+            if (refreshed) {
+              freshAccessToken = refreshed.accessToken;
+              freshRefreshToken = refreshed.refreshToken;
+              await setSupabaseSession(freshAccessToken, freshRefreshToken);
+              log.info('[useNotes:init] Token refreshed successfully');
+            } else {
+              log.error('[useNotes:init] Token refresh failed on startup - session is dead.');
+              tokenValid = false;
+            }
+          }
+        } catch (e) {
+          log.warn('[useNotes:init] Error checking/refreshing token:', e);
+        }
+
+        if (!tokenValid) {
+          setUserId(stored.userId);
+          setUserEmail(stored.email);
+          localStorage.setItem('lama-user-id', stored.userId);
+          localStorage.setItem('lama-user-email', stored.email);
+          setSyncStatus('error');
+          setSyncError('session_expired');
+          return;
+        }
+
         setUserId(stored.userId);
         setUserEmail(stored.email);
         localStorage.setItem('lama-user-id', stored.userId);
