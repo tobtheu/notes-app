@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Lama Notes",
-  "version": "0.7.9",
+  "version": "0.7.10",
   "identifier": "com.tobtheu.notizapp",
   "build": {
     "frontendDist": "../dist",
@@ -22,7 +22,8 @@
         "minHeight": 600,
         "decorations": true,
         "transparent": true,
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "devtools": true
       }
     ],
     "security": {
