@@ -691,6 +691,12 @@ async fn export_pdf(_app: tauri::AppHandle, html: String) -> Result<bool, String
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    {
+        // Disable DMA-BUF renderer to prevent EGL display creation crashes on some Linux graphics drivers/compositors
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+
     #[cfg(target_os = "ios")]
     let _ = rustls::crypto::ring::default_provider().install_default();
 
