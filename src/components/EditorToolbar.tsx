@@ -281,7 +281,10 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
     React.useLayoutEffect(() => {
         if (!containerRef.current || !hiddenContainerRef.current || !hiddenOverflowRef.current) return;
 
-        const parent = containerRef.current.parentElement;
+        let parent = containerRef.current.parentElement;
+        if (parent && parent.classList.contains('md:w-fit')) {
+            parent = parent.parentElement;
+        }
         if (!parent) return;
 
         const observer = new ResizeObserver((entries) => {
@@ -291,14 +294,19 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                 const hiddenChildren = Array.from(hiddenContainerRef.current!.children) as HTMLElement[];
                 const overflowBtnWidth = hiddenOverflowRef.current!.getBoundingClientRect().width;
                 
-                if (hiddenChildren.length === 0) return;
+                if (hiddenChildren.length === 0) {
+                    console.log("[Toolbar Debug] No hidden children found");
+                    return;
+                }
 
                 const gap = 4; // gap-1 is 4px
                 let totalWidth = 0;
                 let fitCount = 0;
 
+                const childWidths = hiddenChildren.map(c => c.getBoundingClientRect().width);
+
                 for (let i = 0; i < hiddenChildren.length; i++) {
-                    const itemWidth = hiddenChildren[i].getBoundingClientRect().width;
+                    const itemWidth = childWidths[i];
                     const nextTotal = totalWidth + itemWidth + (i > 0 ? gap : 0);
 
                     if (nextTotal <= containerWidth) {
@@ -314,7 +322,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                     totalWidth = 0;
                     fitCount = 0;
                     for (let i = 0; i < hiddenChildren.length; i++) {
-                        const itemWidth = hiddenChildren[i].getBoundingClientRect().width;
+                        const itemWidth = childWidths[i];
                         const nextTotal = totalWidth + itemWidth + (i > 0 ? gap : 0);
 
                         if (nextTotal + overflowBtnWidth + gap <= containerWidth) {
@@ -325,6 +333,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
                         }
                     }
                 }
+
+                console.log("[Toolbar Debug]", {
+                    containerWidth,
+                    parentWidth: entry.contentRect.width,
+                    childWidths,
+                    overflowBtnWidth,
+                    fitCount,
+                    totalItems: hiddenChildren.length
+                });
 
                 setVisibleCount(fitCount);
             }
