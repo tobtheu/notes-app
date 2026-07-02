@@ -281,9 +281,13 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
     React.useLayoutEffect(() => {
         if (!containerRef.current || !hiddenContainerRef.current || !hiddenOverflowRef.current) return;
 
+        const parent = containerRef.current.parentElement;
+        if (!parent) return;
+
         const observer = new ResizeObserver((entries) => {
             for (let entry of entries) {
-                const containerWidth = entry.contentRect.width;
+                // available width is parent's content width minus small padding offset (24px)
+                const containerWidth = entry.contentRect.width - 24;
                 const hiddenChildren = Array.from(hiddenContainerRef.current!.children) as HTMLElement[];
                 const overflowBtnWidth = hiddenOverflowRef.current!.getBoundingClientRect().width;
                 
@@ -326,7 +330,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({ editor, mode = 'fu
             }
         });
 
-        observer.observe(containerRef.current);
+        observer.observe(parent);
         return () => observer.disconnect();
     }, [filteredItems.length]);
 
