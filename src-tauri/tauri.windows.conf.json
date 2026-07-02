@@ -3,7 +3,17 @@
     "windows": [
       {
         "label": "main",
-        "decorations": false
+        "title": "",
+        "resizable": true,
+        "fullscreen": false,
+        "width": 1270,
+        "height": 900,
+        "minWidth": 800,
+        "minHeight": 600,
+        "decorations": false,
+        "transparent": true,
+        "dragDropEnabled": false,
+        "devtools": true
       }
     ]
   }

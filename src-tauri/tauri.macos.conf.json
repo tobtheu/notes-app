@@ -4,7 +4,16 @@
       {
         "label": "main",
         "title": "",
+        "resizable": true,
+        "fullscreen": false,
+        "width": 1270,
+        "height": 900,
+        "minWidth": 800,
+        "minHeight": 600,
         "decorations": true,
+        "transparent": true,
+        "dragDropEnabled": false,
+        "devtools": true,
         "titleBarStyle": "Overlay"
       }
     ]
