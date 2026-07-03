@@ -218,13 +218,26 @@ function App() {
 
   if (!currentFolder || syncStatus === 'unauthenticated') {
     return (
-      <OnboardingScreen
-        onSelectFolder={selectFolder}
-        onSetupWorkspace={async () => { await setupDefaultWorkspace(true); }}
-        onSignIn={signIn}
-        onSignUp={signUp}
-        onLocalOnly={goLocalOnly}
-      />
+      <div className="absolute inset-0 flex flex-col overflow-hidden" style={{ borderRadius: '12px', backgroundColor: 'var(--app-bg)' }}>
+        {!isIOS && (
+          <TitleBar
+            isSidebarCollapsed={true}
+            onToggleCollapse={() => {}}
+            activeView="notelist"
+            onBack={() => {}}
+            hideSidebarToggle={true}
+          />
+        )}
+        <div className="flex-1 relative overflow-hidden">
+          <OnboardingScreen
+            onSelectFolder={selectFolder}
+            onSetupWorkspace={async () => { await setupDefaultWorkspace(true); }}
+            onSignIn={signIn}
+            onSignUp={signUp}
+            onLocalOnly={goLocalOnly}
+          />
+        </div>
+      </div>
     );
   }
 

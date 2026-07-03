@@ -1,7 +1,8 @@
-import { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
+import { forwardRef } from 'react';
 import type { Note } from '../types';
 import clsx from 'clsx';
 import { FileText, Hash, ChevronRight } from 'lucide-react';
+import { useWikiLinkMenu } from '../hooks/useWikiLinkMenu';
 
 interface WikiLinkMenuProps {
     items: Note[];
@@ -18,131 +19,18 @@ interface WikiLinkMenuProps {
  * 2. Select a Heading (Anchor) within that note (optional)
  */
 export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
-    /**
-     * --- LOCAL STATE ---
-     */
-    const [selectedIndex, setSelectedIndex] = useState(0);
-    const [step, setStep] = useState<'note' | 'anchor'>('note');
-    const [selectedNote, setSelectedNote] = useState<Note | null>(null);
-    const [anchors, setAnchors] = useState<{ id: string; text: string }[]>([]);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const lastMousePos = useRef({ x: 0, y: 0 });
-
-    /**
-     * --- MOUSE/KEYBOARD SYNC ---
-     * Prevents the selected index from flickering when both mouse and keyboard are used.
-     */
-    const handleMouseMove = (e: React.MouseEvent, index: number) => {
-        if (e.clientX !== lastMousePos.current.x || e.clientY !== lastMousePos.current.y) {
-            lastMousePos.current = { x: e.clientX, y: e.clientY };
-            if (selectedIndex !== index) {
-                setSelectedIndex(index);
-            }
-        }
-    };
-
-    /**
-     * --- ANCHOR EXTRACTION ---
-     * Adjustments: Slugification Logic
-     * Extracts markdown headings and generates IDs that must match the internal
-     * anchor generation in the MarkdownEditor.
-     */
-    const extractAnchors = (content: string) => {
-        const headings: { id: string; text: string }[] = [];
-        const lines = content.split('\n');
-        lines.forEach(line => {
-            const match = line.match(/^(#{1,6})\s+(.+)$/);
-            if (match) {
-                const text = match[2].trim();
-                const id = text
-                    .toLowerCase()
-                    .replace(/[^a-z0-9äöüß ]/gi, '')
-                    .trim()
-                    .replace(/\s+/g, '-');
-                headings.push({ id, text });
-            }
-        });
-        return headings;
-    };
-
-    /**
-     * --- SELECTION FLOW ---
-     */
-    const selectNote = (note: Note) => {
-        const foundAnchors = extractAnchors(note.content || '');
-        if (foundAnchors.length > 0) {
-            // Note has headings, proceed to anchor selection step
-            setSelectedNote(note);
-            setAnchors(foundAnchors);
-            setStep('anchor');
-            setSelectedIndex(0);
-        } else {
-            // No anchors, immediately insert the simple note link
-            props.command({
-                id: note.filename.replace('.md', ''),
-                label: note.filename.replace('.md', '')
-            });
-        }
-    };
-
-    const selectAnchor = (anchor: { id: string; text: string }) => {
-        if (selectedNote) {
-            // Insert link with anchor suffix [[NoteName#HeadingText]]
-            props.command({
-                id: selectedNote.filename.replace('.md', ''),
-                anchor: anchor.id,
-                label: `${selectedNote.filename.replace('.md', '')}#${anchor.text}`
-            });
-        }
-    };
-
-    const currentItems = step === 'note' ? props.items : anchors;
-
-    // Reset cursor when results or step change
-    useEffect(() => {
-        setSelectedIndex(0);
-    }, [props.items, step]);
-
-    // Keep active element in view during keyboard navigation
-    useEffect(() => {
-        const selectedElement = containerRef.current?.children[selectedIndex + (step === 'note' ? 1 : 1)] as HTMLElement;
-        if (selectedElement) {
-            selectedElement.scrollIntoView({ block: 'nearest' });
-        }
-    }, [selectedIndex, step]);
-
-    /**
-     * --- EXTERNAL API (for Tiptap Suggestion Extension) ---
-     */
-    useImperativeHandle(ref, () => ({
-        onKeyDown: ({ event }: { event: KeyboardEvent }) => {
-            if (event.key === 'ArrowUp') {
-                setSelectedIndex((selectedIndex + currentItems.length - 1) % currentItems.length);
-                return true;
-            }
-            if (event.key === 'ArrowDown') {
-                setSelectedIndex((selectedIndex + 1) % currentItems.length);
-                return true;
-            }
-            if (event.key === 'Enter') {
-                if (step === 'note') {
-                    selectNote(currentItems[selectedIndex] as Note);
-                } else {
-                    selectAnchor(currentItems[selectedIndex] as { id: string; text: string });
-                }
-                return true;
-            }
-            if (event.key === 'Escape') {
-                if (step === 'anchor') {
-                    // Back out to note selection instead of closing the whole menu
-                    setStep('note');
-                    setSelectedNote(null);
-                    return true;
-                }
-            }
-            return false;
-        },
-    }));
+    const {
+        selectedIndex,
+        step,
+        setStep,
+        selectedNote,
+        setSelectedNote,
+        containerRef,
+        currentItems,
+        handleMouseMove,
+        selectNote,
+        selectAnchor
+    } = useWikiLinkMenu(props, ref);
 
     return (
         <div ref={containerRef} className="bg-white dark:bg-gray-800 shadow-2xl rounded-xl border border-gray-200 dark:border-gray-700 p-1.5 min-w-[280px] max-h-[350px] overflow-y-auto z-[1000] custom-scrollbar animate-in fade-in zoom-in duration-150">
@@ -153,7 +41,10 @@ export const WikiLinkMenu = forwardRef((props: WikiLinkMenuProps, ref) => {
                 </span>
                 {step === 'anchor' && (
                     <button
-                        onClick={() => setStep('note')}
+                        onClick={() => {
+                            setStep('note');
+                            setSelectedNote(null);
+                        }}
                         className="text-[10px] text-primary-500 hover:text-primary-600 font-bold uppercase tracking-widest"
                     >
                         Back

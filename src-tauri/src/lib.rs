@@ -795,7 +795,7 @@ pub fn run() {
                     }
                 }
             }
-            #[cfg(desktop)]
+            #[cfg(all(desktop, not(target_os = "macos")))]
             {
                 use tauri::tray::TrayIconBuilder;
                 use tauri::menu::{Menu, MenuItem};

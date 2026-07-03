@@ -64,7 +64,7 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
     };
 
     return (
-        <div className="flex flex-col items-center justify-center fixed inset-0 bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 p-6 text-center">
+        <div className="flex flex-col items-center justify-center absolute inset-0 w-full h-full bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 p-6 text-center">
             {/* Logo */}
             <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-primary-500/10 rotate-3 animate-in fade-in zoom-in duration-500 overflow-hidden">
                 <img src={logo} alt="Logo" className="w-16 h-16 object-contain" />

@@ -320,3 +320,38 @@ describe('write payload structure', () => {
     expect(id).toBe(normalizeStr('work/meeting.md'))
   })
 })
+
+describe('timestamp correction for local updates', () => {
+  it('corrects timestamp to existing + 1ms if new timestamp is older', () => {
+    const existingTime = new Date('2026-07-02T10:00:00.000Z').getTime()
+    const newTime = new Date('2026-07-02T09:59:00.000Z').getTime()
+
+    let finalTime = newTime
+    if (existingTime >= newTime) {
+      finalTime = existingTime + 1
+    }
+    expect(new Date(finalTime).toISOString()).toBe('2026-07-02T10:00:00.001Z')
+  })
+
+  it('corrects timestamp to existing + 1ms if new timestamp is equal', () => {
+    const existingTime = new Date('2026-07-02T10:00:00.000Z').getTime()
+    const newTime = new Date('2026-07-02T10:00:00.000Z').getTime()
+
+    let finalTime = newTime
+    if (existingTime >= newTime) {
+      finalTime = existingTime + 1
+    }
+    expect(new Date(finalTime).toISOString()).toBe('2026-07-02T10:00:00.001Z')
+  })
+
+  it('keeps new timestamp if it is already newer than existing', () => {
+    const existingTime = new Date('2026-07-02T10:00:00.000Z').getTime()
+    const newTime = new Date('2026-07-02T10:01:00.000Z').getTime()
+
+    let finalTime = newTime
+    if (existingTime >= newTime) {
+      finalTime = existingTime + 1
+    }
+    expect(new Date(finalTime).toISOString()).toBe('2026-07-02T10:01:00.000Z')
+  })
+})

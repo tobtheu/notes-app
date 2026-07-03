@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-    Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
-    Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart,
-    Plus, Settings, Settings2, Trash2, Pencil, GripVertical, Check, PanelLeftClose, PanelLeftOpen,
-    Pen, Globe, Lock, Archive, Bookmark, Lightbulb, Rocket, Award,
-    FileText, Headphones, Gamepad2, Dumbbell, Plane, Utensils,
-    Microscope, Palette, Film, TreePine, GraduationCap, Bike
+    Folder, Plus, Settings, Settings2, Check, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import clsx from 'clsx';
 import type { AppMetadata } from '../types';
-import { normalizeStr } from '../utils/path';
 import {
     DndContext,
     closestCenter,
@@ -26,44 +20,9 @@ import {
     arrayMove,
     SortableContext,
     sortableKeyboardCoordinates,
-    verticalListSortingStrategy,
-    useSortable
+    verticalListSortingStrategy
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-
-/**
- * ICON_MAP
- * Configuration Point: Add or remove Lucide icons here to make them available for folder selection.
- */
-const ICON_MAP: Record<string, any> = {
-    Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
-    Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart, Settings, Trash2,
-    Pen, Globe, Lock, Archive, Bookmark, Lightbulb, Rocket, Award,
-    FileText, Headphones, Gamepad2, Dumbbell, Plane, Utensils,
-    Microscope, Palette, Film, TreePine, GraduationCap, Bike
-};
-
-/**
- * COLOR_MAP
- * Configuration Point: Define theme colors for folders. Use Tailwind CSS classes.
- */
-const COLOR_MAP: Record<string, any> = {
-    red: { bg: 'bg-red-100', text: 'text-red-600', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-400' },
-    orange: { bg: 'bg-orange-100', text: 'text-orange-600', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400' },
-    amber: { bg: 'bg-amber-100', text: 'text-amber-600', darkBg: 'dark:bg-amber-900/30', darkText: 'dark:text-amber-400' },
-    lime: { bg: 'bg-lime-100', text: 'text-lime-700', darkBg: 'dark:bg-lime-900/30', darkText: 'dark:text-lime-400' },
-    green: { bg: 'bg-emerald-100', text: 'text-emerald-600', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400' },
-    teal: { bg: 'bg-teal-100', text: 'text-teal-600', darkBg: 'dark:bg-teal-900/30', darkText: 'dark:text-teal-400' },
-    cyan: { bg: 'bg-cyan-100', text: 'text-cyan-600', darkBg: 'dark:bg-cyan-900/30', darkText: 'dark:text-cyan-400' },
-    sky: { bg: 'bg-sky-100', text: 'text-sky-600', darkBg: 'dark:bg-sky-900/30', darkText: 'dark:text-sky-400' },
-    blue: { bg: 'bg-blue-100', text: 'text-blue-600', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400' },
-    indigo: { bg: 'bg-indigo-100', text: 'text-indigo-600', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400' },
-    violet: { bg: 'bg-violet-100', text: 'text-violet-600', darkBg: 'dark:bg-violet-900/30', darkText: 'dark:text-violet-400' },
-    purple: { bg: 'bg-purple-100', text: 'text-purple-600', darkBg: 'dark:bg-purple-900/30', darkText: 'dark:text-purple-400' },
-    pink: { bg: 'bg-pink-100', text: 'text-pink-600', darkBg: 'dark:bg-pink-900/30', darkText: 'dark:text-pink-400' },
-    rose: { bg: 'bg-rose-100', text: 'text-rose-600', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400' },
-    gray: { bg: 'bg-gray-100', text: 'text-gray-600', darkBg: 'dark:bg-gray-800', darkText: 'dark:text-gray-400' },
-};
+import { FolderItem, SortableFolderItem } from './FolderItem';
 
 interface SidebarProps {
     sidebarRef?: React.RefObject<HTMLDivElement | null>;
@@ -83,249 +42,6 @@ interface SidebarProps {
     onOpenSettings?: () => void;
     monochromeIcons?: boolean;
 }
-
-interface FolderItemProps {
-    folder: string;
-    metadata: AppMetadata;
-    selectedCategory: string | null;
-    isCollapsed: boolean;
-    isReorderMode?: boolean;
-    isIOS?: boolean;
-    monochromeIcons?: boolean;
-    onSelectCategory?: (name: string | null) => void;
-    onEditCategory?: (name: string) => void;
-    onDeleteCategory?: (name: string) => void;
-    onActivateReorderMode?: () => void;
-    isDragging?: boolean;
-    isOverlay?: boolean;
-    setNodeRef?: (node: HTMLElement | null) => void;
-    attributes?: any;
-    listeners?: any;
-    style?: React.CSSProperties;
-}
-
-interface SortableFolderItemProps {
-    id: string;
-    folder: string;
-    metadata: AppMetadata;
-    selectedCategory: string | null;
-    isCollapsed: boolean;
-    isReorderMode: boolean;
-    isIOS?: boolean;
-    monochromeIcons?: boolean;
-    onSelectCategory: (name: string | null) => void;
-    onEditCategory: (name: string) => void;
-    onDeleteCategory: (name: string) => void;
-}
-
-const CategoryActionButtons = ({
-    folder,
-    onEditCategory,
-    onDeleteCategory,
-    containerClass,
-    buttonClass,
-    deleteButtonClass
-}: {
-    folder: string;
-    onEditCategory: (name: string) => void;
-    onDeleteCategory: (name: string) => void;
-    containerClass: string;
-    buttonClass: string;
-    deleteButtonClass: string;
-}) => (
-    <div className={containerClass}>
-        <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onEditCategory(folder); }}
-            className={buttonClass}
-            title="Edit"
-        >
-            <Pencil size={16} />
-        </button>
-        <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onDeleteCategory(folder); }}
-            className={deleteButtonClass}
-            title="Delete"
-        >
-            <Trash2 size={16} />
-        </button>
-    </div>
-);
-
-/**
- * FolderItem Component
- * Individual folder row inside the sidebar. Handles selection, hover actions (edit/delete), and DnD visual states.
- */
-const FolderItem = ({
-    folder, metadata, selectedCategory, isCollapsed, isReorderMode = false, isIOS = false, monochromeIcons = false,
-    onSelectCategory, onEditCategory, onDeleteCategory,
-    isDragging, isOverlay, setNodeRef, attributes, listeners, style
-}: FolderItemProps) => {
-    const longPressTimer = useRef<any>(null);
-    const [isLongPressing, setIsLongPressing] = useState(false);
-    const [isPressing, setIsPressing] = useState(false);
-
-    const cancelPress = () => {
-        if (longPressTimer.current) {
-            clearTimeout(longPressTimer.current);
-            longPressTimer.current = null;
-        }
-        setIsPressing(false);
-    };
-
-    const handleTouchStart = (e: React.TouchEvent) => {
-        // In reorder mode touches go straight to dnd-kit via the drag handle
-        if (isReorderMode) return;
-        // Prevent iOS text-selection callout and default long-press context menu
-        e.preventDefault();
-        setIsLongPressing(false);
-        setIsPressing(true);
-        longPressTimer.current = setTimeout(() => {
-            setIsPressing(false);
-            setIsLongPressing(true);
-            // Haptic feedback on iOS
-            (window as any).webkit?.messageHandlers?.hapticImpact?.postMessage(null);
-            if (onEditCategory) onEditCategory(folder);
-        }, 500);
-    };
-
-    const handleTouchEnd = () => {
-        const wasLongPress = isLongPressing;
-        cancelPress();
-        if (!wasLongPress && onSelectCategory) {
-            onSelectCategory(folder);
-        }
-        setIsLongPressing(false);
-    };
-
-    const handleTouchMove = () => {
-        // Finger moved — user is scrolling, cancel the long-press timer
-        cancelPress();
-        setIsLongPressing(false);
-    };
-
-    const folderKey = Object.keys(metadata.folders).find(k => normalizeStr(k) === normalizeStr(folder)) || folder;
-    const folderMeta = metadata.folders[folderKey] || {};
-    const IconComponent = ICON_MAP[folderMeta.icon || 'Folder'] || Folder;
-    const colorStyles = COLOR_MAP[folderMeta.color || 'gray'];
-    const isSelected = !!selectedCategory && normalizeStr(selectedCategory) === normalizeStr(folder);
-
-    return (
-        <div
-            ref={setNodeRef}
-            style={{ ...style, WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' } as React.CSSProperties}
-            className={clsx(
-                "group relative flex items-center transition-all rounded-lg cursor-pointer mb-0.5 outline-none",
-                isCollapsed ? "justify-center py-1.5" : clsx("px-1 gap-2 text-sm font-medium", isIOS ? "py-2.5" : "py-1.5"),
-                isSelected
-                    ? isCollapsed
-                        ? clsx(colorStyles.bg, colorStyles.darkBg, "shadow-sm")
-                        : "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100"
-                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700",
-                isDragging && "opacity-40",
-                isOverlay && "shadow-lg scale-105 opacity-90 cursor-grabbing bg-white dark:bg-gray-800"
-            )}
-            title={isCollapsed ? folder : undefined}
-            onClick={() => {
-                if (!('ontouchstart' in window) && onSelectCategory) onSelectCategory(folder);
-            }}
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
-            onTouchMove={handleTouchMove}
-        >
-            {/* Long-press ripple animation overlay */}
-            {isPressing && (
-                <span className={clsx("absolute inset-0 rounded-lg animate-longpress pointer-events-none", colorStyles.bg, colorStyles.darkBg)} />
-            )}
-
-            <div className={clsx("flex items-center gap-2 shrink-0 min-w-0", isCollapsed ? "justify-center" : "flex-1 pr-1")}>
-                {!isCollapsed && (
-                    <div
-                        {...attributes}
-                        {...listeners}
-                        className={clsx(
-                            "shrink-0 outline-none transition-all",
-                            isReorderMode
-                                ? "text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing opacity-100"
-                                : "text-gray-300 dark:text-gray-600 cursor-grab opacity-0 lg:group-hover:opacity-100"
-                        )}
-                    >
-                        <GripVertical size={14} />
-                    </div>
-                )}
-                <div className={clsx(
-                    "p-1 rounded-md transition-colors shrink-0",
-                    isSelected && !isCollapsed ? (monochromeIcons ? "bg-gray-100 dark:bg-gray-800" : colorStyles.bg + " " + colorStyles.darkBg) : "bg-transparent"
-                )}>
-                    <IconComponent
-                        size={isCollapsed ? 20 : 18}
-                        className={clsx(monochromeIcons ? "text-inherit" : clsx(colorStyles.text, colorStyles.darkText))}
-                    />
-                </div>
-                {!isCollapsed && <span className="truncate flex-1 py-0.5">{folder}</span>}
-            </div>
-
-            {/* Desktop hover actions */}
-            {!isCollapsed && !isReorderMode && onEditCategory && onDeleteCategory && (
-                <CategoryActionButtons
-                    folder={folder}
-                    onEditCategory={onEditCategory}
-                    onDeleteCategory={onDeleteCategory}
-                    containerClass="absolute right-1.5 px-1 py-1 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-md shadow-sm border border-gray-100/50 dark:border-gray-700/50 z-20 hidden lg:flex"
-                    buttonClass="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary-500 rounded transition-all outline-none"
-                    deleteButtonClass="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-500 hover:text-red-500 rounded transition-all outline-none"
-                />
-            )}
-
-            {/* Reorder mode: edit/delete buttons visible on mobile */}
-            {!isCollapsed && isReorderMode && onEditCategory && onDeleteCategory && (
-                <CategoryActionButtons
-                    folder={folder}
-                    onEditCategory={onEditCategory}
-                    onDeleteCategory={onDeleteCategory}
-                    containerClass="flex items-center gap-0.5 shrink-0 ml-1"
-                    buttonClass="p-2 text-gray-400 hover:text-primary-500 active:text-primary-500 rounded-md transition-all"
-                    deleteButtonClass="p-2 text-gray-400 hover:text-red-500 active:text-red-500 rounded-md transition-all"
-                />
-            )}
-        </div>
-    );
-};
-
-/**
- * SortableFolderItem
- * Wrapper for FolderItem to inject DnD-kit sortable functionality.
- */
-const SortableFolderItem = (props: SortableFolderItemProps) => {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: props.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-    };
-
-    return (
-        <FolderItem
-            {...props}
-            setNodeRef={setNodeRef}
-            style={style}
-            attributes={attributes}
-            listeners={listeners}
-            isDragging={isDragging}
-            isReorderMode={props.isReorderMode}
-            isIOS={props.isIOS}
-            monochromeIcons={props.monochromeIcons}
-        />
-    );
-};
 
 /**
  * Sidebar Component
@@ -384,8 +100,6 @@ export function Sidebar({
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-        // TouchSensor: only active when isReorderMode (listeners are only applied to
-        // the drag handle in reorder mode, so this is effectively a no-op otherwise)
         useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 6 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
@@ -602,7 +316,7 @@ export function Sidebar({
                 </DndContext>
             </div>
 
-            {/* --- FOOTER / SETTINGS & SYNC --- */}
+            {/* --- FOOTER / SETTINGS --- */}
             <div className="pt-2 pb-[calc(8px+var(--safe-bottom,0vh))] px-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between shrink-0 gap-1 box-content">
                 <button
                     onClick={onOpenSettings}
@@ -615,7 +329,6 @@ export function Sidebar({
                     <Settings size={isCollapsed ? (isIOS ? 24 : 20) : (isIOS ? 22 : 18)} />
                     {!isCollapsed && <span>Settings</span>}
                 </button>
-
             </div>
         </div>
     );

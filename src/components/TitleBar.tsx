@@ -21,9 +21,10 @@ interface TitleBarProps {
     onToggleCollapse: () => void;
     activeView?: 'sidebar' | 'notelist' | 'editor';
     onBack?: () => void;
+    hideSidebarToggle?: boolean;
 }
 
-export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onBack }: TitleBarProps) => {
+export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onBack, hideSidebarToggle }: TitleBarProps) => {
     const [platform, setPlatform] = useState<string | null>(null);
 
     useEffect(() => {
@@ -48,7 +49,7 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
         <div
             id="titlebar"
             onMouseDown={handleMouseDown}
-            style={{ borderTopRightRadius: '12px', backgroundColor: (isIOS && activeView === 'editor') ? 'var(--app-bg)' : 'var(--sidebar-bg)' }}
+            style={{ borderTopRightRadius: '12px', backgroundColor: (isIOS && activeView === 'editor') || hideSidebarToggle ? 'var(--app-bg)' : 'var(--sidebar-bg)' }}
             className={clsx(
                 "pt-[var(--safe-top,0vh)] flex items-stretch justify-between select-none relative z-[9999] box-content",
                 isIOS && activeView !== 'editor' ? "h-0 min-h-0 overflow-hidden" : "h-10 min-h-[40px]"
@@ -81,23 +82,25 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                 )}
 
                 {/* The Toggle Button (Desktop/Tablet) — hidden on iOS when editor is open */}
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleCollapse();
-                    }}
-                    className={clsx(
-                        "no-drag items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all active:scale-95",
-                        isIOS ? "hidden" : "hidden md:flex p-1.5",
-                        isMac && isSidebarCollapsed ? "absolute left-21" : "ml-auto"
-                    )}
-                    title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-                >
-                    {isSidebarCollapsed
-                        ? <PanelLeftOpen size={isIOS && activeView !== 'editor' ? 20 : 18} />
-                        : <PanelLeftClose size={isIOS && activeView !== 'editor' ? 20 : 18} />
-                    }
-                </button>
+                {!hideSidebarToggle && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleCollapse();
+                        }}
+                        className={clsx(
+                            "no-drag items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all active:scale-95",
+                            isIOS ? "hidden" : "hidden md:flex p-1.5",
+                            isMac && isSidebarCollapsed ? "absolute left-21" : "ml-auto"
+                        )}
+                        title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                    >
+                        {isSidebarCollapsed
+                            ? <PanelLeftOpen size={isIOS && activeView !== 'editor' ? 20 : 18} />
+                            : <PanelLeftClose size={isIOS && activeView !== 'editor' ? 20 : 18} />
+                        }
+                    </button>
+                )}
             </div>
 
             {/* Centered Title — hidden on iOS (overlaps Dynamic Island) */}

@@ -30,6 +30,14 @@ export interface AppMetadata {
     settings?: any;
 }
 
+export type SyncStatus =
+  | 'initialising'   // PGlite loading / first sync
+  | 'synced'         // Connected, Electric shapes active
+  | 'offline'        // No network
+  | 'pending'        // Has unsynced local writes
+  | 'error'          // Auth or connection error
+  | 'unauthenticated'; // Not signed in
+
 /**
  * Supabase credentials returned to the frontend.
  * Used to initialise supabase-js and ElectricSQL auth.

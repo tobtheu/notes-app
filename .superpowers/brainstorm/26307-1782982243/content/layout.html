@@ -1,0 +1,69 @@
+<h2>Responsive Toolbar & Overflow Menu Design</h2>
+<p class="subtitle">Select the preferred design/behavior for the responsive toolbar</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Dynamic Calculation (ResizeObserver)</h3>
+      <p>Uses a ResizeObserver on the toolbar wrapper. It dynamically measures toolbar buttons and fits as many as possible. Overflowing items are moved to the dropdown. Highly responsive, adjusts to any font sizes, padding changes, or custom/plugin buttons.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Static Width Calculation</h3>
+      <p>Hardcodes width values for each button type and calculates overflow mathematically based on container width. Simpler implementation, but less flexible if paddings, icons, or custom buttons change.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Visual Preview (Interactive Demo)</h3>
+  <div class="mockup">
+    <div class="mockup-header">Simulation: Resizing Toolbar</div>
+    <div class="mockup-body" style="padding: 20px; background-color: var(--card-bg); display: flex; flex-direction: column; gap: 15px; align-items: center;">
+      <!-- Main Toolbar mock -->
+      <div style="font-weight: bold; font-size: 14px;">Toolbar (Full Width - 100%):</div>
+      <div style="display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--border-color); border-radius: 8px; width: 600px; background: var(--input-bg);">
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer; font-weight: bold;">B</button>
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer; font-style: italic;">I</button>
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer;">H1</button>
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer;">H2</button>
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer;">H3</button>
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer;">List</button>
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer;">Check</button>
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer;">Quote</button>
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer;">Code</button>
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer;">Table</button>
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer;">Link</button>
+        <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); cursor: pointer;">Img</button>
+      </div>
+
+      <div style="font-weight: bold; font-size: 14px; margin-top: 10px;">Toolbar (Narrow Width - e.g. 350px):</div>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px; border: 1px solid var(--border-color); border-radius: 8px; width: 350px; background: var(--input-bg); position: relative;">
+        <div style="display: flex; gap: 4px;">
+          <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); font-weight: bold;">B</button>
+          <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color); font-style: italic;">I</button>
+          <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color);">H1</button>
+          <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color);">H2</button>
+          <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--button-bg); color: var(--text-color);">H3</button>
+        </div>
+        <!-- 3 dots -->
+        <div style="position: relative;">
+          <button style="padding: 6px 10px; border-radius: 4px; border: 0; background: var(--primary-color); color: white; cursor: pointer; font-weight: bold;">•••</button>
+          <!-- Dropdown simulation -->
+          <div style="position: absolute; right: 0; top: 35px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 140px; padding: 6px 0; z-index: 10; display: flex; flex-direction: column; gap: 2px;">
+            <div style="padding: 6px 12px; font-size: 13px; color: var(--text-color);">List</div>
+            <div style="padding: 6px 12px; font-size: 13px; color: var(--text-color);">Check</div>
+            <div style="padding: 6px 12px; font-size: 13px; color: var(--text-color);">Quote</div>
+            <div style="padding: 6px 12px; font-size: 13px; color: var(--text-color);">Code</div>
+            <div style="padding: 6px 12px; font-size: 13px; color: var(--text-color);">Table</div>
+            <div style="padding: 6px 12px; font-size: 13px; color: var(--text-color);">Link</div>
+            <div style="padding: 6px 12px; font-size: 13px; color: var(--text-color);">Img</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
