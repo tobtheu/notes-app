@@ -40,6 +40,7 @@ interface SettingsModalProps {
     onSignOut?: (deleteLocal: boolean) => Promise<void>;
     onDeleteAccount?: () => Promise<void>;
     onImportFolder?: () => Promise<number>;
+    onExportBackup?: () => void;
     onInstallUpdate?: () => Promise<void>;
 }
 
@@ -163,6 +164,7 @@ export function SettingsModal(props: SettingsModalProps) {
                         importState={importState}
                         importCount={importCount}
                         onImportFolderClick={handleImportFolder}
+                        onExportBackup={props.onExportBackup}
                     />
 
                     {/* --- APPEARANCE SECTION --- */}

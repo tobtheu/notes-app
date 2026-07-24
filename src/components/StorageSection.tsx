@@ -1,5 +1,5 @@
 import React from 'react';
-import { FolderOpen, RefreshCw, CheckCircle2, Upload } from 'lucide-react';
+import { FolderOpen, RefreshCw, CheckCircle2, Upload, Download } from 'lucide-react';
 
 interface StorageSectionProps {
     currentPath: string | null;
@@ -8,6 +8,7 @@ interface StorageSectionProps {
     importState: 'idle' | 'loading' | 'done';
     importCount: number;
     onImportFolderClick: () => void;
+    onExportBackup?: () => void;
 }
 
 export function StorageSection({
@@ -16,7 +17,8 @@ export function StorageSection({
     hasImportFolderOption,
     importState,
     importCount,
-    onImportFolderClick
+    onImportFolderClick,
+    onExportBackup
 }: StorageSectionProps) {
     return (
         <div className="mb-8">
@@ -52,6 +54,16 @@ export function StorageSection({
                             {importState === 'done'
                                 ? `${importCount} notes imported`
                                 : 'Import Folder'}
+                        </button>
+                    )}
+                    {onExportBackup && (
+                        <button
+                            type="button"
+                            onClick={onExportBackup}
+                            className="flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
+                        >
+                            <Download size={16} />
+                            Backup / Export (.md)
                         </button>
                     )}
                 </div>
