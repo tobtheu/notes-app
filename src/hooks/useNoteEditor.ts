@@ -97,12 +97,12 @@ export function useNoteEditor({
         const currentNoteId = getPathId(note.filename, note.folder || "");
 
         if (currentNoteId !== lastNoteId.current) {
-            // Because of the 'key' prop in App.tsx, a change here WITHOUT umounting
-            // means this is 100% a background auto-rename while we were typing.
-            // We just update our reference ID and keep our local typing state.
             lastNoteId.current = currentNoteId;
+            setContent(stripFrontmatter(note.content));
+            lastSavedContent.current = stripFrontmatter(note.content);
+            isDirty.current = false;
         } else {
-            // Parent updated the SAME note (e.g. from GitHub). Only accept if we aren't typing.
+            // Parent updated the SAME note (e.g. from GitHub/Electric). Only accept if we aren't typing.
             if (!isDirty.current && note.content !== lastSavedContent.current) {
                 setContent(stripFrontmatter(note.content));
                 lastSavedContent.current = stripFrontmatter(note.content);
@@ -140,6 +140,7 @@ export function useNoteEditor({
 
     // Updates the first line (# Title) of the content string
     const handleTitleChange = useCallback((newTitle: string) => {
+        isDirty.current = true;
         setContent(prevContent => {
             const current = prevContent;
             const lines = current.split(/\r?\n/);
@@ -150,6 +151,7 @@ export function useNoteEditor({
 
     // Updates everything after the first line in the content string
     const handleBodyChange = useCallback((newBody: string) => {
+        isDirty.current = true;
         setContent(prevContent => {
             const current = prevContent;
             const lines = current.split(/\r?\n/);
@@ -256,7 +258,7 @@ export function useNoteEditor({
                 const contentDirty = contentRef.current !== lastSavedContent.current;
 
                 if (contentDirty || titleChanged) {
-                    onSaveRef.current(lastNoteId.current, note.filename, contentRef.current, note.folder, false);
+                    onSaveRef.current(lastNoteId.current, note.filename, contentRef.current, note.folder, true);
                 }
             }
             onSyncRef.current?.();
