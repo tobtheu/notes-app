@@ -1,4 +1,3 @@
-import React from 'react';
 import { Cloud, CloudOff, CheckCircle2, Clock, LogOut, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import type { SyncStatus } from '../hooks/useNotes';

@@ -24,7 +24,7 @@ export function useNotesAuth({
     setUserEmail,
     setSyncStatus,
     setSyncError,
-    currentFolder,
+    currentFolder: _currentFolder,
     setCurrentFolder
 }: UseNotesAuthProps) {
     

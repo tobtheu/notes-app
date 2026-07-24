@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle } from 'react';
+import { forwardRef, useImperativeHandle, memo } from 'react';
 import type { Note } from '../types';
 import { EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
@@ -38,7 +38,7 @@ interface MarkdownEditorProps {
  * Provides: Markdown parsing, Slash Commands, Wiki-style internal linking,
  * Image handling (drag & drop), and dynamic toolbars.
  */
-export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>((props, ref) => {
+export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorProps>((props, ref) => {
     const {
         toolbarVisible = true,
         workspacePath,
@@ -306,6 +306,6 @@ export const MarkdownEditor = forwardRef<MarkdownEditorRef, MarkdownEditorProps>
             )}
         </div>
     );
-});
+}));
 
 MarkdownEditor.displayName = 'MarkdownEditor';

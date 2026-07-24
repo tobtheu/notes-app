@@ -25,12 +25,13 @@ interface EditorProps {
     className?: string;
 }
 
+import React from 'react';
+
 /**
  * Editor Component
- * The main writing environment. Displays the note editor and action toolbar controls,
- * delegate orchestrational state to the useNoteEditor hook.
+ * The main writing environment. Displays the note editor and action toolbar controls.
  */
-export function Editor(props: EditorProps) {
+export const Editor = React.memo(function Editor(props: EditorProps) {
     const {
         note,
         allNotes,
@@ -204,4 +205,4 @@ export function Editor(props: EditorProps) {
             )}
         </div>
     );
-}
+});

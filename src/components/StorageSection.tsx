@@ -1,4 +1,3 @@
-import React from 'react';
 import { FolderOpen, RefreshCw, CheckCircle2, Upload, Download } from 'lucide-react';
 
 interface StorageSectionProps {

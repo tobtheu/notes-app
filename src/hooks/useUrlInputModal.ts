@@ -22,7 +22,7 @@ export function useUrlInputModal({
     initialText,
     initialCaption,
     allNotes = [],
-    onClose,
+    onClose: _onClose,
     onSave,
     workspacePath
 }: UseUrlInputModalProps) {

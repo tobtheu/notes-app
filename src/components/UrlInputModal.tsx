@@ -24,7 +24,7 @@ interface UrlInputModalProps {
  * A versatile modal used for inserting both hyperlink and image references.
  */
 export const UrlInputModal: React.FC<UrlInputModalProps> = (props) => {
-    const { isOpen, type, onClose, allNotes = [], isIOS = false } = props;
+    const { isOpen, type, onClose, allNotes: _allNotes = [], isIOS = false } = props;
 
     const {
         url,

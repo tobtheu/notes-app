@@ -34,21 +34,21 @@ const extractTitle = (content: string) => {
 
 export function useNoteEditor({
     note,
-    allNotes,
+    allNotes: _allNotes,
     onSave,
     onUpdateLocally,
-    onNavigate,
+    onNavigate: _onNavigate,
     markdownEnabled,
-    spellcheckEnabled,
-    toolbarVisible,
-    setToolbarVisible,
-    workspacePath,
+    spellcheckEnabled: _spellcheckEnabled,
+    toolbarVisible: _toolbarVisible,
+    setToolbarVisible: _setToolbarVisible,
+    workspacePath: _workspacePath,
     isFocusMode,
     onToggleFocus,
     onSync,
-    imageCloudSync = false,
-    isIOS = false,
-    iosLandscapeFullscreen = false
+    imageCloudSync: _imageCloudSync = false,
+    isIOS: _isIOS = false,
+    iosLandscapeFullscreen: _iosLandscapeFullscreen = false
 }: UseNoteEditorProps) {
     /**
      * --- LOCAL STATE & REFS ---

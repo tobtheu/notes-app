@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
  * useSettings Hook
@@ -55,19 +55,31 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
     // Triggered when metadata settings are fetched from the backend/Tauri side
     useEffect(() => {
         if (metadataSettings) {
-            if (metadataSettings.markdownEnabled !== undefined) setMarkdownEnabled(metadataSettings.markdownEnabled);
-            if (metadataSettings.accentColor !== undefined) setAccentColor(metadataSettings.accentColor);
+            if (metadataSettings.markdownEnabled !== undefined && metadataSettings.markdownEnabled !== markdownEnabled) {
+                setMarkdownEnabled(metadataSettings.markdownEnabled);
+            }
+            if (metadataSettings.accentColor !== undefined && metadataSettings.accentColor !== accentColor) {
+                setAccentColor(metadataSettings.accentColor);
+            }
             // Note: fontFamily and fontSize are intentionally OMITTED from cloud sync
-            if (metadataSettings.toolbarVisible !== undefined) setToolbarVisible(metadataSettings.toolbarVisible);
-            if (metadataSettings.spellcheckEnabled !== undefined) setSpellcheckEnabled(metadataSettings.spellcheckEnabled);
-            if (metadataSettings.monochromeIcons !== undefined) setMonochromeIcons(metadataSettings.monochromeIcons);
+            if (metadataSettings.toolbarVisible !== undefined && metadataSettings.toolbarVisible !== toolbarVisible) {
+                setToolbarVisible(metadataSettings.toolbarVisible);
+            }
+            if (metadataSettings.spellcheckEnabled !== undefined && metadataSettings.spellcheckEnabled !== spellcheckEnabled) {
+                setSpellcheckEnabled(metadataSettings.spellcheckEnabled);
+            }
+            if (metadataSettings.monochromeIcons !== undefined && metadataSettings.monochromeIcons !== monochromeIcons) {
+                setMonochromeIcons(metadataSettings.monochromeIcons);
+            }
             hasLoadedMetadata.current = true;
+        } else {
+            hasLoadedMetadata.current = false;
         }
-    }, [metadataSettings]);
+    }, [metadataSettings, markdownEnabled, accentColor, toolbarVisible, spellcheckEnabled, monochromeIcons]);
 
-    /** --- 3. PERSISTENCE: LOCAL & CLOUD --- **/
+    /** --- 3. PERSISTENCE: LOCAL STORAGE ONLY --- **/
+    // Always persist to local storage (no-op for React rendering, completely loop-safe)
     useEffect(() => {
-        // Always persist to local storage
         localStorage.setItem('markdown-enabled', String(markdownEnabled));
         localStorage.setItem('accent-color', accentColor);
         localStorage.setItem('font-family', fontFamily);
@@ -76,35 +88,68 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         localStorage.setItem('spellcheck-enabled', String(spellcheckEnabled));
         localStorage.setItem('landscape-fullscreen', String(landscapeFullscreen));
         localStorage.setItem('monochrome-icons', String(monochromeIcons));
+    }, [markdownEnabled, accentColor, fontFamily, fontSize, toolbarVisible, spellcheckEnabled, landscapeFullscreen, monochromeIcons]);
 
-        // Sync with cloud metadata if callback provided AND we have already finished the initial load
+    /** --- 4. CLOUD SYNC: SAVING (USER INITIATED WRAPPERS) --- **/
+    const saveCloudSettings = useCallback((overrides: {
+        markdownEnabled?: boolean;
+        accentColor?: string;
+        toolbarVisible?: boolean;
+        spellcheckEnabled?: boolean;
+        monochromeIcons?: boolean;
+    }) => {
         if (onSaveSettings && hasLoadedMetadata.current) {
             onSaveSettings({
-                markdownEnabled,
-                accentColor,
-                toolbarVisible,
-                spellcheckEnabled,
-                monochromeIcons,
+                markdownEnabled: overrides.markdownEnabled ?? markdownEnabled,
+                accentColor: overrides.accentColor ?? accentColor,
+                toolbarVisible: overrides.toolbarVisible ?? toolbarVisible,
+                spellcheckEnabled: overrides.spellcheckEnabled ?? spellcheckEnabled,
+                monochromeIcons: overrides.monochromeIcons ?? monochromeIcons,
             });
         }
-    }, [markdownEnabled, accentColor, fontFamily, fontSize, toolbarVisible, spellcheckEnabled, landscapeFullscreen, monochromeIcons, onSaveSettings]);
+    }, [markdownEnabled, accentColor, toolbarVisible, spellcheckEnabled, monochromeIcons, onSaveSettings]);
+
+    const setMarkdownEnabledWrapped = useCallback((val: boolean) => {
+        setMarkdownEnabled(val);
+        saveCloudSettings({ markdownEnabled: val });
+    }, [saveCloudSettings]);
+
+    const setAccentColorWrapped = useCallback((val: string) => {
+        setAccentColor(val);
+        saveCloudSettings({ accentColor: val });
+    }, [saveCloudSettings]);
+
+    const setToolbarVisibleWrapped = useCallback((val: boolean) => {
+        setToolbarVisible(val);
+        saveCloudSettings({ toolbarVisible: val });
+    }, [saveCloudSettings]);
+
+    const setSpellcheckEnabledWrapped = useCallback((val: boolean) => {
+        setSpellcheckEnabled(val);
+        saveCloudSettings({ spellcheckEnabled: val });
+    }, [saveCloudSettings]);
+
+    const setMonochromeIconsWrapped = useCallback((val: boolean) => {
+        setMonochromeIcons(val);
+        saveCloudSettings({ monochromeIcons: val });
+    }, [saveCloudSettings]);
 
     return {
         markdownEnabled,
-        setMarkdownEnabled,
+        setMarkdownEnabled: setMarkdownEnabledWrapped,
         accentColor,
-        setAccentColor,
+        setAccentColor: setAccentColorWrapped,
         fontFamily,
         setFontFamily,
         fontSize,
         setFontSize,
         toolbarVisible,
-        setToolbarVisible,
+        setToolbarVisible: setToolbarVisibleWrapped,
         spellcheckEnabled,
-        setSpellcheckEnabled,
+        setSpellcheckEnabled: setSpellcheckEnabledWrapped,
         landscapeFullscreen,
         setLandscapeFullscreen,
         monochromeIcons,
-        setMonochromeIcons,
+        setMonochromeIcons: setMonochromeIconsWrapped,
     };
 }

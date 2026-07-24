@@ -4,7 +4,6 @@ import type { PGliteWithLive } from '@electric-sql/pglite/live';
 import { getDb } from '../lib/electric';
 import { getPathId } from '../utils/path';
 import { enqueue, flushQueue } from '../lib/offlineQueue';
-import { scanAndImportNewFiles } from '../utils/scanAndImport';
 import { log } from '../lib/logger';
 
 interface UseNotesWorkspaceProps {

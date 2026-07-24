@@ -1,4 +1,3 @@
-import React from 'react';
 import { Search, LayoutList, List } from 'lucide-react';
 import clsx from 'clsx';
 

@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Trash2, Pin, FolderTree } from 'lucide-react';
 import clsx from 'clsx';
 import type { Note } from '../types';

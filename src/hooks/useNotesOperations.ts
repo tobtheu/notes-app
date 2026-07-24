@@ -77,8 +77,9 @@ export function useNotesOperations({
                         await writeNote(currentId, currentNote.content, updatedAt, true);
                         await writeNote(newId, content, updatedAt, false);
 
-                        if (metadata.pinnedNotes?.some(p => normalizeStr(p) === currentId)) {
-                            const newMeta = { ...metadata };
+                        const current = metadataRef.current;
+                        if (current.pinnedNotes?.some(p => normalizeStr(p) === currentId)) {
+                            const newMeta = { ...current };
                             newMeta.pinnedNotes = (newMeta.pinnedNotes ?? []).map(p =>
                                 normalizeStr(p) === currentId ? newId : p,
                             );
@@ -98,7 +99,7 @@ export function useNotesOperations({
         } finally {
             delete savingNotes.current[currentId];
         }
-    }, [userId, notes, getNoteId, metadata, selectedNoteId, writeNote, writeConfig, setSelectedNoteId]);
+    }, [userId, notes, getNoteId, metadataRef, selectedNoteId, writeNote, writeConfig, setSelectedNoteId]);
 
     const createNote = useCallback(async () => {
         if (!userId) return;
@@ -128,8 +129,18 @@ export function useNotesOperations({
             window.tauriAPI.deleteMirrorFile({ mirrorFolder, noteId: normalizedId }).catch(() => {});
         }
 
+        // Clean up pin in metadata
+        const current = metadataRef.current;
+        if (current.pinnedNotes?.some(p => normalizeStr(p) === normalizedId)) {
+            const newMeta = { ...current };
+            newMeta.pinnedNotes = (newMeta.pinnedNotes ?? []).filter(
+                p => normalizeStr(p) !== normalizedId
+            );
+            await writeConfig(newMeta);
+        }
+
         if (selectedNoteId === normalizedId) setSelectedNoteId(null);
-    }, [notes, getNoteId, selectedNoteId, writeNote, setSelectedNoteId]);
+    }, [notes, getNoteId, selectedNoteId, writeNote, setSelectedNoteId, writeConfig, metadataRef]);
 
     const updateNoteLocally = useCallback(async (
         filename: string,
@@ -159,8 +170,9 @@ export function useNotesOperations({
         await writeNote(noteId, note.content, updatedAt, true);
         await writeNote(newId, note.content, updatedAt, false);
 
-        if (metadata.pinnedNotes?.some(p => normalizeStr(p) === noteId)) {
-            const newMeta = { ...metadata };
+        const current = metadataRef.current;
+        if (current.pinnedNotes?.some(p => normalizeStr(p) === noteId)) {
+            const newMeta = { ...current };
             newMeta.pinnedNotes = (newMeta.pinnedNotes ?? []).map(p =>
                 normalizeStr(p) === noteId ? newId : p,
             );
@@ -172,18 +184,19 @@ export function useNotesOperations({
             window.tauriAPI.deleteMirrorFile({ mirrorFolder, noteId }).catch(() => {});
         }
         if (selectedNoteId === noteId) setSelectedNoteId(newId);
-    }, [notes, getNoteId, metadata, selectedNoteId, writeNote, writeConfig, setSelectedNoteId]);
+    }, [notes, getNoteId, metadataRef, selectedNoteId, writeNote, writeConfig, setSelectedNoteId]);
 
     const createFolder = useCallback(async (folderName: string) => {
         const mirrorFolder = localStorage.getItem('notes-folder');
         if (mirrorFolder) {
             await window.tauriAPI.createFolder(mirrorFolder, `${mirrorFolder}/${folderName}`);
         }
-        const order = metadata.folderOrder ?? [];
+        const current = metadataRef.current;
+        const order = current.folderOrder ?? [];
         if (!order.some(f => normalizeStr(f) === normalizeStr(folderName))) {
-            await writeConfig({ ...metadata, folderOrder: [...order, folderName] });
+            await writeConfig({ ...current, folderOrder: [...order, folderName] });
         }
-    }, [metadata, writeConfig]);
+    }, [metadataRef, writeConfig]);
 
     const deleteFolder = useCallback(async (folderRelative: string, mode: 'recursive' | 'move') => {
         const normalizedTarget = normalizeStr(folderRelative);
@@ -202,7 +215,8 @@ export function useNotesOperations({
             }
         }
 
-        const newMeta = { ...metadata };
+        const current = metadataRef.current;
+        const newMeta = { ...current };
         const existingKey = Object.keys(newMeta.folders).find(k => normalizeStr(k) === normalizedTarget);
         if (existingKey) delete newMeta.folders[existingKey];
         if (newMeta.folderOrder) newMeta.folderOrder = newMeta.folderOrder.filter(f => normalizeStr(f) !== normalizedTarget);
@@ -213,28 +227,31 @@ export function useNotesOperations({
         await writeConfig(newMeta);
 
         if (selectedCategory === folderRelative) setSelectedCategory(null);
-    }, [notes, getNoteId, metadata, selectedCategory, writeNote, writeConfig, setSelectedCategory]);
+    }, [notes, getNoteId, metadataRef, selectedCategory, writeNote, writeConfig, setSelectedCategory]);
 
     const renameFolder = useCallback(async (oldName: string, newName: string) => {
         const normalizedOld = normalizeStr(oldName);
         const normalizedNew = normalizeStr(newName);
         const updatedAt = new Date().toISOString();
 
-        const folderNotes = notes.filter(n => normalizeStr(n.folder) === normalizedOld);
-        await Promise.all(folderNotes.map(async n => {
-            const oldId = getNoteId(n);
-            const newId = getPathId(n.filename, newName);
-            await writeNote(oldId, n.content, updatedAt, true);
-            await writeNote(newId, n.content, updatedAt, false);
-        }));
+        if (normalizedOld !== normalizedNew) {
+            const folderNotes = notes.filter(n => normalizeStr(n.folder) === normalizedOld);
+            await Promise.all(folderNotes.map(async n => {
+                const oldId = getNoteId(n);
+                const newId = getPathId(n.filename, newName);
+                await writeNote(oldId, n.content, updatedAt, true);
+                await writeNote(newId, n.content, updatedAt, false);
+            }));
+        }
 
-        const newMeta = { ...metadata };
+        const current = metadataRef.current;
+        const newMeta = { ...current };
         const existingKey = Object.keys(newMeta.folders).find(k => normalizeStr(k) === normalizedOld);
         if (existingKey) {
             newMeta.folders[newName] = newMeta.folders[existingKey];
             if (existingKey !== newName) delete newMeta.folders[existingKey];
         }
-        if (newMeta.pinnedNotes) {
+        if (newMeta.pinnedNotes && normalizedOld !== normalizedNew) {
             const oldPrefix = `${normalizedOld}/`;
             const newPrefix = `${normalizedNew}/`;
             newMeta.pinnedNotes = newMeta.pinnedNotes.map(p => {
@@ -254,26 +271,28 @@ export function useNotesOperations({
 
         if (selectedCategory === oldName) setSelectedCategory(newName);
         return { success: true };
-    }, [notes, getNoteId, metadata, selectedCategory, writeNote, writeConfig, setSelectedCategory]);
+    }, [notes, getNoteId, metadataRef, selectedCategory, writeNote, writeConfig, setSelectedCategory]);
 
     const reorderFolders = useCallback(async (newOrder: string[]) => {
-        const currentOrder = metadata.folderOrder ?? sortedFolders;
+        const current = metadataRef.current;
+        const currentOrder = current.folderOrder ?? sortedFolders;
         const newOrderNorm = newOrder.map(f => normalizeStr(f));
         const merged = [...newOrder];
         currentOrder.forEach(f => {
             if (!newOrderNorm.includes(normalizeStr(f))) merged.push(f);
         });
-        await writeConfig({ ...metadata, folderOrder: merged });
-    }, [metadata, sortedFolders, writeConfig]);
+        await writeConfig({ ...current, folderOrder: merged });
+    }, [metadataRef, sortedFolders, writeConfig]);
 
     const togglePinNote = useCallback(async (note: Note) => {
         const notePath = getNoteId(note);
-        const pinned = (metadata.pinnedNotes ?? []).map(p => normalizeStr(p));
+        const current = metadataRef.current;
+        const pinned = (current.pinnedNotes ?? []).map(p => normalizeStr(p));
         const newPins = pinned.includes(notePath)
             ? pinned.filter(p => p !== notePath)
             : [...pinned, notePath];
-        await writeConfig({ ...metadata, pinnedNotes: newPins });
-    }, [getNoteId, metadata, writeConfig]);
+        await writeConfig({ ...current, pinnedNotes: newPins });
+    }, [getNoteId, metadataRef, writeConfig]);
 
     const updateFolderMetadata = useCallback(async (folderName: string, meta: FolderMetadata) => {
         const current = metadataRef.current;

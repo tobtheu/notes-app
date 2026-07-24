@@ -1,4 +1,3 @@
-import React from 'react';
 import { RefreshCw, Download, CheckCircle2, Rocket, AlertCircle, Activity, Loader2, Wifi } from 'lucide-react';
 import type { HealthStatus } from '../utils/health';
 

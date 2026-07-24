@@ -55,6 +55,7 @@ function App() {
     renameFolder,
     updateFolderMetadata,
     reorderFolders,
+    saveSettings,
     selectedNote,
     setSelectedNote,
     setSelectedCategory,
@@ -102,7 +103,7 @@ function App() {
     setLandscapeFullscreen,
     monochromeIcons,
     setMonochromeIcons,
-  } = useSettings(metadata.settings, () => {});
+  } = useSettings(metadata.settings, saveSettings);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   useEffect(() => { if (syncStatus === 'unauthenticated') setIsSettingsOpen(false); }, [syncStatus]);
@@ -148,7 +149,6 @@ function App() {
     isFocusMode,
   });
 
-  const [selectionCount, setSelectionCount] = useState(0);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
 
   // Hide native iOS toolbar accessory bar whenever the user leaves the editor view
@@ -177,21 +177,18 @@ function App() {
   };
 
   const handleSelectNote = (note: Note) => {
-    setSelectionCount(prev => prev + 1);
     setSelectedNote(getNoteId(note));
     setActiveView('editor');
   };
 
   const handleCreateNote = async () => {
     await createNote();
-    setSelectionCount(prev => prev + 1);
     setActiveView('editor');
   };
 
   const handleNavigate = (id: string) => {
     if (!id) return;
     setSelectedNote(id);
-    setSelectionCount(prev => prev + 1);
     setActiveView('editor');
   };
 
@@ -345,7 +342,7 @@ function App() {
             {/* EDITOR — on desktop, it is rendered inline */}
             {selectedNote && !_isMobile && (
               <Editor
-                key={selectionCount}
+                key={getNoteId(selectedNote)}
                 className={clsx(
                   "flex-1",
                   activeView === 'editor' ? "flex" : "hidden md:flex"
@@ -396,7 +393,7 @@ function App() {
           isMobile={_isMobile}
         >
           <Editor
-            key={selectionCount}
+            key={getNoteId(selectedNote)}
             className="flex-1 flex"
             note={selectedNote}
             allNotes={allNotes}
