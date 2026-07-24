@@ -186,29 +186,6 @@ export function useNotes() {
     };
   }, [userId]);
 
-  // ── File watcher — import new .md files added externally while app is open ─
-  useEffect(() => {
-    if (!userId || !currentFolder) return;
-
-    window.tauriAPI.startWatch(currentFolder);
-
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    const unlisten = window.tauriAPI.onFileChanged(() => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(async () => {
-        if (!dbRef.current) return;
-        await scanAndImportNewFiles(dbRef.current, userId, currentFolder);
-        if (userId !== 'local' && navigator.onLine) {
-          flushQueue(dbRef.current).catch((e: unknown) => log.error(String(e)));
-        }
-      }, 1500);
-    });
-
-    return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      unlisten();
-    };
-  }, [userId, currentFolder]);
 
   // ── Live queries — Notes ──────────────────────────────────────────────────
   const notesQuery = useLiveQuery<{
@@ -255,20 +232,30 @@ export function useNotes() {
     prevUserIdRef.current = userId;
   }, [userId]);
 
+  const configRow = configQuery?.rows?.[0];
+  const configUpdatedAt = configRow?.updated_at;
+  const configMetadataRaw = configRow?.metadata;
+  const configMetadataStr = typeof configMetadataRaw === 'string' ? configMetadataRaw : JSON.stringify(configMetadataRaw);
+
   useEffect(() => {
-    const row = configQuery?.rows?.[0];
-    if (!row) return;
-    const incomingAt = row.updated_at;
+    if (!configRow) return;
+    const incomingAt = configRow.updated_at;
     // Skip if this is our own write echoing back (same or older timestamp)
     if (lastConfigWriteAt.current && incomingAt <= lastConfigWriteAt.current) return;
     // It's a remote change (or initial load) — apply it
     try {
-      const m = row.metadata;
+      const m = configRow.metadata;
       const parsed = (typeof m === 'string' ? JSON.parse(m) : m) as AppMetadata;
-      setMetadataState(parsed);
-      metadataRef.current = parsed;
+      const safeMetadata: AppMetadata = {
+        folders: parsed.folders ?? {},
+        pinnedNotes: parsed.pinnedNotes ?? [],
+        folderOrder: parsed.folderOrder ?? [],
+        settings: parsed.settings ?? {},
+      };
+      setMetadataState(safeMetadata);
+      metadataRef.current = safeMetadata;
     } catch { /* ignore parse errors */ }
-  }, [configQuery]);
+  }, [configUpdatedAt, configMetadataStr]);
 
   // Note ID helper
   const getNoteId = useCallback((note: Note) => {
@@ -291,40 +278,10 @@ export function useNotes() {
     }
   }, [hasPending, syncStatus]);
 
-  // ── File Mirror ───────────────────────────────────────────────────────────
+  // ── Notes memoization ─────────────────────────────────────────────────────
   const notes = useMemo(() => {
-    const rawNotes = notesQuery?.rows?.map(rowToNote) ?? [];
-    const pinned = (metadata.pinnedNotes ?? []).map(p => normalizeStr(p));
-    const cleanedPinned = pinned.filter(p => rawNotes.some(n => getNoteId(n) === p));
-
-    if (cleanedPinned.length !== pinned.length && dbRef.current && userId) {
-      const newMeta = { ...metadata, pinnedNotes: cleanedPinned };
-      const db = dbRef.current;
-      const updatedAt = new Date().toISOString();
-      lastConfigWriteAt.current = updatedAt;
-      setMetadataState(newMeta);
-      metadataRef.current = newMeta;
-      db.query(
-        `INSERT INTO app_config (user_id, metadata, updated_at)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (user_id) DO UPDATE SET
-           metadata   = EXCLUDED.metadata,
-           updated_at = EXCLUDED.updated_at`,
-        [userId, JSON.stringify(newMeta), updatedAt],
-      ).catch(e => log.error('Zombie pin cleanup failed:', e));
-    }
-
-    const mirrorFolder = localStorage.getItem('notes-folder');
-    if (mirrorFolder && rawNotes.length > 0) {
-      rawNotes.forEach(note => {
-        window.tauriAPI.writeMirrorFile({ mirrorFolder, note }).catch(e => {
-          log.warn(`[useNotes:mirror] failed to write ${note.filename}:`, e);
-        });
-      });
-    }
-
-    return rawNotes;
-  }, [notesQuery?.rows, metadata, userId, getNoteId]);
+    return notesQuery?.rows?.map(rowToNote) ?? [];
+  }, [notesQuery?.rows]);
 
   // ── Core note write helper ────────────────────────────────────────────────
   const NOTE_SIZE_LIMIT = 5 * 1024 * 1024;
@@ -428,7 +385,7 @@ export function useNotes() {
   const sortedFolders = useMemo(() => {
     const active = foldersQuery?.rows?.map(r => r.folder) ?? [];
     const ordered = metadata.folderOrder ?? [];
-    const result = ordered.filter(f => active.some(a => normalizeStr(a) === normalizeStr(f)));
+    const result = [...ordered];
     active.forEach(f => {
       if (!result.some(r => normalizeStr(r) === normalizeStr(f))) {
         result.push(f);
