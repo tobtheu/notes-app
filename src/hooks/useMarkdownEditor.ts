@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { Note } from '../types';
 import { useEditor, ReactNodeViewRenderer, mergeAttributes } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
@@ -31,7 +30,6 @@ const lowlight = createLowlight(common);
 
 interface UseMarkdownEditorProps {
     content: string;
-    allNotes?: Note[];
     onChange: (markdown: string) => void;
     onNavigate?: (id: string, anchor?: string) => void;
     spellcheckEnabled?: boolean;
@@ -44,7 +42,6 @@ interface UseMarkdownEditorProps {
 
 export function useMarkdownEditor({
     content,
-    allNotes,
     onChange,
     onNavigate,
     spellcheckEnabled = true,
