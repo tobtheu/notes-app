@@ -160,8 +160,7 @@ export const tauriAPI: TauriAPI = {
     refreshSupabaseToken: () =>
         invoke<{ userId: string; email: string; accessToken: string; refreshToken: string }>('refresh_supabase_token'),
 
-    // Legacy GitHub (kept for existing users)
-    clearGithubCredentials: () => invoke<void>('clear_github_credentials'),
+
 };
 
 // Attach to window globally

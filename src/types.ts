@@ -113,9 +113,6 @@ export interface TauriAPI {
     getSupabaseUser: () => Promise<{ userId: string; email: string } | null>;
     getSupabaseCredentials: () => Promise<SupabaseCredentialsResult | null>;
     refreshSupabaseToken: () => Promise<SupabaseCredentialsResult>;
-
-    // Legacy GitHub (desktop only, kept for existing users)
-    clearGithubCredentials: () => Promise<void>;
 }
 
 declare global {

@@ -18,16 +18,12 @@ import type { Note } from './types';
 import { Loader2, Book } from 'lucide-react';
 import clsx from 'clsx';
 import { platform } from '@tauri-apps/plugin-os';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-
 import { initGlobalHandlers } from './utils/initGlobalHandlers';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { PGliteWrapper } from './components/PGliteWrapper';
 import { useSidebarGestures } from './hooks/useSidebarGestures';
 import { useTauriUpdater } from './hooks/useTauriUpdater';
 import { useViewport } from './hooks/useViewport';
-
-const appWindow = getCurrentWindow();
 
 // Kick off PGlite init immediately at module load time so it's ready
 void getDb();
@@ -36,7 +32,6 @@ void getDb();
 initGlobalHandlers();
 
 function App() {
-  const isQuickNote = appWindow.label === 'quick-note';
   const {
     userId,
     allNotes,
@@ -80,11 +75,6 @@ function App() {
     importFolder,
     goLocalOnly,
   } = useNotes();
-
-  // If this Webview is the Quick Note window, display only the QuickNote component rather than the full app.
-  if (isQuickNote) {
-    return <div className="h-screen w-screen bg-transparent flex items-center justify-center text-white"><p>Quick Note</p></div>;
-  }
 
   const {
     markdownEnabled,
