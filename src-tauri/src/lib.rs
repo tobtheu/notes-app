@@ -9,10 +9,6 @@ use tauri::{Emitter, Manager};
 use base64::{engine::general_purpose, Engine as _};
 use filetime::FileTime;
 
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
-mod git;
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
-mod github;
 mod store;
 mod supabase_sync;
 
@@ -562,65 +558,7 @@ async fn refresh_supabase_token(app: tauri::AppHandle) -> Result<SupabaseCredent
     })
 }
 
-// ---------------------------------------------------------------------------
-// GitHub (desktop only — kept for legacy users)
-// ---------------------------------------------------------------------------
 
-#[tauri::command]
-async fn clear_github_credentials(app: tauri::AppHandle) {
-    store::clear_github_credentials(&app);
-}
-
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
-#[tauri::command]
-async fn connect_github(token: String, folder_path: String) -> Result<String, String> {
-    let username = github::verify_token(&token).await?;
-    let repo_url = github::ensure_remote_repo(&token, &username).await?;
-    let root = Path::new(&folder_path);
-    git::ensure_repo(root).map_err(|e| format!("Git init failed: {}", e))?;
-    let auth_url = repo_url.replace("https://", &format!("https://{}:{}@", username, token));
-    git::add_remote(root, &auth_url).map_err(|e| format!("Remote add failed: {}", e))?;
-    Ok(username)
-}
-
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
-#[tauri::command]
-async fn start_github_oauth() -> Result<serde_json::Value, String> {
-    let flow = github::start_device_flow().await?;
-    let url = flow.verification_uri.clone();
-    #[cfg(not(mobile))]
-    {
-        std::thread::spawn(move || {
-            #[cfg(target_os = "windows")]
-            let _ = std::process::Command::new("cmd").args(&["/C", "start", &url]).spawn();
-            #[cfg(target_os = "macos")]
-            let _ = std::process::Command::new("open").arg(&url).spawn();
-            #[cfg(target_os = "linux")]
-            let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
-        });
-    }
-    Ok(serde_json::json!({
-        "deviceCode": flow.device_code,
-        "userCode": flow.user_code,
-        "verificationUri": flow.verification_uri,
-        "interval": flow.interval,
-        "expiresIn": flow.expires_in,
-    }))
-}
-
-#[cfg(not(any(target_os = "ios", target_os = "android")))]
-#[tauri::command]
-async fn complete_github_oauth(app: tauri::AppHandle, device_code: String, interval: u64, folder_path: String) -> Result<String, String> {
-    let token = github::poll_device_flow(&device_code, interval).await?;
-    let username = github::verify_token(&token).await?;
-    store::save_github_credentials(&app, &token, &username);
-    let repo_url = github::ensure_remote_repo(&token, &username).await?;
-    let root = Path::new(&folder_path);
-    git::ensure_repo(root).map_err(|e| format!("Git init failed: {}", e))?;
-    let auth_url = repo_url.replace("https://", &format!("https://{}:{}@", username, token));
-    git::add_remote(root, &auth_url).map_err(|e| format!("Remote add failed: {}", e))?;
-    Ok(username)
-}
 
 // ---------------------------------------------------------------------------
 // PDF export (desktop only)
@@ -754,14 +692,6 @@ pub fn run() {
             get_supabase_user,
             get_supabase_credentials,
             refresh_supabase_token,
-            // GitHub (desktop legacy)
-            clear_github_credentials,
-            #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            connect_github,
-            #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            start_github_oauth,
-            #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            complete_github_oauth,
             #[cfg(not(any(target_os = "ios", target_os = "android")))]
             export_pdf,
             #[cfg(not(any(target_os = "ios", target_os = "android")))]

@@ -35,23 +35,4 @@ pub fn clear_supabase_credentials(app: &AppHandle) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// GitHub credentials (legacy)
-// ---------------------------------------------------------------------------
 
-pub fn save_github_credentials(app: &AppHandle, token: &str, username: &str) {
-    if let Ok(store) = app.store("settings.json") {
-        let _ = store.set("github-sync", serde_json::json!({
-            "token": token,
-            "username": username
-        }));
-        let _ = store.save();
-    }
-}
-
-pub fn clear_github_credentials(app: &AppHandle) {
-    if let Ok(store) = app.store("settings.json") {
-        let _ = store.delete("github-sync");
-        let _ = store.save();
-    }
-}
