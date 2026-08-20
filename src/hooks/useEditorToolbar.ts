@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
     Bold, Italic, Heading1, Heading2, Heading3, List, CheckSquare,
-    Quote, Code, Table, Highlighter, Link as LinkIcon, Image as ImageIcon,
+    Quote, Code, Table, Highlighter, Link as LinkIcon,
     type LucideIcon
 } from 'lucide-react';
 import { toggleSmartMark } from '../utils/editor';
@@ -11,7 +11,6 @@ interface UseEditorToolbarProps {
     editor: Editor | null;
     mode?: 'full' | 'compact';
     onLinkClick?: () => void;
-    onImageClick?: () => void;
     mobile?: boolean;
 }
 
@@ -29,7 +28,6 @@ export function useEditorToolbar({
     editor,
     mode = 'full',
     onLinkClick,
-    onImageClick,
     mobile = false
 }: UseEditorToolbarProps) {
     const [, setUpdateCount] = useState(0);
@@ -198,24 +196,6 @@ export function useEditorToolbar({
                 }
             },
             isActive: editor.isActive('link'),
-            showInCompact: true
-        },
-        {
-            type: 'button',
-            id: 'image',
-            icon: ImageIcon,
-            label: "Image",
-            action: () => {
-                if (onImageClick) {
-                    onImageClick();
-                } else {
-                    const url = window.prompt('Image URL');
-                    if (url) {
-                        editor.chain().focus().setImage({ src: url }).run();
-                    }
-                }
-            },
-            isActive: editor.isActive('image'),
             showInCompact: true
         }
     ];

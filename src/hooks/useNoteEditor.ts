@@ -46,7 +46,6 @@ export function useNoteEditor({
     isFocusMode,
     onToggleFocus,
     onSync,
-    imageCloudSync: _imageCloudSync = false,
     isIOS: _isIOS = false,
     iosLandscapeFullscreen: _iosLandscapeFullscreen = false
 }: UseNoteEditorProps) {

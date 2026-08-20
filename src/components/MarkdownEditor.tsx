@@ -2,13 +2,11 @@ import { forwardRef, useImperativeHandle, memo } from 'react';
 import type { Note } from '../types';
 import { EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import clsx from 'clsx';
 
 import { EditorToolbar } from './EditorToolbar';
 import { UrlInputModal } from './UrlInputModal';
 import { BubbleToolbarContent } from './BubbleToolbarContent';
-import { ImageLightbox } from './ImageLightbox';
 import { DropIndicator } from './DropIndicator';
 import { useMarkdownEditor } from '../hooks/useMarkdownEditor';
 
@@ -23,7 +21,6 @@ interface MarkdownEditorProps {
     onNavigate?: (id: string, anchor?: string) => void;
     toolbarVisible?: boolean;
     spellcheckEnabled?: boolean;
-    imageCloudSync?: boolean;
     workspacePath: string;
     header?: React.ReactNode;
     isFocusMode?: boolean;
@@ -35,14 +32,10 @@ interface MarkdownEditorProps {
 /**
  * MarkdownEditor Component
  * A feature-rich WYSIWYG editor powered by Tiptap.
- * Provides: Markdown parsing, Slash Commands, Wiki-style internal linking,
- * Image handling (drag & drop), and dynamic toolbars.
  */
 export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorProps>((props, ref) => {
     const {
         toolbarVisible = true,
-        workspacePath,
-        imageCloudSync = false,
         header,
         isFocusMode = false,
         iosLandscapeFullscreen = false,
@@ -52,17 +45,11 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
 
     const {
         editor,
-        localAssetsDir,
         isLinkModalOpen,
         setIsLinkModalOpen,
         linkModalData,
-        isImageModalOpen,
-        setIsImageModalOpen,
-        imageModalData,
         hoveredLink,
         setHoveredLink,
-        lightboxImage,
-        setLightboxImage,
         isScrolling,
         isIOS,
         keyboardHeight,
@@ -74,9 +61,7 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
         startHideTimeout,
         handleScroll,
         openLinkModal,
-        openImageModal,
         saveLink,
-        saveImage
     } = useMarkdownEditor(props);
 
     useImperativeHandle(ref, () => ({
@@ -117,58 +102,21 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
                 isIOS={isIOS}
             />
 
-            {/* Image Modal */}
-            <UrlInputModal
-                isOpen={isImageModalOpen}
-                type="image"
-                initialUrl={imageModalData.src}
-                initialCaption={imageModalData.caption}
-                onClose={() => setIsImageModalOpen(false)}
-                onSave={saveImage}
-                workspacePath={workspacePath}
-                isIOS={isIOS}
-            />
-
             {/* Merged Formatting & Link Menu */}
             {editor && (
                 <BubbleMenu
                     pluginKey="formattingMenu"
                     editor={editor}
                     updateDelay={0}
-                    shouldShow={({ from, to, editor }) => {
+                    shouldShow={({ from, to }) => {
                         if (isIOS) return false;
-                        return from !== to || editor.isActive('image');
+                        return from !== to;
                     }}
                 >
                     <BubbleToolbarContent
                         editor={editor}
                         onLinkClick={openLinkModal}
                         onRemoveLink={() => setHoveredLink(null)}
-                        onImageEdit={() => {
-                            const attrs = editor.getAttributes('image');
-                            openImageModal(attrs);
-                        }}
-                        onImagePreview={() => {
-                            const attrs = editor.getAttributes('image');
-                            let previewSrc = attrs.src;
-                            if (previewSrc && previewSrc.startsWith('.assets/')) {
-                                try {
-                                    previewSrc = convertFileSrc(`${workspacePath}/${previewSrc}`);
-                                } catch (e) {
-                                    console.warn("Could not convert image src to asset URL:", e);
-                                }
-                            } else if (previewSrc && previewSrc.startsWith('local-asset://')) {
-                                try {
-                                    const filename = previewSrc.replace('local-asset://', '');
-                                    if (localAssetsDir) {
-                                        previewSrc = convertFileSrc(`${localAssetsDir}/${filename}`);
-                                    }
-                                } catch (e) {
-                                    console.warn("Could not convert local image src to asset URL:", e);
-                                }
-                            }
-                            setLightboxImage({ src: previewSrc, caption: attrs.alt });
-                        }}
                         onNavigate={onNavigate}
                     />
                 </BubbleMenu>
@@ -193,15 +141,6 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
                         onNavigate={onNavigate}
                     />
                 </div>
-            )}
-
-            {/* Image Lightbox */}
-            {lightboxImage && (
-                <ImageLightbox
-                    src={lightboxImage.src}
-                    caption={lightboxImage.caption}
-                    onClose={() => setLightboxImage(null)}
-                />
             )}
 
             {/* Drop Indicator */}
@@ -239,34 +178,6 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
                     e.preventDefault();
                     e.stopPropagation();
                     setIsDragging(false);
-                    if (e.dataTransfer?.files?.length) {
-                        const file = e.dataTransfer.files[0];
-                        if (file.type.startsWith('image/')) {
-                            const reader = new FileReader();
-                            reader.onload = async (re) => {
-                                if (re.target?.result && editor) {
-                                    const base64 = re.target.result as string;
-                                    const extension = file.name.split('.').pop() || 'png';
-                                    const filename = `img-${Date.now()}.${extension}`;
-
-                                    try {
-                                        const res = imageCloudSync
-                                            ? await window.tauriAPI.saveAsset(workspacePath, filename, base64)
-                                            : await window.tauriAPI.saveLocalAsset(filename, base64);
-
-                                        if (res.success && res.path) {
-                                            editor.chain().focus().setImage({ src: res.path }).run();
-                                        } else {
-                                            console.error("Failed to save asset:", res.error);
-                                        }
-                                    } catch (err) {
-                                        console.error("Save asset error:", err);
-                                    }
-                                }
-                            };
-                            reader.readAsDataURL(file);
-                        }
-                    }
                 }}
                 onClick={(e) => {
                     if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('max-w-4xl')) {
@@ -299,7 +210,6 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
                     <EditorToolbar
                         editor={editor}
                         onLinkClick={() => openLinkModal()}
-                        onImageClick={openImageModal}
                         mobile={keyboardHeight > 0}
                     />
                 </div>

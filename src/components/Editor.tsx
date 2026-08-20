@@ -19,7 +19,6 @@ interface EditorProps {
     isFocusMode: boolean;
     onToggleFocus: () => void;
     onSync?: () => void;
-    imageCloudSync?: boolean;
     isIOS?: boolean;
     iosLandscapeFullscreen?: boolean;
     className?: string;
@@ -36,7 +35,6 @@ export const Editor = React.memo(function Editor(props: EditorProps) {
         note,
         allNotes,
         workspacePath,
-        imageCloudSync = false,
         isIOS = false,
         iosLandscapeFullscreen = false,
         className,
@@ -98,13 +96,15 @@ export const Editor = React.memo(function Editor(props: EditorProps) {
 
             {/* On iOS: menu button lives in the TitleBar row (fixed top-right) */}
             {isIOS && !isFocusMode && (
-                <EditorMenu
-                    isIOS={true}
-                    toolbarVisible={toolbarVisible}
-                    setToolbarVisible={setToolbarVisible}
-                    onToggleFocus={onToggleFocus}
-                    onExport={handleExport}
-                />
+                <div className="absolute top-2 right-4 z-20 flex items-center gap-2">
+                    <EditorMenu
+                        isIOS={isIOS}
+                        toolbarVisible={toolbarVisible}
+                        setToolbarVisible={setToolbarVisible}
+                        onToggleFocus={onToggleFocus}
+                        onExport={handleExport}
+                    />
+                </div>
             )}
 
             {/* Header with Title and Actions - Hidden in Focus Mode */}
@@ -163,7 +163,6 @@ export const Editor = React.memo(function Editor(props: EditorProps) {
                     content={body}
                     allNotes={allNotes}
                     workspacePath={workspacePath}
-                    imageCloudSync={imageCloudSync}
                     onChange={handleBodyChange}
                     onNavigate={onNavigate}
                     toolbarVisible={toolbarVisible}

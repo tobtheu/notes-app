@@ -9,7 +9,6 @@ interface EditorToolbarProps {
     editor: Editor | null;
     mode?: 'full' | 'compact';
     onLinkClick?: () => void;
-    onImageClick?: () => void;
     mobile?: boolean;
 }
 

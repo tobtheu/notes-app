@@ -33,7 +33,6 @@ initGlobalHandlers();
 
 function App() {
   const {
-    userId,
     allNotes,
     folders,
     metadata,
@@ -340,7 +339,6 @@ function App() {
                 note={selectedNote}
                 allNotes={allNotes}
                 workspacePath={currentFolder || ''}
-                imageCloudSync={userId === 'local'}
                 onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
                 onUpdateLocally={updateNoteLocally}
                 markdownEnabled={markdownEnabled}
@@ -388,7 +386,6 @@ function App() {
             note={selectedNote}
             allNotes={allNotes}
             workspacePath={currentFolder || ''}
-            imageCloudSync={userId === 'local'}
             onSave={(id, filename, content, folder, skipRename) => saveNote(id, filename, content, folder, skipRename)}
             onUpdateLocally={updateNoteLocally}
             markdownEnabled={markdownEnabled}

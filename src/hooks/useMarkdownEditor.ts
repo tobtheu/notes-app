@@ -7,17 +7,16 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
-import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
+import Link from '@tiptap/extension-link';
+import Highlight from '@tiptap/extension-highlight';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import BulletList from '@tiptap/extension-bullet-list';
 import OrderedList from '@tiptap/extension-ordered-list';
-import Highlight from '@tiptap/extension-highlight';
-import Link from '@tiptap/extension-link';
 import Heading from '@tiptap/extension-heading';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { createLowlight, common } from 'lowlight';
+import { common, createLowlight } from 'lowlight';
 
-import { ImageWithCaption } from '../extensions/ImageWithCaption';
 import { platform } from '@tauri-apps/plugin-os';
 import { TableNode } from '../components/TableNode';
 import { toggleSmartMark } from '../utils/editor';
@@ -33,7 +32,6 @@ interface UseMarkdownEditorProps {
     onChange: (markdown: string) => void;
     onNavigate?: (id: string, anchor?: string) => void;
     spellcheckEnabled?: boolean;
-    imageCloudSync?: boolean;
     workspacePath: string;
     isFocusMode?: boolean;
     onArrowUpAtStart?: () => void;
@@ -46,27 +44,18 @@ export function useMarkdownEditor({
     onNavigate,
     spellcheckEnabled = true,
     workspacePath,
-    imageCloudSync = false,
     onArrowUpAtStart,
     onBlur
 }: UseMarkdownEditorProps) {
     /**
      * --- LOCAL STATE ---
      */
-    const [localAssetsDir, setLocalAssetsDir] = useState<string | null>(null);
-
-    useEffect(() => {
-        window.tauriAPI.getLocalAssetsDir().then(setLocalAssetsDir).catch(console.error);
-    }, []);
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [linkModalData, setLinkModalData] = useState<{ url: string; text: string }>({ url: '', text: '' });
-    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-    const [imageModalData, setImageModalData] = useState<{ src: string; caption: string }>({ src: '', caption: '' });
 
     // Tracks current hover state for "quick action" popups on links
     const [hoveredLink, setHoveredLink] = useState<{ href: string, text: string, pos: number, rect: DOMRect } | null>(null);
 
-    const [lightboxImage, setLightboxImage] = useState<{ src: string, caption?: string } | null>(null);
     const [isScrolling, setIsScrolling] = useState(false);
 
     const [isIOS, setIsIOS] = useState(false);
@@ -200,10 +189,9 @@ export function useMarkdownEditor({
                     class: 'cursor-pointer text-primary-600 hover:text-primary-700 underline underline-offset-4',
                 },
             }),
-            ImageWithCaption.configure({ workspacePathRef }),
             Table.extend({ addNodeView() { return ReactNodeViewRenderer(TableNode); } }).configure({ resizable: true }),
             TableRow, TableHeader, TableCell,
-            Placeholder.configure({ placeholder: "Type '/' for commands or '[[' for links..." }),
+            Placeholder.configure({ placeholder: "Type '/' for commands..." }),
         ];
 
         return rawExtensions;
@@ -422,19 +410,8 @@ export function useMarkdownEditor({
         return () => window.removeEventListener('tiptap:openLinkModal', handler);
     }, [openLinkModal]);
 
-    const openImageModal = useCallback((initialAttrs?: { src?: string, alt?: string }) => {
-        if (!editor) return;
-        setImageModalData({
-            src: initialAttrs?.src || '',
-            caption: initialAttrs?.alt || ''
-        });
-        setIsImageModalOpen(true);
-    }, [editor]);
-
     const openLinkModalRef = useRef(openLinkModal);
     useEffect(() => { openLinkModalRef.current = openLinkModal; }, [openLinkModal]);
-    const openImageModalRef = useRef(openImageModal);
-    useEffect(() => { openImageModalRef.current = openImageModal; }, [openImageModal]);
 
     useEffect(() => {
         if (!isIOS || !editor || keyboardHeight <= 0) return;
@@ -461,7 +438,6 @@ export function useMarkdownEditor({
                 case 'blockquote': editor.chain().toggleBlockquote().run(); break;
                 case 'codeBlock':  editor.chain().toggleCodeBlock().run(); break;
                 case 'link':       openLinkModalRef.current(); break;
-                case 'image':      openImageModalRef.current(); break;
                 case 'undo':       editor.chain().undo().run(); break;
                 case 'redo':       editor.chain().redo().run(); break;
                 case 'indent':     editor.chain().sinkListItem('listItem').run(); break;
@@ -529,45 +505,13 @@ export function useMarkdownEditor({
         setIsLinkModalOpen(false);
     };
 
-    const saveImage = async (src: string, _text?: string, caption?: string) => {
-        if (!editor) return;
-
-        if (src) {
-            if (src.startsWith('data:image/')) {
-                const extMatch = src.match(/data:image\/([a-zA-Z0-9]+);base64,/);
-                const extension = extMatch ? extMatch[1] : 'png';
-                const filename = `img-${Date.now()}.${extension}`;
-                try {
-                    const res = imageCloudSync
-                        ? await window.tauriAPI.saveAsset(workspacePath, filename, src)
-                        : await window.tauriAPI.saveLocalAsset(filename, src);
-
-                    if (res.success && res.path) {
-                        editor.chain().focus().setImage({ src: res.path, alt: caption }).run();
-                    }
-                } catch (e) {
-                    console.error("Failed to save image asset", e);
-                }
-            } else {
-                editor.chain().focus().setImage({ src, alt: caption }).run();
-            }
-        }
-        setIsImageModalOpen(false);
-    };
-
     return {
         editor,
-        localAssetsDir,
         isLinkModalOpen,
         setIsLinkModalOpen,
         linkModalData,
-        isImageModalOpen,
-        setIsImageModalOpen,
-        imageModalData,
         hoveredLink,
         setHoveredLink,
-        lightboxImage,
-        setLightboxImage,
         isScrolling,
         isIOS,
         keyboardHeight,
@@ -579,8 +523,6 @@ export function useMarkdownEditor({
         startHideTimeout,
         handleScroll,
         openLinkModal,
-        openImageModal,
         saveLink,
-        saveImage
     };
 }
