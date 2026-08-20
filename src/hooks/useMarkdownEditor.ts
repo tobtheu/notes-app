@@ -26,7 +26,6 @@ import { CodeBlockComponent } from '../components/CodeBlockComponent';
 
 // Custom Tiptap Extensions
 import { SlashCommands } from '../extensions/SlashCommands';
-import { WikiLinkSuggestion } from '../extensions/WikiLinkSuggestion';
 
 const lowlight = createLowlight(common);
 
@@ -150,16 +149,13 @@ export function useMarkdownEditor({
     /**
      * --- EDITOR CONFIGURATION ---
      */
-    const allNotesRef = useRef<Note[]>([]);
     const workspacePathRef = useRef<string>(workspacePath);
 
-    useEffect(() => { allNotesRef.current = allNotes || []; }, [allNotes]);
     useEffect(() => { workspacePathRef.current = workspacePath; }, [workspacePath]);
 
     const extensions = useMemo(() => {
         const rawExtensions = [
             // Suggestions & Slash Commands
-            WikiLinkSuggestion.configure({ allNotesRef }),
             SlashCommands,
 
             // Core Block Parsing
