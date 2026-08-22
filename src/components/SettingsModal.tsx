@@ -1,6 +1,8 @@
-import { X } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Palette, Edit3, Cloud, HardDrive, Info } from 'lucide-react';
 import clsx from 'clsx';
 import type { SyncStatus } from '../hooks/useNotes';
+import type { Theme, ThemeOrigin } from '../hooks/useTheme';
 import { useSettingsModal } from '../hooks/useSettingsModal';
 
 import { CloudSyncSection } from './CloudSyncSection';
@@ -13,18 +15,20 @@ interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     isIOS?: boolean;
-    currentPath: string | null;
-    onChangePath: () => void;
-    theme: 'light' | 'dark' | 'system';
-    setTheme: (theme: 'light' | 'dark' | 'system') => void;
+    currentPath?: string | null;
+    onChangePath?: () => void;
+    theme: Theme;
+    setTheme: (theme: Theme, origin?: ThemeOrigin) => void;
     markdownEnabled: boolean;
     onToggleMarkdown: (enabled: boolean) => void;
-    accentColor: string;
-    setAccentColor: (color: string) => void;
+    accentColor?: string;
+    setAccentColor?: (color: string) => void;
     monochromeIcons: boolean;
     onToggleMonochromeIcons: (v: boolean) => void;
-    fontFamily: 'inter' | 'roboto' | 'system';
-    setFontFamily: (fontFamily: 'inter' | 'roboto' | 'system') => void;
+    showIconsWhenCollapsed?: boolean;
+    onToggleShowIconsWhenCollapsed?: (v: boolean) => void;
+    fontFamily: 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system';
+    setFontFamily: (fontFamily: 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system') => void;
     fontSize: 'small' | 'medium' | 'large';
     setFontSize: (fontSize: 'small' | 'medium' | 'large') => void;
     spellcheckEnabled: boolean;
@@ -40,30 +44,32 @@ interface SettingsModalProps {
     onSignOut?: (deleteLocal: boolean) => Promise<void>;
     onDeleteAccount?: () => Promise<void>;
     onImportFolder?: () => Promise<number>;
-    onExportBackup?: () => void;
+    onImportFiles?: () => Promise<number>;
+    onExportBackup?: () => Promise<number>;
     onInstallUpdate?: () => Promise<void>;
 }
 
+type TabKey = 'appearance' | 'editor' | 'sync' | 'storage' | 'about';
+
 /**
  * SettingsModal Component
- * Manages application-wide configurations including theme, storage path,
- * typography, and software updates.
+ * 5-Tab Spring Modal managing theme, storage path, typography, sync, and software updates.
  */
 export function SettingsModal(props: SettingsModalProps) {
     const {
         isOpen,
         onClose,
         isIOS = false,
-        currentPath,
-        onChangePath,
         theme,
         setTheme,
-        markdownEnabled,
-        onToggleMarkdown,
         accentColor,
         setAccentColor,
+        markdownEnabled,
+        onToggleMarkdown,
         monochromeIcons,
         onToggleMonochromeIcons,
+        showIconsWhenCollapsed,
+        onToggleShowIconsWhenCollapsed,
         fontFamily,
         setFontFamily,
         fontSize,
@@ -75,8 +81,29 @@ export function SettingsModal(props: SettingsModalProps) {
         syncStatus,
         hasPending = false,
         userEmail,
-        onImportFolder
     } = props;
+
+    const [activeTab, setActiveTab] = useState<TabKey>('appearance');
+    const [isClosing, setIsClosing] = useState(false);
+
+    const handleClose = useCallback(() => {
+        setIsClosing(true);
+        setTimeout(() => {
+            setIsClosing(false);
+            onClose();
+        }, 220);
+    }, [onClose]);
+
+    // Handle Escape key
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                handleClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleClose]);
 
     const {
         version,
@@ -87,6 +114,12 @@ export function SettingsModal(props: SettingsModalProps) {
         importState,
         importCount,
         handleImportFolder,
+        importFilesState,
+        importFilesCount,
+        handleImportFiles,
+        exportState,
+        exportCount,
+        handleExportBackup,
         authMode,
         setAuthMode,
         authEmail,
@@ -114,97 +147,215 @@ export function SettingsModal(props: SettingsModalProps) {
 
     return (
         <div
-            className={clsx("fixed inset-0 z-[10001] flex p-4 bg-black/50 backdrop-blur-sm", isIOS && window.innerWidth < 768 ? "items-start" : "items-center justify-center")}
+            className={clsx(
+                "fixed inset-0 z-[10001] flex p-3 sm:p-4 bg-black/40 dark:bg-black/70 backdrop-blur-md transition-opacity duration-300",
+                isIOS && window.innerWidth < 768 ? "items-start" : "items-center justify-center",
+                isClosing ? "opacity-0" : "opacity-100"
+            )}
             style={isIOS && window.innerWidth < 768 ? { paddingTop: 'max(env(safe-area-inset-top, 0px), 24px)' } : undefined}
-            onClick={onClose}
+            onClick={handleClose}
         >
-            <div className="rounded-xl shadow-xl w-full max-w-md p-6 relative animate-in fade-in zoom-in duration-200 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--app-bg)' }}>
-                <button
-                    onClick={onClose}
-                    className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors z-10"
-                >
-                    <X size={20} />
-                </button>
+            <div
+                className={clsx(
+                    "bg-[var(--canvas-bg)] rounded-[24px] border border-[var(--border-subtle)] shadow-2xl w-full max-w-[780px] h-[550px] max-h-[88vh] flex overflow-hidden relative",
+                    isClosing ? "animate-modal-close" : "animate-modal-spring"
+                )}
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Left Navigation Sidebar */}
+                <aside className="w-40 sm:w-44 bg-[var(--shell-bg)] border-r border-[var(--border-subtle)] p-3 flex flex-col justify-between select-none shrink-0 overflow-x-hidden">
+                    <div className="space-y-4">
+                        <div className="px-2 pt-1">
+                            <h3 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">Settings</h3>
+                        </div>
+                        <nav className="space-y-1 text-xs font-medium">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('appearance')}
+                                className={clsx(
+                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
+                                    activeTab === 'appearance'
+                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
+                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
+                                )}
+                            >
+                                <Palette size={16} />
+                                <span>Appearance</span>
+                            </button>
 
-                <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white shrink-0">Settings</h2>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('editor')}
+                                className={clsx(
+                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
+                                    activeTab === 'editor'
+                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
+                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
+                                )}
+                            >
+                                <Edit3 size={16} />
+                                <span>Editor</span>
+                            </button>
 
-                <div
-                    ref={scrollContainerRef}
-                    className="overflow-y-auto flex-1 pr-2 -mr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700"
-                >
-                    {/* --- SYNC SECTION --- */}
-                    <CloudSyncSection
-                        userEmail={userEmail}
-                        syncStatus={syncStatus}
-                        hasPending={hasPending}
-                        signOutStep={signOutStep}
-                        setSignOutStep={setSignOutStep}
-                        signOutLoading={signOutLoading}
-                        deleteAccountStep={deleteAccountStep}
-                        setDeleteAccountStep={setDeleteAccountStep}
-                        deleteAccountLoading={deleteAccountLoading}
-                        authMode={authMode}
-                        setAuthMode={setAuthMode}
-                        authEmail={authEmail}
-                        setAuthEmail={setAuthEmail}
-                        authPassword={authPassword}
-                        setAuthPassword={setAuthPassword}
-                        authError={authError}
-                        authLoading={authLoading}
-                        handleAuth={handleAuth}
-                        handleSignOutConfirm={handleSignOutConfirm}
-                        handleDeleteAccountConfirm={handleDeleteAccountConfirm}
-                    />
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('sync')}
+                                className={clsx(
+                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
+                                    activeTab === 'sync'
+                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
+                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
+                                )}
+                            >
+                                <Cloud size={16} />
+                                <span>Cloud Sync</span>
+                            </button>
 
-                    {/* --- STORAGE SECTION --- */}
-                    <StorageSection
-                        currentPath={currentPath}
-                        onChangePath={onChangePath}
-                        hasImportFolderOption={!!onImportFolder}
-                        importState={importState}
-                        importCount={importCount}
-                        onImportFolderClick={handleImportFolder}
-                        onExportBackup={props.onExportBackup}
-                    />
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('storage')}
+                                className={clsx(
+                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
+                                    activeTab === 'storage'
+                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
+                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
+                                )}
+                            >
+                                <HardDrive size={16} />
+                                <span>Backup & Data</span>
+                            </button>
 
-                    {/* --- APPEARANCE SECTION --- */}
-                    <AppearanceSection
-                        theme={theme}
-                        setTheme={setTheme}
-                        accentColor={accentColor}
-                        setAccentColor={setAccentColor}
-                        monochromeIcons={monochromeIcons}
-                        onToggleMonochromeIcons={onToggleMonochromeIcons}
-                        fontFamily={fontFamily}
-                        setFontFamily={setFontFamily}
-                        fontSize={fontSize}
-                        setFontSize={setFontSize}
-                    />
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('about')}
+                                className={clsx(
+                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
+                                    activeTab === 'about'
+                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
+                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
+                                )}
+                            >
+                                <Info size={16} />
+                                <span>About</span>
+                            </button>
+                        </nav>
+                    </div>
+                </aside>
 
-                    {/* --- EDITOR CONFIGURATION SECTION --- */}
-                    <EditorSection
-                        markdownEnabled={markdownEnabled}
-                        onToggleMarkdown={onToggleMarkdown}
-                        spellcheckEnabled={spellcheckEnabled}
-                        onToggleSpellcheck={onToggleSpellcheck}
-                        isIOS={isIOS}
-                        landscapeFullscreen={landscapeFullscreen}
-                        onToggleLandscapeFullscreen={onToggleLandscapeFullscreen}
-                    />
+                {/* Right Content Panel */}
+                <section className="flex-1 flex flex-col justify-between p-4 sm:p-5 overflow-hidden">
+                    <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)] shrink-0">
+                        <h2 className="text-sm font-bold text-[var(--text-main)]">
+                            {activeTab === 'appearance' && 'Appearance'}
+                            {activeTab === 'editor' && 'Editor'}
+                            {activeTab === 'sync' && 'Cloud Sync'}
+                            {activeTab === 'storage' && 'Backup & Data'}
+                            {activeTab === 'about' && 'About'}
+                        </h2>
+                    </div>
 
-                    {/* --- ABOUT & UPDATER SECTION --- */}
-                    <AboutSection
-                        isIOS={isIOS}
-                        version={version}
-                        updateStatus={updateStatus}
-                        diagResults={diagResults}
-                        isDiagnosing={isDiagnosing}
-                        handleCheckForUpdates={handleCheckForUpdates}
-                        handleDownloadUpdate={handleDownloadUpdate}
-                        handleInstallUpdate={handleInstallUpdate}
-                        handleRunDiagnostics={handleRunDiagnostics}
-                    />
-                </div>
+                    {/* Scrollable Tab Content Container */}
+                    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 pt-3 pr-1.5 sm:pr-2.5 custom-scrollbar">
+                            {/* TAB 1: APPEARANCE */}
+                            {activeTab === 'appearance' && (
+                                <AppearanceSection
+                                    theme={theme}
+                                    setTheme={setTheme}
+                                    accentColor={accentColor}
+                                    setAccentColor={setAccentColor}
+                                    monochromeIcons={monochromeIcons}
+                                    onToggleMonochromeIcons={onToggleMonochromeIcons}
+                                    showIconsWhenCollapsed={showIconsWhenCollapsed}
+                                    onToggleShowIconsWhenCollapsed={onToggleShowIconsWhenCollapsed}
+                                    fontFamily={fontFamily}
+                                    setFontFamily={setFontFamily}
+                                    fontSize={fontSize}
+                                    setFontSize={setFontSize}
+                                />
+                            )}
+
+                            {/* TAB 2: EDITOR */}
+                            {activeTab === 'editor' && (
+                                <EditorSection
+                                    markdownEnabled={markdownEnabled}
+                                    onToggleMarkdown={onToggleMarkdown}
+                                    spellcheckEnabled={spellcheckEnabled}
+                                    onToggleSpellcheck={onToggleSpellcheck}
+                                    isIOS={isIOS}
+                                    landscapeFullscreen={landscapeFullscreen}
+                                    onToggleLandscapeFullscreen={onToggleLandscapeFullscreen}
+                                />
+                            )}
+
+                            {/* TAB 3: CLOUD SYNC */}
+                            {activeTab === 'sync' && (
+                                <CloudSyncSection
+                                    userEmail={userEmail}
+                                    syncStatus={syncStatus}
+                                    hasPending={hasPending}
+                                    signOutStep={signOutStep}
+                                    setSignOutStep={setSignOutStep}
+                                    signOutLoading={signOutLoading}
+                                    deleteAccountStep={deleteAccountStep}
+                                    setDeleteAccountStep={setDeleteAccountStep}
+                                    deleteAccountLoading={deleteAccountLoading}
+                                    authMode={authMode}
+                                    setAuthMode={setAuthMode}
+                                    authEmail={authEmail}
+                                    setAuthEmail={setAuthEmail}
+                                    authPassword={authPassword}
+                                    setAuthPassword={setAuthPassword}
+                                    authError={authError}
+                                    authLoading={authLoading}
+                                    handleAuth={handleAuth}
+                                    handleSignOutConfirm={handleSignOutConfirm}
+                                    handleDeleteAccountConfirm={handleDeleteAccountConfirm}
+                                />
+                            )}
+
+                            {/* TAB 4: STORAGE & BACKUP */}
+                            {activeTab === 'storage' && (
+                                <StorageSection
+                                    hasImportFolderOption={!!props.onImportFolder}
+                                    importState={importState}
+                                    importCount={importCount}
+                                    onImportFolderClick={handleImportFolder}
+                                    importFilesState={importFilesState}
+                                    importFilesCount={importFilesCount}
+                                    onImportFilesClick={props.onImportFiles ? handleImportFiles : undefined}
+                                    exportState={exportState}
+                                    exportCount={exportCount}
+                                    onExportBackup={props.onExportBackup ? handleExportBackup : undefined}
+                                />
+                            )}
+
+                            {/* TAB 5: ABOUT */}
+                            {activeTab === 'about' && (
+                                <AboutSection
+                                    isIOS={isIOS}
+                                    version={version}
+                                    updateStatus={updateStatus}
+                                    diagResults={diagResults}
+                                    isDiagnosing={isDiagnosing}
+                                    handleCheckForUpdates={handleCheckForUpdates}
+                                    handleDownloadUpdate={handleDownloadUpdate}
+                                    handleInstallUpdate={handleInstallUpdate}
+                                    handleRunDiagnostics={handleRunDiagnostics}
+                                />
+                            )}
+                    </div>
+
+                    {/* Bottom Done Button */}
+                    <div className="pt-3.5 border-t border-[var(--border-subtle)] flex justify-end gap-2 shrink-0 bg-[var(--canvas-bg)]">
+                        <button
+                            type="button"
+                            onClick={handleClose}
+                            className="smooth-transition px-4 py-1.5 text-xs font-semibold text-white bg-[var(--accent-color)] hover:opacity-90 rounded-xl shadow-sm active:scale-95"
+                        >
+                            Done
+                        </button>
+                    </div>
+                </section>
             </div>
         </div>
     );

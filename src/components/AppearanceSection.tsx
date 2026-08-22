@@ -1,15 +1,17 @@
-import { Sun, Moon, Monitor, Palette } from 'lucide-react';
 import clsx from 'clsx';
+import type { Theme, ThemeOrigin } from '../hooks/useTheme';
 
 interface AppearanceSectionProps {
-    theme: 'light' | 'dark' | 'system';
-    setTheme: (theme: 'light' | 'dark' | 'system') => void;
-    accentColor: string;
-    setAccentColor: (color: string) => void;
+    theme: Theme;
+    setTheme: (theme: Theme, origin?: ThemeOrigin) => void;
+    accentColor?: string;
+    setAccentColor?: (color: string) => void;
     monochromeIcons: boolean;
     onToggleMonochromeIcons: (v: boolean) => void;
-    fontFamily: 'inter' | 'roboto' | 'system';
-    setFontFamily: (fontFamily: 'inter' | 'roboto' | 'system') => void;
+    showIconsWhenCollapsed?: boolean;
+    onToggleShowIconsWhenCollapsed?: (v: boolean) => void;
+    fontFamily: 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system';
+    setFontFamily: (fontFamily: 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system') => void;
     fontSize: 'small' | 'medium' | 'large';
     setFontSize: (fontSize: 'small' | 'medium' | 'large') => void;
 }
@@ -17,143 +19,90 @@ interface AppearanceSectionProps {
 export function AppearanceSection({
     theme,
     setTheme,
-    accentColor,
-    setAccentColor,
     monochromeIcons,
     onToggleMonochromeIcons,
+    showIconsWhenCollapsed = false,
+    onToggleShowIconsWhenCollapsed,
     fontFamily,
     setFontFamily,
     fontSize,
     setFontSize
 }: AppearanceSectionProps) {
     return (
-        <div>
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Appearance</h3>
-
+        <div className="space-y-6 text-xs select-none pb-6">
             {/* Theme Configuration */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
-                <button
-                    onClick={() => setTheme('light')}
-                    className={clsx(
-                        "flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all",
-                        theme === 'light'
-                            ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300"
-                            : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
-                    )}
-                >
-                    <Sun size={20} />
-                    <span className="text-xs font-medium">Light</span>
-                </button>
-                <button
-                    onClick={() => setTheme('dark')}
-                    className={clsx(
-                        "flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all",
-                        theme === 'dark'
-                            ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300"
-                            : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
-                    )}
-                >
-                    <Moon size={20} />
-                    <span className="text-xs font-medium">Dark</span>
-                </button>
-                <button
-                    onClick={() => setTheme('system')}
-                    className={clsx(
-                        "flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all",
-                        theme === 'system'
-                            ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300"
-                            : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400"
-                    )}
-                >
-                    <Monitor size={20} />
-                    <span className="text-xs font-medium">System</span>
-                </button>
+            <div>
+                <label className="block font-semibold text-[var(--text-main)] mb-2.5">Theme Selection</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* 1. Dark Mode */}
+                    <button
+                        type="button"
+                        onClick={(e) => setTheme('dark', e)}
+                        className={clsx(
+                            "smooth-transition flex flex-col p-2.5 sm:p-3 rounded-2xl border text-left active:scale-98 min-w-0 overflow-hidden",
+                            theme === 'dark'
+                                ? "border-[var(--accent-color)] ring-2 ring-[var(--accent-color)]/30 bg-[#222221] text-white shadow-sm"
+                                : "border-[var(--border-subtle)] hover:border-gray-500/40 bg-[#222221]/90 text-gray-300"
+                        )}
+                    >
+                        <div className="flex items-center gap-2 mb-1 min-w-0">
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#1A1A19] border border-[#E5484D] shrink-0" />
+                            <span className="font-bold text-xs text-[#D8D5CF] truncate">Dark Mode</span>
+                        </div>
+                        <div className="text-[10px] text-[#7E7A73] truncate">Charcoal & Crimson</div>
+                    </button>
+
+                    {/* 2. Sage Green */}
+                    <button
+                        type="button"
+                        onClick={(e) => setTheme('sage', e)}
+                        className={clsx(
+                            "smooth-transition flex flex-col p-2.5 sm:p-3 rounded-2xl border text-left active:scale-98 min-w-0 overflow-hidden",
+                            theme === 'sage'
+                                ? "border-[var(--accent-color)] ring-2 ring-[var(--accent-color)]/30 bg-[#E8ECE6] text-[#242B24] shadow-sm"
+                                : "border-[var(--border-subtle)] hover:border-gray-500/40 bg-[#E8ECE6]/90 text-gray-700"
+                        )}
+                    >
+                        <div className="flex items-center gap-2 mb-1 min-w-0">
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#5D6D5D] shrink-0" />
+                            <span className="font-bold text-xs text-[#242B24] truncate">Sage Green</span>
+                        </div>
+                        <div className="text-[10px] text-[#707A70] truncate">Botanical Earth</div>
+                    </button>
+
+                    {/* 3. Clay & Oatmeal */}
+                    <button
+                        type="button"
+                        onClick={(e) => setTheme('clay', e)}
+                        className={clsx(
+                            "smooth-transition flex flex-col p-2.5 sm:p-3 rounded-2xl border text-left active:scale-98 min-w-0 overflow-hidden",
+                            theme === 'clay'
+                                ? "border-[var(--accent-color)] ring-2 ring-[var(--accent-color)]/30 bg-[#EDE9E2] text-[#262422] shadow-sm"
+                                : "border-[var(--border-subtle)] hover:border-gray-500/40 bg-[#EDE9E2]/90 text-gray-700"
+                        )}
+                    >
+                        <div className="flex items-center gap-2 mb-1 min-w-0">
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#7D6B5D] shrink-0" />
+                            <span className="font-bold text-xs text-[#262422] truncate">Clay & Oatmeal</span>
+                        </div>
+                        <div className="text-[10px] text-[#79736D] truncate">Muted Warm Earth</div>
+                    </button>
+                </div>
             </div>
 
-            {/* Accent Color Selection */}
-            <div className="mb-6">
-                <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Accent Color</h4>
-                <div className="flex items-center gap-3 px-3 py-1 -mx-1 mb-4">
-                    {([
-                        ['blue', '#3b82f6'],
-                        ['purple', '#a855f7'],
-                        ['green', '#59FFA0'],
-                        ['red', '#ef4444'],
-                        ['orange', '#f97316'],
-                        ['jasmine', '#FFD972'],
-                        ['periwinkle', '#B4ADEA'],
-                        ['watermelon', '#E84855'],
-                    ] as [string, string][]).map(([color, hex]) => (
-                        <button
-                            key={color}
-                            onClick={() => setAccentColor(color)}
-                            data-accent={color}
-                            className={clsx(
-                                "w-8 h-8 rounded-full flex items-center justify-center transition-all ring-offset-2 dark:ring-offset-gray-800",
-                                accentColor === color ? "ring-2 ring-gray-400 dark:ring-gray-400 scale-110" : "hover:scale-110"
-                            )}
-                            style={{ backgroundColor: hex }}
-                            title={color.charAt(0).toUpperCase() + color.slice(1)}
-                        >
-                            {accentColor === color && (
-                                <div className="w-2.5 h-2.5 bg-white rounded-full shadow-sm" />
-                            )}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Premium Themes Selection */}
-                <div className="mb-6">
-                    <div className="flex items-center gap-2 mb-3">
-                        <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400">Premium Themes</h4>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 uppercase tracking-wider">Pro</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {([
-                            ['terracotta', '#8c4a4a', '#f2ebe1', 'Terracotta'],
-                            ['sage', '#5d6d5d', '#ecebe4', 'Sage & Stone'],
-                            ['indigo', '#3f4d71', '#f1f1f1', 'Lava & Indigo'],
-                        ] as [string, string, string, string][]).map(([color, primary, bg, label]) => (
-                            <button
-                                key={color}
-                                onClick={() => setAccentColor(color)}
-                                className={clsx(
-                                    "relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all overflow-hidden group",
-                                    accentColor === color
-                                        ? "border-[var(--primary-500)] shadow-md shadow-[var(--primary-500)]/20"
-                                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm"
-                                )}
-                                style={{ backgroundColor: theme === 'dark' ? '#111' : bg }}
-                            >
-                                <div
-                                    className="w-10 h-10 rounded-full mb-2 flex items-center justify-center shadow-sm"
-                                    style={{ backgroundColor: primary }}
-                                >
-                                    {accentColor === color && <div className="w-3 h-3 bg-white rounded-full" />}
-                                </div>
-                                <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                                    {label}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Monochrome Icons Toggle */}
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg mb-3">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-800 flex items-center justify-center text-gray-500">
-                            <Palette size={16} />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Monochrome Sidebar Icons</span>
-                        </div>
+            {/* Folder Icons Toggle */}
+            <div className="pt-3 border-t border-[var(--border-subtle)] space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-[var(--text-main)] truncate">Monochrome Sidebar Icons</div>
+                        <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">Display neutral icons matching active theme</div>
                     </div>
                     <button
+                        type="button"
                         onClick={() => onToggleMonochromeIcons(!monochromeIcons)}
                         className={clsx(
-                            "w-10 h-5 rounded-full transition-colors relative",
-                            monochromeIcons ? "bg-primary-600" : "bg-gray-200 dark:bg-gray-700"
+                            "w-10 h-5 rounded-full transition-colors relative shrink-0",
+                            monochromeIcons ? "bg-[var(--accent-color)]" : "bg-gray-300 dark:bg-gray-700"
                         )}
                     >
                         <div className={clsx(
@@ -162,77 +111,126 @@ export function AppearanceSection({
                         )} />
                     </button>
                 </div>
+
+                <div className="flex items-center justify-between gap-3 pt-1">
+                    <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-[var(--text-main)] truncate">Icons bei eingeklappter Sidebar</div>
+                        <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">Ordner-Icons anzeigen wenn Sidebar eingeklappt ist (sonst ausblenden)</div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => onToggleShowIconsWhenCollapsed?.(!showIconsWhenCollapsed)}
+                        className={clsx(
+                            "w-10 h-5 rounded-full transition-colors relative shrink-0",
+                            showIconsWhenCollapsed ? "bg-[var(--accent-color)]" : "bg-gray-300 dark:bg-gray-700"
+                        )}
+                    >
+                        <div className={clsx(
+                            "absolute top-1 w-3 h-3 rounded-full bg-white transition-transform",
+                            showIconsWhenCollapsed ? "translate-x-6" : "translate-x-1"
+                        )} />
+                    </button>
+                </div>
             </div>
 
             {/* Typography Configuration */}
-            <div className="mt-6">
-                <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">Typography</h4>
-
-                {/* Font Family Selection */}
-                <div className="flex items-center gap-2 mb-4 p-1 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
+            <div className="pt-3 border-t border-[var(--border-subtle)]">
+                <label className="block font-semibold text-[var(--text-main)] mb-2">Editor Typography</label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 mb-4">
                     <button
-                        onClick={() => setFontFamily('system')}
-                        className={clsx(
-                            "flex-1 text-xs font-medium py-1.5 px-3 rounded-md transition-all",
-                            fontFamily === 'system' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                        )}
-                        style={{ fontFamily: "ui-sans-serif, system-ui, sans-serif" }}
-                    >
-                        System
-                    </button>
-                    <button
+                        type="button"
                         onClick={() => setFontFamily('inter')}
                         className={clsx(
-                            "flex-1 text-xs font-medium py-1.5 px-3 rounded-md transition-all",
-                            fontFamily === 'inter' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            "p-2 sm:p-2.5 rounded-xl text-center text-xs font-inter transition-all border min-w-0 truncate",
+                            fontFamily === 'inter'
+                                ? "border-[var(--accent-color)] bg-[var(--card-active)] text-[var(--accent-color)] font-semibold shadow-sm"
+                                : "border-transparent bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
                         )}
-                        style={{ fontFamily: "'Inter', sans-serif" }}
                     >
                         Inter
                     </button>
                     <button
+                        type="button"
                         onClick={() => setFontFamily('roboto')}
                         className={clsx(
-                            "flex-1 text-xs font-medium py-1.5 px-3 rounded-md transition-all",
-                            fontFamily === 'roboto' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            "p-2 sm:p-2.5 rounded-xl text-center text-xs font-roboto transition-all border min-w-0 truncate",
+                            fontFamily === 'roboto'
+                                ? "border-[var(--accent-color)] bg-[var(--card-active)] text-[var(--accent-color)] font-semibold shadow-sm"
+                                : "border-transparent bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
                         )}
-                        style={{ fontFamily: "'Roboto', sans-serif" }}
                     >
                         Roboto
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setFontFamily('courier')}
+                        className={clsx(
+                            "p-2 sm:p-2.5 rounded-xl text-center text-xs font-courier transition-all border min-w-0 truncate",
+                            fontFamily === 'courier'
+                                ? "border-[var(--accent-color)] bg-[var(--card-active)] text-[var(--accent-color)] font-semibold shadow-sm"
+                                : "border-transparent bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                        )}
+                    >
+                        Courier New
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setFontFamily('sfmono')}
+                        className={clsx(
+                            "p-2 sm:p-2.5 rounded-xl text-center text-xs font-sfmono transition-all border min-w-0 truncate",
+                            fontFamily === 'sfmono'
+                                ? "border-[var(--accent-color)] bg-[var(--card-active)] text-[var(--accent-color)] font-semibold shadow-sm"
+                                : "border-transparent bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                        )}
+                    >
+                        SF Mono
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setFontFamily('serif')}
+                        className={clsx(
+                            "p-2 sm:p-2.5 rounded-xl text-center text-xs font-serif transition-all border min-w-0 truncate",
+                            fontFamily === 'serif'
+                                ? "border-[var(--accent-color)] bg-[var(--card-active)] text-[var(--accent-color)] font-semibold shadow-sm"
+                                : "border-transparent bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                        )}
+                    >
+                        Newsreader
                     </button>
                 </div>
 
                 {/* Font Size Selection */}
-                <div className="flex items-center gap-2 p-1 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
+                <label className="block font-semibold text-[var(--text-main)] mb-2">Font Size</label>
+                <div className="flex items-center gap-1.5 p-1 bg-[var(--card-hover)] rounded-xl border border-[var(--border-subtle)]">
                     <button
+                        type="button"
                         onClick={() => setFontSize('small')}
                         className={clsx(
-                            "flex-1 py-1.5 px-3 rounded-md transition-all flex items-center justify-center",
-                            fontSize === 'small' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            "flex-1 py-1.5 px-2.5 rounded-lg transition-all text-xs min-w-0 truncate",
+                            fontSize === 'small' ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                         )}
-                        title="Small Text"
                     >
-                        <span className="text-[12px] font-medium leading-none">Small</span>
+                        Small
                     </button>
                     <button
+                        type="button"
                         onClick={() => setFontSize('medium')}
                         className={clsx(
-                            "flex-1 py-1.5 px-3 rounded-md transition-all flex items-center justify-center",
-                            fontSize === 'medium' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            "flex-1 py-1.5 px-2.5 rounded-lg transition-all text-xs min-w-0 truncate",
+                            fontSize === 'medium' ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                         )}
-                        title="Medium Text"
                     >
-                        <span className="font-medium text-[14px] leading-none">Medium</span>
+                        Medium
                     </button>
                     <button
+                        type="button"
                         onClick={() => setFontSize('large')}
                         className={clsx(
-                            "flex-1 py-1.5 px-3 rounded-md transition-all flex items-center justify-center",
-                            fontSize === 'large' ? "bg-white dark:bg-gray-800 shadow text-gray-800 dark:text-white" : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                            "flex-1 py-1.5 px-2.5 rounded-lg transition-all text-xs min-w-0 truncate",
+                            fontSize === 'large' ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                         )}
-                        title="Large Text"
                     >
-                        <span className="font-medium text-[16px] leading-none">Large</span>
+                        Large
                     </button>
                 </div>
             </div>
