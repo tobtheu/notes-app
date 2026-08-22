@@ -1,8 +1,5 @@
-/**
- * Escape a string for safe embedding in HTML. Used for PDF export where
- * user-controlled values (e.g. note title) are interpolated into a template
- * before being written via innerHTML.
- */
+import DOMPurify from 'dompurify';
+
 export function escapeHtml(value: string): string {
     return value
         .replace(/&/g, '&amp;')
@@ -16,11 +13,15 @@ export function escapeHtml(value: string): string {
  * Parses markdown to HTML and exports it as a PDF using Tauri API.
  */
 export async function exportNoteToPdf(title: string, body: string): Promise<void> {
-    // Parse markdown to HTML
-    let parsedBody = body;
+    // Parse markdown to HTML and sanitize against XSS
+    let parsedBody = '';
     try {
         const { marked } = await import('marked');
-        parsedBody = await marked.parse(body);
+        const rawHtml = await marked.parse(body);
+        parsedBody = DOMPurify.sanitize(rawHtml, {
+            USE_PROFILES: { html: true },
+            ADD_ATTR: ['target'],
+        });
     } catch (e) {
         console.error('Failed to parse markdown with marked:', e);
         // Fallback: simple newline conversion if marked fails
