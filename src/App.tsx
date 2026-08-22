@@ -124,8 +124,6 @@ function App() {
     handleSkipUpdate,
   } = useTauriUpdater();
 
-  const isAnyModalOpen = isSettingsOpen || editingCategory !== null || categoryToDelete !== null || isUpdateModalOpen;
-
   // Viewport custom hook logic
   const {
     isMobile: _isMobile,
@@ -285,6 +283,8 @@ function App() {
     monochromeIcons,
     showIconsWhenCollapsed,
   };
+
+  const isAnyModalOpen = isSettingsOpen || editingCategory !== null || categoryToDelete !== null || isUpdateModalOpen;
 
   return (
     <div
