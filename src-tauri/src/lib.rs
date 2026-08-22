@@ -105,6 +105,21 @@ fn is_safe_component(s: &str) -> bool {
         && !s.contains('\\')
 }
 
+/// Returns true if the asset filename is safe and has an allowed image extension.
+fn is_safe_asset_filename(name: &str) -> bool {
+    if !is_safe_component(name) {
+        return false;
+    }
+    let path = Path::new(name);
+    let allowed_extensions = [
+        "png", "jpg", "jpeg", "gif", "webp", "svg", "avif", "ico", "bmp"
+    ];
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some(ext) => allowed_extensions.contains(&ext.to_ascii_lowercase().as_str()),
+        None => false,
+    }
+}
+
 /// Validates that every component of a relative path (e.g. "Work/note.md") is safe.
 fn is_safe_relative_path(rel: &str) -> bool {
     if rel.is_empty() { return true; }
@@ -330,9 +345,9 @@ pub struct SaveAssetResponse {
 
 #[tauri::command]
 async fn save_asset(_app: tauri::AppHandle, root_path: String, filename: String, content_base64: String) -> Result<SaveAssetResponse, String> {
-    // Only allow a flat filename — no path separators or traversal
-    if !is_safe_component(&filename) {
-        return Err("Invalid filename".to_string());
+    // Only allow a flat filename with allowed image extensions
+    if !is_safe_asset_filename(&filename) {
+        return Err("Invalid or disallowed asset filename".to_string());
     }
 
     let root = Path::new(&root_path);
@@ -374,8 +389,8 @@ async fn get_local_assets_dir(app: tauri::AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 async fn save_local_asset(app: tauri::AppHandle, filename: String, content_base64: String) -> Result<SaveAssetResponse, String> {
-    if !is_safe_component(&filename) {
-        return Err("Invalid filename".to_string());
+    if !is_safe_asset_filename(&filename) {
+        return Err("Invalid or disallowed asset filename".to_string());
     }
 
     let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
