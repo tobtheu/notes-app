@@ -25,10 +25,15 @@ services:
       DATABASE_URL: "${ELECTRIC_DATABASE_URL}"
 
       # --------------------------------------------------------
-      # Security: use ELECTRIC_INSECURE for local dev,
-      # or set ELECTRIC_SECRET for production.
+      # Security: use ELECTRIC_INSECURE for local dev only.
+      # For production, set ELECTRIC_INSECURE: "false", ELECTRIC_SECRET_KEY_BASE
+      # and SUPABASE_JWT_SECRET.
       # --------------------------------------------------------
       ELECTRIC_INSECURE: "true"
+      # In production, configure JWT auth:
+      # ELECTRIC_SECRET_KEY_BASE: "${ELECTRIC_SECRET_KEY_BASE}"
+      # AUTH_JWT_ALG: "HS256"
+      # AUTH_JWT_KEY: "${SUPABASE_JWT_SECRET}"
 
       # --------------------------------------------------------
       # Optional: Persistence directory for Electric's state
