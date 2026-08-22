@@ -124,6 +124,8 @@ function App() {
     handleSkipUpdate,
   } = useTauriUpdater();
 
+  const isAnyModalOpen = isSettingsOpen || editingCategory !== null || categoryToDelete !== null || isUpdateModalOpen;
+
   // Viewport custom hook logic
   const {
     isMobile: _isMobile,
@@ -302,7 +304,10 @@ function App() {
     >
       <div
         id="app-background"
-        className="flex-1 flex overflow-hidden w-full h-full"
+        className={clsx(
+          "flex-1 flex overflow-hidden w-full h-full transition-[filter] duration-200",
+          isAnyModalOpen && "filter blur-md pointer-events-none select-none"
+        )}
         style={{
           flexDirection: isIOS ? 'row' : 'column',
         }}
@@ -424,7 +429,10 @@ function App() {
         <MobileSwipeContainer
           active={activeView === 'editor'}
           onBack={() => setActiveView('notelist')}
-          className="flex-1 flex"
+          className={clsx(
+            "flex-1 flex transition-[filter] duration-200",
+            isAnyModalOpen && "filter blur-md pointer-events-none select-none"
+          )}
           isIOS={isIOS}
           isMobile={_isMobile}
         >
