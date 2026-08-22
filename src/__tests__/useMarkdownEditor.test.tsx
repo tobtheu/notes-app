@@ -11,11 +11,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 }));
 
 // Mock window.tauriAPI
-(window as any).tauriAPI = {
-    getLocalAssetsDir: vi.fn().mockResolvedValue('/mock/assets'),
-    saveAsset: vi.fn(),
-    saveLocalAsset: vi.fn(),
-};
+(window as any).tauriAPI = {};
 
 describe('useMarkdownEditor paste behavior', () => {
     it('parses pasted markdown text into formatted nodes instead of raw codeBlock', () => {

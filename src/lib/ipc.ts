@@ -45,13 +45,6 @@ export const tauriAPI: TauriAPI = {
     deleteFolderMoveContents: (data) =>
         invoke<boolean>('delete_folder_move_contents', data).then(() => true).catch(() => false),
 
-    // Assets
-    saveAsset: (rootPath: string, filename: string, contentBase64: string) =>
-        invoke<{ success: boolean; path?: string; error?: string }>('save_asset', { rootPath, filename, contentBase64 }),
-    saveLocalAsset: (filename: string, contentBase64: string) =>
-        invoke<{ success: boolean; path?: string; error?: string }>('save_local_asset', { filename, contentBase64 }),
-    getLocalAssetsDir: () => invoke<string>('get_local_assets_dir'),
-
     // App info
     getAppVersion: () => invoke<string>('get_app_version'),
 
@@ -76,22 +69,22 @@ export const tauriAPI: TauriAPI = {
 
     // PDF export
     exportPdf: async (htmlContent: string): Promise<void> => {
-        const iframe = document.createElement('iframe');
-        iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-        document.body.appendChild(iframe);
-        const doc = iframe.contentWindow?.document;
-        if (doc) {
-            doc.open();
-            doc.write('<!DOCTYPE html><html><head><title>Note Export</title></head><body></body></html>');
-            doc.close();
-            // Use innerHTML on the body instead of doc.write with interpolation
-            doc.body.innerHTML = htmlContent;
-            setTimeout(() => {
-                iframe.contentWindow?.focus();
-                iframe.contentWindow?.print();
-                setTimeout(() => document.body.removeChild(iframe), 1000);
-            }, 500);
+        let printContainer = document.getElementById('tauri-print-container');
+        if (!printContainer) {
+            printContainer = document.createElement('div');
+            printContainer.id = 'tauri-print-container';
+            document.body.appendChild(printContainer);
         }
+        printContainer.innerHTML = htmlContent;
+
+        setTimeout(() => {
+            window.focus();
+            window.print();
+            setTimeout(() => {
+                const el = document.getElementById('tauri-print-container');
+                if (el) el.remove();
+            }, 1000);
+        }, 150);
     },
 
     // Auto-updater

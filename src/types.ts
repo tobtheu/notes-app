@@ -80,11 +80,6 @@ export interface TauriAPI {
     deleteFolderRecursive: (rootPath: string, folderPath: string) => Promise<boolean>;
     deleteFolderMoveContents: (data: { folderPath: string; rootPath: string }) => Promise<boolean>;
 
-    // Assets
-    saveAsset: (rootPath: string, filename: string, contentBase64: string) => Promise<{ success: boolean; path?: string; error?: string }>;
-    saveLocalAsset: (filename: string, contentBase64: string) => Promise<{ success: boolean; path?: string; error?: string }>;
-    getLocalAssetsDir: () => Promise<string>;
-
     // App info
     getAppVersion: () => Promise<string>;
 
@@ -123,5 +118,30 @@ declare global {
                 platform?: string;
             };
         };
+        __noteOpenStartTime?: number | null;
+        webkit?: {
+            messageHandlers?: {
+                toolbarVisible?: {
+                    postMessage: (visible: boolean) => void;
+                };
+            };
+        };
     }
 }
+
+/**
+ * Safely sanitizes raw metadata input, guaranteeing a valid AppMetadata structure.
+ */
+export function sanitizeAppMetadata(raw: unknown): AppMetadata {
+    if (!raw || typeof raw !== 'object') {
+        return { folders: {}, pinnedNotes: [], folderOrder: [], settings: {} };
+    }
+    const data = raw as Partial<AppMetadata>;
+    return {
+        folders: data.folders && typeof data.folders === 'object' ? data.folders : {},
+        pinnedNotes: Array.isArray(data.pinnedNotes) ? data.pinnedNotes : [],
+        folderOrder: Array.isArray(data.folderOrder) ? data.folderOrder : [],
+        settings: data.settings && typeof data.settings === 'object' ? data.settings : {},
+    };
+}
+

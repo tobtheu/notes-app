@@ -30,12 +30,11 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "$APPDATA/local_assets/**",
           "$DOCUMENT/**/.assets/**",
           "$HOME/**/.assets/**"
         ]
       },
-      "csp": "default-src 'self' tauri: http://localhost:* http://127.0.0.1:*; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: local-asset: https: data: blob:; font-src 'self' data: https:; connect-src 'self' ipc: http://localhost:* http://127.0.0.1:* https://api.lamanotes.de https://sync.lamanotes.de https://*.supabase.co wss://*.supabase.co;"
+      "csp": "default-src 'self' tauri: http://localhost:* http://127.0.0.1:*; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https: data: blob:; font-src 'self' data: https:; connect-src 'self' ipc: http://localhost:* http://127.0.0.1:* https://api.lamanotes.de https://sync.lamanotes.de https://*.supabase.co wss://*.supabase.co;"
     }
   },
   "bundle": {

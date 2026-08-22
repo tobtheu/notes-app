@@ -6,7 +6,6 @@ use chrono::Utc;
 use std::sync::{Arc, Mutex};
 use notify::{Watcher, RecursiveMode};
 use tauri::{Emitter, Manager};
-use base64::{engine::general_purpose, Engine as _};
 use filetime::FileTime;
 
 mod store;
@@ -103,21 +102,6 @@ fn is_safe_component(s: &str) -> bool {
         && !s.contains('\0')
         && !s.contains('/')
         && !s.contains('\\')
-}
-
-/// Returns true if the asset filename is safe and has an allowed image extension.
-fn is_safe_asset_filename(name: &str) -> bool {
-    if !is_safe_component(name) {
-        return false;
-    }
-    let path = Path::new(name);
-    let allowed_extensions = [
-        "png", "jpg", "jpeg", "gif", "webp", "svg", "avif", "ico", "bmp"
-    ];
-    match path.extension().and_then(|ext| ext.to_str()) {
-        Some(ext) => allowed_extensions.contains(&ext.to_ascii_lowercase().as_str()),
-        None => false,
-    }
 }
 
 /// Validates that every component of a relative path (e.g. "Work/note.md") is safe.
@@ -329,92 +313,6 @@ async fn delete_folder_move_contents(_app: tauri::AppHandle, folder_path: String
     }
     fs::remove_dir_all(folder).map_err(|e| e.to_string())?;
     Ok(())
-}
-
-// ---------------------------------------------------------------------------
-// Assets
-// ---------------------------------------------------------------------------
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct SaveAssetResponse {
-    pub success: bool,
-    pub path: Option<String>,
-    pub error: Option<String>,
-}
-
-#[tauri::command]
-async fn save_asset(_app: tauri::AppHandle, root_path: String, filename: String, content_base64: String) -> Result<SaveAssetResponse, String> {
-    // Only allow a flat filename with allowed image extensions
-    if !is_safe_asset_filename(&filename) {
-        return Err("Invalid or disallowed asset filename".to_string());
-    }
-
-    let root = Path::new(&root_path);
-    let assets_dir = root.join(".assets");
-    if !assets_dir.exists() {
-        fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    }
-    let gitkeep_path = assets_dir.join(".gitkeep");
-    if !gitkeep_path.exists() {
-        let _ = fs::write(&gitkeep_path, "");
-    }
-
-    let file_path = assets_dir.join(&filename);
-    assert_within_root(&assets_dir, &file_path)?;
-
-    let b64_data = if let Some(idx) = content_base64.find("base64,") {
-        &content_base64[idx + 7..]
-    } else {
-        &content_base64
-    };
-    let decoded = general_purpose::STANDARD.decode(b64_data).map_err(|e| format!("Base64 Error: {}", e))?;
-    fs::write(&file_path, decoded).map_err(|e| e.to_string())?;
-    Ok(SaveAssetResponse {
-        success: true,
-        path: Some(format!(".assets/{}", filename).replace("\\", "/")),
-        error: None,
-    })
-}
-
-#[tauri::command]
-async fn get_local_assets_dir(app: tauri::AppHandle) -> Result<String, String> {
-    let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let local_assets = app_data.join("local_assets");
-    if !local_assets.exists() {
-        fs::create_dir_all(&local_assets).map_err(|e| e.to_string())?;
-    }
-    Ok(local_assets.to_string_lossy().to_string())
-}
-
-#[tauri::command]
-async fn save_local_asset(app: tauri::AppHandle, filename: String, content_base64: String) -> Result<SaveAssetResponse, String> {
-    if !is_safe_asset_filename(&filename) {
-        return Err("Invalid or disallowed asset filename".to_string());
-    }
-
-    let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let assets_dir = app_data.join("local_assets");
-    if !assets_dir.exists() {
-        fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    }
-
-    let file_path = assets_dir.join(&filename);
-    assert_within_root(&assets_dir, &file_path)?;
-
-    let b64_data = if let Some(idx) = content_base64.find("base64,") {
-        &content_base64[idx + 7..]
-    } else {
-        &content_base64
-    };
-    let decoded = general_purpose::STANDARD.decode(b64_data).map_err(|e| format!("Base64 Error: {}", e))?;
-    fs::write(&file_path, decoded).map_err(|e| e.to_string())?;
-
-    Ok(SaveAssetResponse {
-        success: true,
-        path: Some(format!("local-asset://{}", filename)),
-        error: None,
-    })
 }
 
 // ---------------------------------------------------------------------------
@@ -691,10 +589,6 @@ pub fn run() {
             create_folder,
             delete_folder_recursive,
             delete_folder_move_contents,
-            // Assets
-            save_asset,
-            save_local_asset,
-            get_local_assets_dir,
             // App info
             get_app_version,
             get_document_dir,
