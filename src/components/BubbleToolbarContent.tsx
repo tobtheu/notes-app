@@ -95,7 +95,16 @@ export const BubbleToolbarContent: React.FC<BubbleToolbarContentProps> = ({
                                 } else if (href.startsWith('#')) {
                                     onNavigate?.('', href.substring(1));
                                 } else {
-                                    window.open(href, '_blank');
+                                    try {
+                                        const parsed = new URL(href);
+                                        if (['http:', 'https:', 'mailto:'].includes(parsed.protocol)) {
+                                            window.open(href, '_blank', 'noopener,noreferrer');
+                                        } else {
+                                            console.warn('Blocked link with unsafe protocol:', href);
+                                        }
+                                    } catch {
+                                        console.warn('Invalid URL:', href);
+                                    }
                                 }
                             }
                         }}
