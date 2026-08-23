@@ -23,7 +23,7 @@ pub fn get_supabase_credentials(app: &AppHandle) -> Option<SupabaseStoredCredent
 
 pub fn save_supabase_credentials(app: &AppHandle, creds: &SupabaseStoredCredentials) {
     if let Ok(store) = app.store("settings.json") {
-        let _ = store.set("supabase-sync", serde_json::to_value(creds).unwrap_or_default());
+        store.set("supabase-sync", serde_json::to_value(creds).unwrap_or_default());
         let _ = store.save();
     }
 }

@@ -1,11 +1,9 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('[supabaseClient] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env');
-}
+const envUrl = (import.meta.env.VITE_SUPABASE_URL as string) || '';
+const SUPABASE_URL = (envUrl && !envUrl.includes('46.225.11.148')) ? envUrl : 'https://api.lamanotes.de';
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc3MDYwNDMzLCJleHAiOjIwOTI0MjA0MzN9.MfNPRgANFJG_PqejvzL269R4J-u7AaRBoNdEdGqaQJQ';
+const LAMA_SECRET = (import.meta.env.VITE_LAMA_SECRET as string) || 'LamaNotes_Safe_30b9d5a4';
 
 /**
  * Supabase JS client — used exclusively for writes to Postgres.
@@ -20,8 +18,8 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON
     autoRefreshToken: false, // Token refresh handled by Tauri backend
   },
   global: {
-    headers: import.meta.env.VITE_LAMA_SECRET 
-      ? { 'X-Lama-Secret': import.meta.env.VITE_LAMA_SECRET as string }
+    headers: LAMA_SECRET 
+      ? { 'X-Lama-Secret': LAMA_SECRET }
       : {},
   },
 });
@@ -31,12 +29,20 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON
  * make authenticated writes. Call this after sign-in or app start.
  */
 export async function setSupabaseSession(accessToken: string, refreshToken: string): Promise<void> {
-  await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+  try {
+    await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+  } catch (e) {
+    console.warn('[supabaseClient] setSession failed:', e);
+  }
 }
 
 /**
  * Clear the active session (on sign-out).
  */
 export async function clearSupabaseSession(): Promise<void> {
-  await supabase.auth.signOut();
+  try {
+    await supabase.auth.signOut();
+  } catch (e) {
+    console.warn('[supabaseClient] signOut failed:', e);
+  }
 }

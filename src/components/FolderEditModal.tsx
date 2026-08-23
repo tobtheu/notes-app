@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-    X, Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
+    Folder, Book, Star, Code, Heart, Target, Briefcase, Music, Home, Layout,
     Type, Palette, Coffee, Zap, Flag, Bell, Cloud, Camera, Smile, ShoppingCart,
     Settings, Trash2,
     Pen, Globe, Lock, Archive, Bookmark, Lightbulb, Rocket, Award,
@@ -62,21 +62,21 @@ const ICONS = [
 ] as const;
 
 const COLORS = [
-    { id: 'red', bg: 'bg-red-100', text: 'text-red-600', border: 'border-red-200', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-400' },
-    { id: 'orange', bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-400' },
-    { id: 'amber', bg: 'bg-amber-100', text: 'text-amber-600', border: 'border-amber-200', darkBg: 'dark:bg-amber-900/30', darkText: 'dark:text-amber-400' },
-    { id: 'lime', bg: 'bg-lime-100', text: 'text-lime-700', border: 'border-lime-200', darkBg: 'dark:bg-lime-900/30', darkText: 'dark:text-lime-400' },
-    { id: 'green', bg: 'bg-emerald-100', text: 'text-emerald-600', border: 'border-emerald-200', darkBg: 'dark:bg-emerald-900/30', darkText: 'dark:text-emerald-400' },
-    { id: 'teal', bg: 'bg-teal-100', text: 'text-teal-600', border: 'border-teal-200', darkBg: 'dark:bg-teal-900/30', darkText: 'dark:text-teal-400' },
-    { id: 'cyan', bg: 'bg-cyan-100', text: 'text-cyan-600', border: 'border-cyan-200', darkBg: 'dark:bg-cyan-900/30', darkText: 'dark:text-cyan-400' },
-    { id: 'sky', bg: 'bg-sky-100', text: 'text-sky-600', border: 'border-sky-200', darkBg: 'dark:bg-sky-900/30', darkText: 'dark:text-sky-400' },
-    { id: 'blue', bg: 'bg-blue-100', text: 'text-blue-600', border: 'border-blue-200', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-400' },
-    { id: 'indigo', bg: 'bg-indigo-100', text: 'text-indigo-600', border: 'border-indigo-200', darkBg: 'dark:bg-indigo-900/30', darkText: 'dark:text-indigo-400' },
-    { id: 'violet', bg: 'bg-violet-100', text: 'text-violet-600', border: 'border-violet-200', darkBg: 'dark:bg-violet-900/30', darkText: 'dark:text-violet-400' },
-    { id: 'purple', bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200', darkBg: 'dark:bg-purple-900/30', darkText: 'dark:text-purple-400' },
-    { id: 'pink', bg: 'bg-pink-100', text: 'text-pink-600', border: 'border-pink-200', darkBg: 'dark:bg-pink-900/30', darkText: 'dark:text-pink-400' },
-    { id: 'rose', bg: 'bg-rose-100', text: 'text-rose-600', border: 'border-rose-200', darkBg: 'dark:bg-rose-900/30', darkText: 'dark:text-rose-400' },
-    { id: 'gray', bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200', darkBg: 'dark:bg-gray-800', darkText: 'dark:text-gray-400' },
+    { id: 'red', bg: 'bg-red-500', hex: '#EF4444' },
+    { id: 'orange', bg: 'bg-orange-500', hex: '#F97316' },
+    { id: 'amber', bg: 'bg-amber-500', hex: '#F59E0B' },
+    { id: 'lime', bg: 'bg-lime-500', hex: '#84CC16' },
+    { id: 'green', bg: 'bg-emerald-500', hex: '#10B981' },
+    { id: 'teal', bg: 'bg-teal-500', hex: '#14B8A6' },
+    { id: 'cyan', bg: 'bg-cyan-500', hex: '#06B6D4' },
+    { id: 'sky', bg: 'bg-sky-500', hex: '#0EA5E9' },
+    { id: 'blue', bg: 'bg-blue-500', hex: '#3B82F6' },
+    { id: 'indigo', bg: 'bg-indigo-500', hex: '#6366F1' },
+    { id: 'violet', bg: 'bg-violet-500', hex: '#8B5CF6' },
+    { id: 'purple', bg: 'bg-purple-500', hex: '#A855F7' },
+    { id: 'pink', bg: 'bg-pink-500', hex: '#EC4899' },
+    { id: 'rose', bg: 'bg-rose-500', hex: '#F43F5E' },
+    { id: 'gray', bg: 'bg-gray-400', hex: '#9CA3AF' },
 ];
 
 export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave }: FolderEditModalProps) {
@@ -117,31 +117,31 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
 
     if (!isOpen) return null;
 
-    const selectedColorData = COLORS.find(c => c.id === selectedColor) || COLORS[9];
+    const selectedColorData = COLORS.find(c => c.id === selectedColor) || COLORS[14];
     const SelectedIconComponent = (ICONS.find(i => i.id === selectedIcon) || ICONS[0]).icon;
 
     return (
-        <div className="fixed inset-0 z-10000 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
-            <div className="rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--app-bg)' }}>
-
-                {/* Header with Preview */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800 shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className={clsx("p-2 rounded-lg transition-colors duration-300", selectedColorData.bg, selectedColorData.darkBg)}>
-                            <SelectedIconComponent size={24} className={clsx("transition-colors duration-300", selectedColorData.text, selectedColorData.darkText)} />
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+            <div
+                className="rounded-3xl w-full max-w-md border border-[var(--border-subtle)] shadow-2xl overflow-hidden animate-modal-spring flex flex-col max-h-[85vh] text-xs select-none relative"
+                onClick={e => e.stopPropagation()}
+                style={{ backgroundColor: 'var(--canvas-bg)' }}
+            >
+                {/* Header with Compact Preview */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)] shrink-0 bg-[var(--canvas-bg)]">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-black/5 dark:bg-white/5">
+                            <SelectedIconComponent size={16} style={{ color: selectedColorData.hex }} />
                         </div>
-                        <h2 className="text-xl font-bold dark:text-gray-100">Edit Category</h2>
+                        <h2 className="text-sm font-bold text-[var(--text-main)]">Edit Folder</h2>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors text-gray-500">
-                        <X size={20} />
-                    </button>
                 </div>
 
-                <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+                <div className="p-5 space-y-4 overflow-y-auto custom-scrollbar flex-1">
                     {/* Name Input */}
-                    <div className="space-y-3">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-400">
-                            <Type size={16} /> Name
+                    <div className="space-y-1.5">
+                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                            <Type size={12} /> Name
                         </label>
                         <input
                             type="text"
@@ -149,29 +149,29 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                             onChange={(e) => setName(e.target.value)}
                             onBlur={handleNameBlur}
                             onKeyDown={handleKeyDown}
-                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-xl outline-none transition-all dark:text-gray-100"
-                            placeholder="Category name..."
+                            className="smooth-transition w-full px-3 py-1.5 bg-[var(--card-hover)] border border-transparent focus:border-[var(--border-subtle)] rounded-xl outline-none text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:ring-1 focus:ring-[var(--accent-color)]/30"
+                            placeholder="Folder name..."
                             autoFocus
                         />
                     </div>
 
-                    {/* Color Picker Section */}
-                    <div className="space-y-3">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-400">
-                            <Palette size={16} /> Accent Color
+                    {/* Compact Color Picker */}
+                    <div className="space-y-1.5">
+                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                            <Palette size={12} /> Color
                         </label>
-                        <div className="grid grid-cols-5 gap-3">
+                        <div className="grid grid-cols-8 gap-1.5">
                             {COLORS.map((c) => (
                                 <button
                                     key={c.id}
                                     type="button"
                                     onClick={() => handleColorSelect(c.id)}
                                     className={clsx(
-                                        "w-full aspect-square rounded-full transition-all border-4 flex items-center justify-center",
-                                        c.bg, c.darkBg,
+                                        "w-6 h-6 rounded-full transition-all flex items-center justify-center relative",
+                                        c.bg,
                                         selectedColor === c.id
-                                            ? "border-primary-500 shadow-md scale-110"
-                                            : "border-white dark:border-gray-900"
+                                            ? "ring-2 ring-[var(--accent-color)] scale-110 shadow-sm"
+                                            : "opacity-80 hover:opacity-100 hover:scale-105"
                                     )}
                                     title={c.id}
                                 />
@@ -179,40 +179,37 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                         </div>
                     </div>
 
-                    {/* Icon Picker Section */}
-                    <div className="space-y-3">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-400">
-                            <Folder size={16} /> Icon
+                    {/* Compact Icon Picker */}
+                    <div className="space-y-1.5">
+                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                            <Folder size={12} /> Icon
                         </label>
-                        <div className="grid grid-cols-5 gap-3 min-h-[200px] px-1">
+                        <div className="grid grid-cols-8 gap-1.5 p-1 bg-black/5 dark:bg-white/5 rounded-2xl">
                             {ICONS.map(({ id, icon: IconComponent }) => (
                                 <button
                                     key={id}
                                     type="button"
                                     onClick={() => handleIconSelect(id)}
                                     className={clsx(
-                                        "p-3 rounded-xl flex items-center justify-center transition-all border-2",
+                                        "w-7 h-7 rounded-xl flex items-center justify-center transition-all",
                                         selectedIcon === id
-                                            ? "bg-primary-50 dark:bg-primary-900/30 border-primary-500"
-                                            : "bg-gray-50 dark:bg-gray-800 border-transparent hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] shadow-sm font-semibold border border-[var(--border-subtle)] scale-105"
+                                            : "text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/10"
                                     )}
                                 >
-                                    <IconComponent
-                                        size={24}
-                                        className={clsx("transition-colors duration-300", selectedIcon === id ? selectedColorData.text + " " + selectedColorData.darkText : "text-gray-500")}
-                                    />
+                                    <IconComponent size={14} />
                                 </button>
                             ))}
                         </div>
                     </div>
                 </div>
 
-                {/* Footer Button */}
-                <div className="p-6 border-t border-gray-100 dark:border-gray-800 shrink-0">
+                {/* Sticky Footer Button */}
+                <div className="px-5 py-3 border-t border-[var(--border-subtle)] flex justify-end gap-2 shrink-0 bg-[var(--canvas-bg)] sticky bottom-0 z-10">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="w-full px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold transition-all shadow-lg shadow-primary-500/20 active:scale-95 text-center"
+                        className="smooth-transition px-4 py-1.5 text-xs font-semibold text-white bg-[var(--accent-color)] hover:opacity-90 rounded-xl shadow-sm active:scale-95"
                     >
                         Done
                     </button>

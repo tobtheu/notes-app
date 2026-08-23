@@ -58,6 +58,11 @@ describe('useSettings', () => {
             const { result } = renderHook(() => useSettings())
             expect(result.current.landscapeFullscreen).toBe(false)
         })
+
+        it('showNoteCounts defaults to false', () => {
+            const { result } = renderHook(() => useSettings())
+            expect(result.current.showNoteCounts).toBe(false)
+        })
     })
 
     // -----------------------------------------------------------------------
@@ -72,6 +77,7 @@ describe('useSettings', () => {
             localStorage.setItem('toolbar-visible', 'false')
             localStorage.setItem('spellcheck-enabled', 'false')
             localStorage.setItem('landscape-fullscreen', 'true')
+            localStorage.setItem('show-note-counts', 'true')
 
             const { result } = renderHook(() => useSettings())
             expect(result.current.markdownEnabled).toBe(false)
@@ -81,6 +87,7 @@ describe('useSettings', () => {
             expect(result.current.toolbarVisible).toBe(false)
             expect(result.current.spellcheckEnabled).toBe(false)
             expect(result.current.landscapeFullscreen).toBe(true)
+            expect(result.current.showNoteCounts).toBe(true)
         })
 
         it('persists changes back to localStorage', () => {
@@ -95,6 +102,11 @@ describe('useSettings', () => {
                 result.current.setFontSize('small')
             })
             expect(localStorage.getItem('font-size')).toBe('small')
+
+            act(() => {
+                result.current.setShowNoteCounts(true)
+            })
+            expect(localStorage.getItem('show-note-counts')).toBe('true')
         })
 
         it('ignores invalid fontFamily values and defaults to inter', () => {
@@ -120,6 +132,7 @@ describe('useSettings', () => {
                 accentColor: 'purple',
                 toolbarVisible: false,
                 spellcheckEnabled: false,
+                showNoteCounts: true,
             }
             const { result } = renderHook(() => useSettings(metadataSettings))
 
@@ -127,6 +140,7 @@ describe('useSettings', () => {
             expect(result.current.accentColor).toBe('purple')
             expect(result.current.toolbarVisible).toBe(false)
             expect(result.current.spellcheckEnabled).toBe(false)
+            expect(result.current.showNoteCounts).toBe(true)
         })
 
         it('does NOT override device-specific settings from cloud', () => {
@@ -186,6 +200,30 @@ describe('useSettings', () => {
             expect(lastCall).toHaveProperty('accentColor')
             expect(lastCall).toHaveProperty('toolbarVisible')
             expect(lastCall).toHaveProperty('spellcheckEnabled')
+        })
+
+        it('does NOT revert local changes when re-rendered with stale metadataSettings before save completes', () => {
+            const onSave = vi.fn()
+            const metadataSettings = { toolbarVisible: false }
+            const { result, rerender } = renderHook(
+                (props: { meta?: any }) => useSettings(props.meta, onSave),
+                { initialProps: { meta: metadataSettings } }
+            )
+
+            expect(result.current.toolbarVisible).toBe(false)
+
+            act(() => {
+                result.current.setToolbarVisible(true)
+            })
+
+            // Local state should immediately become true
+            expect(result.current.toolbarVisible).toBe(true)
+
+            // Re-render with the SAME metadataSettings object before async save updates metadata
+            rerender({ meta: metadataSettings })
+
+            // Local state MUST STILL BE TRUE, not reverted to false!
+            expect(result.current.toolbarVisible).toBe(true)
         })
     })
 })

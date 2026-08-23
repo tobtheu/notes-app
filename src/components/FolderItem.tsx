@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Folder, Pencil, Trash2, GripVertical } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Folder, Pencil, Trash2, GripVertical, MoreVertical } from 'lucide-react';
 import clsx from 'clsx';
 import type { AppMetadata } from '../types';
 import { normalizeStr } from '../utils/path';
@@ -15,6 +15,8 @@ export interface FolderItemProps {
     isReorderMode?: boolean;
     isIOS?: boolean;
     monochromeIcons?: boolean;
+    showNoteCounts?: boolean;
+    noteCount?: number;
     onSelectCategory?: (name: string | null) => void;
     onEditCategory?: (name: string) => void;
     onDeleteCategory?: (name: string) => void;
@@ -32,54 +34,24 @@ export interface SortableFolderItemProps {
     metadata: AppMetadata;
     selectedCategory: string | null;
     isCollapsed: boolean;
-    isReorderMode: boolean;
+    isReorderMode?: boolean;
     isIOS?: boolean;
     monochromeIcons?: boolean;
+    showNoteCounts?: boolean;
+    noteCount?: number;
     onSelectCategory: (name: string | null) => void;
     onEditCategory: (name: string) => void;
     onDeleteCategory: (name: string) => void;
 }
 
-const CategoryActionButtons = ({
-    folder,
-    onEditCategory,
-    onDeleteCategory,
-    containerClass,
-    buttonClass,
-    deleteButtonClass
-}: {
-    folder: string;
-    onEditCategory: (name: string) => void;
-    onDeleteCategory: (name: string) => void;
-    containerClass: string;
-    buttonClass: string;
-    deleteButtonClass: string;
-}) => (
-    <div className={containerClass}>
-        <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onEditCategory(folder); }}
-            className={buttonClass}
-            title="Edit"
-        >
-            <Pencil size={16} />
-        </button>
-        <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onDeleteCategory(folder); }}
-            className={deleteButtonClass}
-            title="Delete"
-        >
-            <Trash2 size={16} />
-        </button>
-    </div>
-);
-
 export const FolderItem = ({
     folder, metadata, selectedCategory, isCollapsed, isReorderMode = false, isIOS = false, monochromeIcons = false,
+    showNoteCounts = false,
+    noteCount = 0,
     onSelectCategory, onEditCategory, onDeleteCategory,
     isDragging, isOverlay, setNodeRef, attributes, listeners, style
 }: FolderItemProps) => {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const longPressTimer = useRef<any>(null);
     const [isLongPressing, setIsLongPressing] = useState(false);
     const [isPressing, setIsPressing] = useState(false);
@@ -92,9 +64,8 @@ export const FolderItem = ({
         setIsPressing(false);
     };
 
-    const handleTouchStart = (e: React.TouchEvent) => {
+    const handleTouchStart = () => {
         if (isReorderMode) return;
-        e.preventDefault();
         setIsLongPressing(false);
         setIsPressing(true);
         longPressTimer.current = setTimeout(() => {
@@ -119,6 +90,19 @@ export const FolderItem = ({
         setIsLongPressing(false);
     };
 
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = () => {
+            setIsMenuOpen(false);
+        };
+        if (isMenuOpen) {
+            document.addEventListener('click', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+        };
+    }, [isMenuOpen]);
+
     const folderKey = Object.keys(metadata.folders).find(k => normalizeStr(k) === normalizeStr(folder)) || folder;
     const folderMeta = metadata.folders[folderKey] || {};
     const IconComponent = ICON_MAP[folderMeta.icon || 'Folder'] || Folder;
@@ -130,15 +114,14 @@ export const FolderItem = ({
             ref={setNodeRef}
             style={{ ...style, WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' } as React.CSSProperties}
             className={clsx(
-                "group relative flex items-center transition-all rounded-lg cursor-pointer mb-0.5 outline-none",
-                isCollapsed ? "justify-center py-1.5" : clsx("px-1 gap-2 text-sm font-medium", isIOS ? "py-2.5" : "py-1.5"),
+                "group/folder folder-item-animated relative flex items-center rounded-xl cursor-pointer outline-none border",
+                isCollapsed ? "justify-center py-2 px-1" : clsx("px-2.5 gap-2 text-xs font-medium", isIOS ? "py-2" : "py-1.5"),
                 isSelected
-                    ? isCollapsed
-                        ? clsx(colorStyles.bg, colorStyles.darkBg, "shadow-sm")
-                        : "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100"
-                    : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700",
+                    ? "bg-[var(--card-active)] border-[var(--border-subtle)] text-[var(--text-main)] font-semibold shadow-sm"
+                    : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)] border-transparent",
                 isDragging && "opacity-40",
-                isOverlay && "shadow-lg scale-105 opacity-90 cursor-grabbing bg-white dark:bg-gray-800"
+                isOverlay && "shadow-xl scale-105 opacity-95 cursor-grabbing bg-[var(--card-hover)] z-50 rounded-xl",
+                isMenuOpen && "z-30"
             )}
             title={isCollapsed ? folder : undefined}
             onClick={() => {
@@ -149,56 +132,104 @@ export const FolderItem = ({
             onTouchMove={handleTouchMove}
         >
             {isPressing && (
-                <span className={clsx("absolute inset-0 rounded-lg animate-longpress pointer-events-none", colorStyles.bg, colorStyles.darkBg)} />
+                <span className={clsx("absolute inset-0 rounded-xl animate-longpress pointer-events-none opacity-20 bg-current")} />
             )}
 
-            <div className={clsx("flex items-center gap-2 shrink-0 min-w-0", isCollapsed ? "justify-center" : "flex-1 pr-1")}>
-                {!isCollapsed && (
-                    <div
-                        {...attributes}
-                        {...listeners}
-                        className={clsx(
-                            "shrink-0 outline-none transition-all",
-                            isReorderMode
-                                ? "text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing opacity-100"
-                                : "text-gray-300 dark:text-gray-600 cursor-grab opacity-0 lg:group-hover:opacity-100"
+            <div className={clsx("flex items-center gap-2 shrink-0 min-w-0 w-full", isCollapsed ? "justify-center" : "flex-1")}>
+                {/* Drag handle or Icon */}
+                <div className="flex items-center gap-2 min-w-0">
+                    <div className="relative flex items-center justify-center w-4 h-4 shrink-0">
+                        {!isCollapsed && (
+                            <div
+                                {...attributes}
+                                {...listeners}
+                                className={clsx(
+                                    "outline-none transition-opacity duration-200 absolute w-5 h-5 -m-0.5 flex items-center justify-center z-20 touch-none",
+                                    isReorderMode
+                                        ? "text-[var(--text-muted)] cursor-grab active:cursor-grabbing opacity-100"
+                                        : "opacity-0 group-hover/folder:opacity-100 text-[var(--text-muted)] cursor-grab active:cursor-grabbing pointer-events-none group-hover/folder:pointer-events-auto"
+                                )}
+                                title="Drag to reorder"
+                            >
+                                <GripVertical size={13} />
+                            </div>
                         )}
-                    >
-                        <GripVertical size={14} />
+                        <div className={clsx(
+                            "transition-opacity duration-200 flex items-center justify-center",
+                            !isCollapsed && !isReorderMode && "group-hover/folder:opacity-0"
+                        )}>
+                            <IconComponent
+                                size={isCollapsed ? (isIOS ? 20 : 16) : 14}
+                                className={clsx(monochromeIcons ? "text-inherit" : clsx(colorStyles.text, colorStyles.darkText))}
+                            />
+                        </div>
                     </div>
-                )}
-                <div className={clsx(
-                    "p-1 rounded-md transition-colors shrink-0",
-                    isSelected && !isCollapsed ? (monochromeIcons ? "bg-gray-100 dark:bg-gray-800" : colorStyles.bg + " " + colorStyles.darkBg) : "bg-transparent"
-                )}>
-                    <IconComponent
-                        size={isCollapsed ? 20 : 18}
-                        className={clsx(monochromeIcons ? "text-inherit" : clsx(colorStyles.text, colorStyles.darkText))}
-                    />
+
+                    {!isCollapsed && <span className="truncate flex-1">{folder}</span>}
                 </div>
-                {!isCollapsed && <span className="truncate flex-1 py-0.5">{folder}</span>}
+
+                {/* Right Note Count (fades out on hover) */}
+                {!isCollapsed && showNoteCounts && (
+                    <span className="ml-auto text-[10px] font-mono text-[var(--text-muted)] group-hover/folder:opacity-0 transition-opacity duration-200 pr-0.5">
+                        {noteCount}
+                    </span>
+                )}
             </div>
 
-            {!isCollapsed && !isReorderMode && onEditCategory && onDeleteCategory && (
-                <CategoryActionButtons
-                    folder={folder}
-                    onEditCategory={onEditCategory}
-                    onDeleteCategory={onDeleteCategory}
-                    containerClass="absolute right-1.5 px-1 py-1 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-md shadow-sm border border-gray-100/50 dark:border-gray-700/50 z-20 hidden lg:flex"
-                    buttonClass="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-primary-500 rounded transition-all outline-none"
-                    deleteButtonClass="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-500 hover:text-red-500 rounded transition-all outline-none"
-                />
+            {/* 3-Dots Button (fades in at same position on hover) */}
+            {!isCollapsed && !isReorderMode && (onEditCategory || onDeleteCategory) && (
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsMenuOpen(prev => !prev);
+                    }}
+                    className={clsx(
+                        "smooth-transition absolute right-1.5 p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 z-20",
+                        isMenuOpen ? "opacity-100 bg-black/5 dark:bg-white/10 text-[var(--text-main)]" : "opacity-0 group-hover/folder:opacity-100 pointer-events-none group-hover/folder:pointer-events-auto"
+                    )}
+                    title="Folder Options"
+                >
+                    <MoreVertical size={13} />
+                </button>
             )}
 
-            {!isCollapsed && isReorderMode && onEditCategory && onDeleteCategory && (
-                <CategoryActionButtons
-                    folder={folder}
-                    onEditCategory={onEditCategory}
-                    onDeleteCategory={onDeleteCategory}
-                    containerClass="flex items-center gap-0.5 shrink-0 ml-1"
-                    buttonClass="p-2 text-gray-400 hover:text-primary-500 active:text-primary-500 rounded-md transition-all"
-                    deleteButtonClass="p-2 text-gray-400 hover:text-red-500 active:text-red-500 rounded-md transition-all"
-                />
+            {/* 3-Dots Popover Menu */}
+            {isMenuOpen && (
+                <div
+                    className="absolute right-0 top-7 z-50 bg-[var(--canvas-bg)] border border-[var(--border-subtle)] shadow-xl rounded-2xl py-1.5 w-36 text-xs font-medium animate-popover-expand backdrop-blur-xl"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {onEditCategory && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsMenuOpen(false);
+                                onEditCategory(folder);
+                            }}
+                            className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-[var(--card-hover)] flex items-center gap-2 text-[var(--text-main)] active:scale-95"
+                        >
+                            <Pencil size={13} className="text-[var(--text-muted)]" />
+                            <span>Edit Folder</span>
+                        </button>
+                    )}
+                    {onDeleteCategory && (
+                        <>
+                            <div className="h-px bg-[var(--border-subtle)] my-1 mx-2" />
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsMenuOpen(false);
+                                    onDeleteCategory(folder);
+                                }}
+                                className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 flex items-center gap-2 active:scale-95"
+                            >
+                                <Trash2 size={13} />
+                                <span>Delete</span>
+                            </button>
+                        </>
+                    )}
+                </div>
             )}
         </div>
     );
@@ -230,6 +261,8 @@ export const SortableFolderItem = (props: SortableFolderItemProps) => {
             isReorderMode={props.isReorderMode}
             isIOS={props.isIOS}
             monochromeIcons={props.monochromeIcons}
+            showNoteCounts={props.showNoteCounts}
+            noteCount={props.noteCount}
         />
     );
 };

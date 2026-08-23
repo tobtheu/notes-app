@@ -4,6 +4,7 @@ import type { PGliteWithLive } from '@electric-sql/pglite/live';
 import { getDb, startElectricSync, stopElectricSync } from '../lib/electric';
 import { supabase, setSupabaseSession, clearSupabaseSession } from '../lib/supabaseClient';
 import { enqueue, flushQueue } from '../lib/offlineQueue';
+import { pullFromSupabase } from '../lib/syncSupabase';
 import { log } from '../lib/logger';
 
 interface UseNotesAuthProps {
@@ -13,8 +14,6 @@ interface UseNotesAuthProps {
     setUserEmail: (email: string | null) => void;
     setSyncStatus: (status: SyncStatus) => void;
     setSyncError: (error: string | null) => void;
-    currentFolder: string | null;
-    setCurrentFolder: (folder: string | null) => void;
 }
 
 export function useNotesAuth({
@@ -24,8 +23,6 @@ export function useNotesAuth({
     setUserEmail,
     setSyncStatus,
     setSyncError,
-    currentFolder: _currentFolder,
-    setCurrentFolder
 }: UseNotesAuthProps) {
     
     const migrateLocalNotes = useCallback(async (db: PGliteWithLive, realUserId: string) => {
@@ -88,13 +85,6 @@ export function useNotesAuth({
     const clearLocalData = useCallback(async (uid: string) => {
         const db = dbRef.current;
         if (!db) return;
-        const mirrorFolder = localStorage.getItem('notes-folder');
-        if (mirrorFolder) {
-            const rows = await db.query<{ id: string }>('SELECT id FROM notes WHERE user_id = $1 AND deleted = false', [uid]);
-            for (const row of rows.rows) {
-                window.tauriAPI.deleteMirrorFile({ mirrorFolder, noteId: row.id }).catch(() => {});
-            }
-        }
         await db.query('DELETE FROM notes WHERE user_id = $1', [uid]);
         await db.query('DELETE FROM app_config WHERE user_id = $1', [uid]);
     }, [dbRef]);
@@ -109,15 +99,27 @@ export function useNotesAuth({
             log.info('[useNotes:signIn] Supabase session set');
             const db = await getDb();
             dbRef.current = db;
+
             if (userId === 'local') {
                 log.info('[useNotes:signIn] migrating local notes to', result.userId);
                 await migrateLocalNotes(db, result.userId);
             }
+
+            // Immediately fetch remote notes and config from Supabase into local PGlite
+            log.info('[useNotes:signIn] pulling remote notes from Supabase...');
+            await pullFromSupabase(db, result.userId);
+
             setUserId(result.userId);
             setUserEmail(result.email);
             localStorage.setItem('lama-user-id', result.userId);
             localStorage.setItem('lama-user-email', result.email);
             localStorage.removeItem('lama-mode');
+
+            if (navigator.onLine) {
+                log.info('[useNotes:signIn] flushing queue...');
+                await flushQueue(db);
+            }
+
             log.info('[useNotes:signIn] starting Electric sync...');
             await startElectricSync(result.userId, creds.accessToken, (err) => {
                 log.error('[useNotes] Electric sync error:', String(err));
@@ -126,26 +128,11 @@ export function useNotesAuth({
             });
             log.info('[useNotes:signIn] Electric sync started');
             setSyncStatus('synced');
-            if (navigator.onLine) {
-                log.info('[useNotes:signIn] flushing queue...');
-                await flushQueue(db);
-            }
-            const existingFolder = localStorage.getItem('notes-folder');
-            log.info('[useNotes:signIn] existing folder:', existingFolder);
-            if (!existingFolder) {
-                log.info('[useNotes:signIn] no folder set → creating default workspace');
-                const docDir = await window.tauriAPI.getDocumentDir();
-                const defaultPath = `${docDir}/Lama Notes`.replace(/\\/g, '/');
-                await window.tauriAPI.createFolder(docDir, defaultPath);
-                localStorage.setItem('notes-folder', defaultPath);
-                setCurrentFolder(defaultPath);
-                log.info('[useNotes:signIn] default workspace set:', defaultPath);
-            }
         } else {
             log.warn('[useNotes:signIn] no creds returned after sign-in!');
         }
         return result;
-    }, [userId, dbRef, migrateLocalNotes, setUserId, setUserEmail, setSyncStatus, setSyncError, setCurrentFolder]);
+    }, [userId, dbRef, migrateLocalNotes, setUserId, setUserEmail, setSyncStatus, setSyncError]);
 
     const signUp = useCallback(async (email: string, password: string) => {
         log.info('[useNotes:signUp] signing up:', email);
@@ -156,15 +143,24 @@ export function useNotesAuth({
             await setSupabaseSession(creds.accessToken, creds.refreshToken);
             const db = await getDb();
             dbRef.current = db;
+
             if (userId === 'local') {
                 log.info('[useNotes:signUp] migrating local notes to', result.userId);
                 await migrateLocalNotes(db, result.userId);
             }
+
+            // Immediately fetch remote notes and config from Supabase into local PGlite
+            log.info('[useNotes:signUp] pulling remote notes from Supabase...');
+            await pullFromSupabase(db, result.userId);
+
             setUserId(result.userId);
             setUserEmail(result.email);
             localStorage.setItem('lama-user-id', result.userId);
             localStorage.setItem('lama-user-email', result.email);
             localStorage.removeItem('lama-mode');
+
+            if (navigator.onLine) await flushQueue(db);
+
             log.info('[useNotes:signUp] starting Electric sync...');
             await startElectricSync(result.userId, creds.accessToken, (err) => {
                 log.error('[useNotes] Electric sync error:', String(err));
@@ -173,22 +169,11 @@ export function useNotesAuth({
             });
             log.info('[useNotes:signUp] Electric sync started');
             setSyncStatus('synced');
-            if (navigator.onLine) await flushQueue(db);
-            const existingFolder = localStorage.getItem('notes-folder');
-            if (!existingFolder) {
-                log.info('[useNotes:signUp] no folder set → creating default workspace');
-                const docDir = await window.tauriAPI.getDocumentDir();
-                const defaultPath = `${docDir}/Lama Notes`.replace(/\\/g, '/');
-                await window.tauriAPI.createFolder(docDir, defaultPath);
-                localStorage.setItem('notes-folder', defaultPath);
-                setCurrentFolder(defaultPath);
-                log.info('[useNotes:signUp] default workspace set:', defaultPath);
-            }
         } else {
             log.warn('[useNotes:signUp] no creds returned after sign-up!');
         }
         return result;
-    }, [userId, dbRef, migrateLocalNotes, setUserId, setUserEmail, setSyncStatus, setSyncError, setCurrentFolder]);
+    }, [userId, dbRef, migrateLocalNotes, setUserId, setUserEmail, setSyncStatus, setSyncError]);
 
     const signOut = useCallback(async (deleteLocal = false) => {
         log.info('[useNotes:signOut] signing out, deleteLocal:', deleteLocal);
@@ -201,6 +186,7 @@ export function useNotesAuth({
         localStorage.removeItem('lama-user-id');
         localStorage.removeItem('lama-user-email');
         localStorage.removeItem('lama-mode');
+        localStorage.removeItem('lama-metadata');
         setSyncStatus('unauthenticated');
         log.info('[useNotes:signOut] done — status: unauthenticated');
     }, [userId, clearLocalData, setUserId, setUserEmail, setSyncStatus]);
@@ -221,6 +207,7 @@ export function useNotesAuth({
         localStorage.removeItem('lama-user-id');
         localStorage.removeItem('lama-user-email');
         localStorage.removeItem('lama-mode');
+        localStorage.removeItem('lama-metadata');
         setSyncStatus('unauthenticated');
         log.info('[useNotes:deleteAccount] done');
     }, [userId, clearLocalData, setUserId, setUserEmail, setSyncStatus]);

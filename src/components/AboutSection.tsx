@@ -1,5 +1,7 @@
-import { RefreshCw, Download, CheckCircle2, Rocket, AlertCircle, Activity, Loader2, Wifi } from 'lucide-react';
+import { RefreshCw, Download, CheckCircle2, Rocket, AlertCircle, Activity, Loader2 } from 'lucide-react';
+import clsx from 'clsx';
 import type { HealthStatus } from '../utils/health';
+import logo from '../assets/logo.png';
 
 interface AboutSectionProps {
     isIOS: boolean;
@@ -30,162 +32,157 @@ export function AboutSection({
     handleRunDiagnostics
 }: AboutSectionProps) {
     return (
-        <div className="mt-8 border-t border-gray-100 dark:border-gray-700 pt-6 mb-2">
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">About</h3>
-
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Version</span>
-                    <span className="text-xs text-gray-500">{version}</span>
+        <div className="space-y-6 text-xs select-none pb-6">
+            {/* Hero App Branding Section */}
+            <div>
+                <label className="block font-semibold text-[var(--text-main)] mb-2.5">Application Info</label>
+                <div className="text-center py-5 bg-[var(--card-hover)] rounded-2xl border border-[var(--border-subtle)] p-5">
+                    <img
+                        src={logo}
+                        alt="Lama Notes"
+                        className="w-14 h-14 mx-auto mb-2.5 rounded-2xl shadow-sm object-contain select-none pointer-events-none"
+                    />
+                    <h4 className="font-bold text-[var(--text-main)] text-sm">LamaNotes</h4>
+                    <p className="text-[var(--text-muted)] font-mono text-xs mt-0.5">Version {version || '0.7.12'}</p>
+                    <p className="text-[var(--text-muted)] text-[11px] mt-1 font-medium">© Tobias Theunissen</p>
+                    
+                    <div className="flex justify-center gap-2 mt-4">
+                        {!isIOS && (
+                            <button
+                                type="button"
+                                onClick={handleCheckForUpdates}
+                                className="smooth-transition px-3.5 py-1.5 rounded-xl bg-[var(--canvas-bg)] border border-[var(--border-subtle)] text-[var(--text-main)] hover:border-[var(--accent-color)] font-medium text-xs shadow-sm active:scale-95 flex items-center gap-1.5"
+                            >
+                                <RefreshCw size={12} className={updateStatus.type === 'checking' ? 'animate-spin' : ''} />
+                                <span>Check for Updates</span>
+                            </button>
+                        )}
+                        {import.meta.env.DEV && (
+                            <button
+                                type="button"
+                                onClick={handleRunDiagnostics}
+                                disabled={isDiagnosing}
+                                className="smooth-transition px-3.5 py-1.5 rounded-xl bg-[var(--canvas-bg)] border border-[var(--border-subtle)] text-[var(--text-main)] hover:border-[var(--accent-color)] font-medium text-xs shadow-sm active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                                {isDiagnosing ? <Loader2 size={12} className="animate-spin" /> : <Activity size={12} />}
+                                <span>Diagnostics</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
-
-                {!isIOS && (updateStatus.type === 'idle' || updateStatus.type === 'not-available' || updateStatus.type === 'error') && (
-                    <button
-                        onClick={handleCheckForUpdates}
-                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
-                    >
-                        <RefreshCw size={14} />
-                        Check for Updates
-                    </button>
-                )}
             </div>
 
             {/* Real-time Update Status Display */}
             {updateStatus.type !== 'idle' && (
-                <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-                    {updateStatus.type === 'checking' && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                            <RefreshCw size={14} className="animate-spin" />
-                            <span>Checking for updates...</span>
-                        </div>
-                    )}
+                <div className="pt-3 border-t border-[var(--border-subtle)] space-y-2.5">
+                    <label className="block font-semibold text-[var(--text-main)] mb-2">Software Update</label>
+                    <div className="bg-[var(--card-hover)] rounded-2xl p-4 border border-[var(--border-subtle)]">
+                        {updateStatus.type === 'checking' && (
+                            <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                                <RefreshCw size={13} className="animate-spin text-[var(--accent-color)]" />
+                                <span>Checking for updates...</span>
+                            </div>
+                        )}
 
-                    {updateStatus.type === 'available' && (
-                        <div className="flex flex-col gap-3">
-                            <div className="flex items-start gap-2 text-sm text-primary-600 dark:text-primary-400">
-                                <RefreshCw size={14} className="mt-0.5" />
-                                <div>
-                                    <p className="font-semibold">Update Available ({updateStatus.version})</p>
-                                    <p className="text-xs opacity-80">A new version is ready to download.</p>
+                        {updateStatus.type === 'available' && (
+                            <div className="flex flex-col gap-2.5">
+                                <div className="flex items-start gap-2 text-xs text-[var(--accent-color)]">
+                                    <RefreshCw size={14} className="mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="font-bold">Update Available ({updateStatus.version})</p>
+                                        <p className="text-[11px] opacity-80 text-[var(--text-muted)]">A new version is ready to download.</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleDownloadUpdate}
+                                    className="smooth-transition w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold bg-[var(--accent-color)] text-white rounded-xl shadow-sm hover:opacity-90 active:scale-95"
+                                >
+                                    <Download size={14} />
+                                    Download Now
+                                </button>
+                            </div>
+                        )}
+
+                        {updateStatus.type === 'downloading' && (
+                            <div className="flex flex-col gap-1.5">
+                                <div className="flex justify-between text-xs font-medium mb-1">
+                                    <span className="text-[var(--text-muted)]">Downloading update...</span>
+                                    <span className="text-[var(--accent-color)] font-bold">{Math.round(updateStatus.progress || 0)}%</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-[var(--accent-color)] transition-all duration-300"
+                                        style={{ width: `${updateStatus.progress || 0}%` }}
+                                    />
                                 </div>
                             </div>
-                            <button
-                                onClick={handleDownloadUpdate}
-                                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-semibold bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
-                            >
-                                <Download size={14} />
-                                Download Now
-                            </button>
-                        </div>
-                    )}
+                        )}
 
-                    {updateStatus.type === 'downloading' && (
-                        <div className="flex flex-col gap-2">
-                            <div className="flex justify-between text-xs font-medium mb-1">
-                                <span className="text-gray-600 dark:text-gray-400">Downloading...</span>
-                                <span className="text-primary-600 dark:text-primary-400">{Math.round(updateStatus.progress || 0)}%</span>
-                            </div>
-                            <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-primary-500 transition-all duration-300"
-                                    style={{ width: `${updateStatus.progress || 0}%` }}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {updateStatus.type === 'downloaded' && (
-                        <div className="flex flex-col gap-3">
-                            <div className="flex items-start gap-2 text-sm text-green-600 dark:text-green-400">
-                                <CheckCircle2 size={14} className="mt-0.5" />
-                                <div>
-                                    <p className="font-semibold">Update Ready</p>
-                                    <p className="text-xs opacity-80">Download complete. Restart to apply.</p>
+                        {updateStatus.type === 'downloaded' && (
+                            <div className="flex flex-col gap-2.5">
+                                <div className="flex items-start gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                                    <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="font-bold">Update Ready</p>
+                                        <p className="text-[11px] text-[var(--text-muted)]">Download complete. Restart application to apply.</p>
+                                    </div>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={handleInstallUpdate}
+                                    className="smooth-transition w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm active:scale-95"
+                                >
+                                    <Rocket size={14} />
+                                    Restart & Install
+                                </button>
                             </div>
-                            <button
-                                onClick={handleInstallUpdate}
-                                className="w-full flex items-center justify-center gap-2 py-2 text-sm font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
-                            >
-                                <Rocket size={14} />
-                                Restart & Install
-                            </button>
-                        </div>
-                    )}
+                        )}
 
-                    {updateStatus.type === 'not-available' && (
-                        <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-                            <CheckCircle2 size={14} />
-                            <span>You are on the latest version!</span>
-                        </div>
-                    )}
-
-                    {updateStatus.type === 'error' && (
-                        <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
-                                <AlertCircle size={14} />
-                                <span>Update failed</span>
+                        {updateStatus.type === 'not-available' && (
+                            <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                                <CheckCircle2 size={14} />
+                                <span>You are on the latest version!</span>
                             </div>
-                            <p className="text-[10px] text-red-500 pl-6 break-all">{updateStatus.error}</p>
-                        </div>
-                    )}
+                        )}
+
+                        {updateStatus.type === 'error' && (
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2 text-xs text-red-500">
+                                    <AlertCircle size={14} />
+                                    <span className="font-semibold">Update check failed</span>
+                                </div>
+                                <p className="text-[10px] text-red-400 pl-5 break-all">{updateStatus.error}</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
-            {/* Connection Diagnostic - Only shown in DEV mode */}
-            {import.meta.env.DEV && (
-                <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
-                    <h3 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                        <Activity size={12} />
-                        Connection Diagnostic
-                    </h3>
-
-                    <button
-                        onClick={handleRunDiagnostics}
-                        disabled={isDiagnosing}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md transition-colors disabled:opacity-50"
-                    >
-                        {isDiagnosing ? (
-                            <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                            <Wifi size={14} />
-                        )}
-                        {isDiagnosing ? 'Checking Connections...' : 'Test Connection Status'}
-                    </button>
-
-                    {diagResults && (
-                        <div className="mt-4 space-y-2">
-                            {diagResults.map((res, i) => (
-                                <div key={i} className="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-900/50">
-                                    <div className="flex items-center gap-2">
-                                        {res.ok ? (
-                                            <div className="w-2 h-2 rounded-full bg-green-500" />
-                                        ) : (
-                                            <div className="w-2 h-2 rounded-full bg-red-500" />
-                                        )}
-                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{res.service}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {res.latency !== undefined && res.latency > 0 && (
-                                            <span className="text-[10px] text-gray-400">{res.latency}ms</span>
-                                        )}
-                                        {res.ok ? (
-                                            <CheckCircle2 size={14} className="text-green-500" />
-                                        ) : (
-                                            <AlertCircle size={14} className="text-red-500" />
-                                        )}
-                                    </div>
+            {/* Connection Diagnostic Results */}
+            {import.meta.env.DEV && diagResults && (
+                <div className="pt-3 border-t border-[var(--border-subtle)] space-y-2.5">
+                    <label className="block font-semibold text-[var(--text-main)] mb-2">Connection Diagnostics</label>
+                    <div className="space-y-1.5 p-3 rounded-2xl bg-[var(--card-hover)] border border-[var(--border-subtle)]">
+                        {diagResults.map((res, i) => (
+                            <div key={i} className="flex items-center justify-between p-2 rounded-xl bg-[var(--canvas-bg)] text-xs border border-[var(--border-subtle)]">
+                                <div className="flex items-center gap-2">
+                                    <span className={clsx("w-2 h-2 rounded-full", res.ok ? "bg-emerald-500" : "bg-red-500")} />
+                                    <span className="font-medium text-[var(--text-main)]">{res.service}</span>
                                 </div>
-                            ))}
-                            {!diagResults.every(r => r.ok) && (
-                                <div className="p-2 mt-2 bg-red-50 dark:bg-red-900/20 rounded border border-red-100 dark:border-red-900/30">
-                                    <p className="text-[10px] text-red-600 dark:text-red-400 leading-relaxed">
-                                        One or more services are unreachable. If you are on iOS, check if the server uses HTTPS.
-                                    </p>
+                                <div className="flex items-center gap-2">
+                                    {res.latency !== undefined && res.latency > 0 && (
+                                        <span className="text-[10px] font-mono text-[var(--text-muted)]">{res.latency}ms</span>
+                                    )}
+                                    {res.ok ? (
+                                        <CheckCircle2 size={13} className="text-emerald-500" />
+                                    ) : (
+                                        <AlertCircle size={13} className="text-red-500" />
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    )}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>

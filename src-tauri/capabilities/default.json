@@ -4,8 +4,7 @@
   "description": "enables the default permissions for desktop",
   "platforms": ["linux", "macOS", "windows"],
   "windows": [
-    "main",
-    "quick-note"
+    "main"
   ],
   "permissions": [
     "core:default",

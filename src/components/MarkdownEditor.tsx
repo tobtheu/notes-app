@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, memo } from 'react';
+import { forwardRef, useImperativeHandle, memo, useState } from 'react';
 import type { Note } from '../types';
 import { EditorContent } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
@@ -12,6 +12,7 @@ import { useMarkdownEditor } from '../hooks/useMarkdownEditor';
 
 export interface MarkdownEditorRef {
     focus: (position?: 'start' | 'end') => void;
+    scrollToTop: () => void;
 }
 
 interface MarkdownEditorProps {
@@ -39,9 +40,20 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
         header,
         isFocusMode = false,
         iosLandscapeFullscreen = false,
-        allNotes,
         onNavigate
     } = props;
+
+    const [prevVisible, setPrevVisible] = useState(toolbarVisible);
+    const [animState, setAnimState] = useState<'initial-visible' | 'initial-hidden' | 'entering' | 'exiting'>(() =>
+        toolbarVisible ? 'initial-visible' : 'initial-hidden'
+    );
+
+    if (prevVisible !== toolbarVisible) {
+        setPrevVisible(toolbarVisible);
+        setAnimState(toolbarVisible ? 'entering' : 'exiting');
+    }
+
+
 
     const {
         editor,
@@ -74,8 +86,13 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
             } else {
                 editor.chain().focus().run();
             }
+        },
+        scrollToTop: () => {
+            if (scrollContainerRef.current) {
+                scrollContainerRef.current.scrollTop = 0;
+            }
         }
-    }), [editor]);
+    }), [editor, scrollContainerRef]);
 
     if (!editor) {
         return null;
@@ -88,7 +105,7 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
                 isScrolling && "is-scrolling"
             )}
             onMouseLeave={() => setHoveredLink(null)}
-            style={{ backgroundColor: 'var(--app-bg)' }}
+            style={{ backgroundColor: 'transparent' }}
         >
             {/* Link Modal */}
             <UrlInputModal
@@ -96,7 +113,6 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
                 type="link"
                 initialUrl={linkModalData.url}
                 initialText={linkModalData.text}
-                allNotes={allNotes}
                 onClose={() => setIsLinkModalOpen(false)}
                 onSave={saveLink}
                 isIOS={isIOS}
@@ -150,7 +166,7 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
             <div
                 ref={scrollContainerRef}
                 className={clsx(
-                    "flex-1 overflow-y-auto custom-scrollbar min-h-0 cursor-text group/editor",
+                    "flex-1 overflow-y-auto custom-scrollbar min-h-0 cursor-text group/editor pb-16",
                     isFocusMode && "focus-mode-active"
                 )}
                 style={isIOS && keyboardHeight > 0 ? { paddingBottom: `${keyboardHeight + 80}px` } : undefined}
@@ -181,7 +197,7 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
                 }}
                 onClick={(e) => {
                     if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('max-w-4xl')) {
-                        editor.chain().focus('end').run();
+                        editor.chain().focus().run();
                     }
                 }}
             >
@@ -197,23 +213,35 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
                 </div>
             </div>
 
-            {/* Footer Toolbar - native accessory bar on iOS, floating web bar on desktop */}
-            {toolbarVisible && !isIOS && (
-                <div
-                    ref={toolbarRef}
-                    className="px-2 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 flex items-center justify-center w-full box-content"
-                    style={keyboardHeight > 0
-                        ? { backgroundColor: 'var(--app-bg)', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9998, paddingTop: 4, paddingBottom: 4 }
-                        : { backgroundColor: 'var(--app-bg)', paddingTop: 8, paddingBottom: 'calc(8px + var(--safe-bottom, 0vh))' }
+            {/* Floating Toolbar with Elastic Spring Physics */}
+            <div
+                ref={toolbarRef}
+                className={clsx(
+                    "absolute bottom-4 left-0 right-0 flex justify-center z-30 px-4 pointer-events-none origin-bottom",
+                    animState === 'entering' && "animate-toolbar-enter",
+                    animState === 'exiting' && "animate-toolbar-exit",
+                    animState === 'initial-visible' && "toolbar-static-visible",
+                    animState === 'initial-hidden' && "toolbar-static-hidden"
+                )}
+                style={keyboardHeight > 0 ? { bottom: `${keyboardHeight + 12}px` } : undefined}
+                onAnimationEnd={(e) => {
+                    if (e.target === toolbarRef.current) {
+                        if (animState === 'entering') {
+                            setAnimState('initial-visible');
+                        } else if (animState === 'exiting') {
+                            setAnimState('initial-hidden');
+                        }
                     }
-                >
+                }}
+            >
+                <div className="pointer-events-auto">
                     <EditorToolbar
                         editor={editor}
                         onLinkClick={() => openLinkModal()}
                         mobile={keyboardHeight > 0}
                     />
                 </div>
-            )}
+            </div>
         </div>
     );
 }));

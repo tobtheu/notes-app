@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLiveQuery } from '@electric-sql/pglite-react';
 import type { Note, AppMetadata, SyncStatus } from '../types';
+import { sanitizeAppMetadata } from '../types';
 import { normalizeStr, getPathId } from '../utils/path';
 import { getDb, startElectricSync } from '../lib/electric';
 import { setSupabaseSession, supabase } from '../lib/supabaseClient';
 import { enqueue, flushQueue } from '../lib/offlineQueue';
+import { pullFromSupabase } from '../lib/syncSupabase';
 import { log } from '../lib/logger';
 import type { PGliteWithLive } from '@electric-sql/pglite/live';
-import { scanAndImportNewFiles } from '../utils/scanAndImport';
 
 import { useNotesAuth } from './useNotesAuth';
 import { useNotesWorkspace } from './useNotesWorkspace';
@@ -67,9 +68,6 @@ export function useNotes() {
           log.info('[useNotes:init] restoring local-only mode');
           setUserId('local');
           setSyncStatus('offline');
-
-          const folder = localStorage.getItem('notes-folder');
-          if (folder) await scanAndImportNewFiles(db, 'local', folder);
           return;
         }
 
@@ -140,17 +138,16 @@ export function useNotes() {
           log.info('[useNotes:init] online → starting Electric sync');
           setSyncStatus('synced');
         }
+        if (navigator.onLine && stored.userId) {
+          log.info('[useNotes:init] pulling remote notes from Supabase...');
+          await pullFromSupabase(db, stored.userId);
+        }
+
         await startElectricSync(stored.userId, stored.accessToken, (err) => {
           log.error('[useNotes] Electric sync error:', String(err));
           if (!cancelled) { setSyncStatus('error'); setSyncError(String(err)); }
         });
         log.info('[useNotes:init] Electric sync started');
-
-        const mirrorFolder = localStorage.getItem('notes-folder');
-        if (mirrorFolder) {
-          log.info('[useNotes:init] scanning mirror folder for new files...');
-          await scanAndImportNewFiles(db, stored.userId, mirrorFolder);
-        }
 
         if (navigator.onLine) {
           log.info('[useNotes:init] flushing offline queue...');
@@ -174,6 +171,7 @@ export function useNotes() {
     const handleOnline = async () => {
       if (!dbRef.current || !userId) return;
       setSyncStatus('synced');
+      await pullFromSupabase(dbRef.current, userId);
       await flushQueue(dbRef.current);
     };
     const handleOffline = () => setSyncStatus('offline');
@@ -220,14 +218,27 @@ export function useNotes() {
     userId ? [userId] : [],
   );
 
-  const [metadata, setMetadataState] = useState<AppMetadata>({ folders: {}, pinnedNotes: [] });
+  const [metadata, setMetadataState] = useState<AppMetadata>(() => {
+    try {
+      const cached = localStorage.getItem('lama-metadata');
+      return cached ? sanitizeAppMetadata(JSON.parse(cached)) : { folders: {}, pinnedNotes: [] };
+    } catch {
+      return { folders: {}, pinnedNotes: [] };
+    }
+  });
 
-  // Reset metadata when the user changes so the previous account's folders don't bleed through.
+  // Reset metadata only when an active user changes to a DIFFERENT active user or signs out.
+  // Do NOT reset when initializing/restoring the session from null -> userId on startup.
   const prevUserIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (prevUserIdRef.current !== undefined && prevUserIdRef.current !== userId) {
+    if (
+      prevUserIdRef.current !== undefined &&
+      prevUserIdRef.current !== null &&
+      prevUserIdRef.current !== userId
+    ) {
       setMetadataState({ folders: {}, pinnedNotes: [] });
       metadataRef.current = { folders: {}, pinnedNotes: [] };
+      try { localStorage.removeItem('lama-metadata'); } catch {}
     }
     prevUserIdRef.current = userId;
   }, [userId]);
@@ -235,7 +246,6 @@ export function useNotes() {
   const configRow = configQuery?.rows?.[0];
   const configUpdatedAt = configRow?.updated_at;
   const configMetadataRaw = configRow?.metadata;
-  const configMetadataStr = typeof configMetadataRaw === 'string' ? configMetadataRaw : JSON.stringify(configMetadataRaw);
 
   useEffect(() => {
     if (!configRow) return;
@@ -245,17 +255,13 @@ export function useNotes() {
     // It's a remote change (or initial load) — apply it
     try {
       const m = configRow.metadata;
-      const parsed = (typeof m === 'string' ? JSON.parse(m) : m) as AppMetadata;
-      const safeMetadata: AppMetadata = {
-        folders: parsed.folders ?? {},
-        pinnedNotes: parsed.pinnedNotes ?? [],
-        folderOrder: parsed.folderOrder ?? [],
-        settings: parsed.settings ?? {},
-      };
+      const parsed = typeof m === 'string' ? JSON.parse(m) : m;
+      const safeMetadata = sanitizeAppMetadata(parsed);
       setMetadataState(safeMetadata);
       metadataRef.current = safeMetadata;
+      try { localStorage.setItem('lama-metadata', JSON.stringify(safeMetadata)); } catch {}
     } catch { /* ignore parse errors */ }
-  }, [configUpdatedAt, configMetadataStr]);
+  }, [configUpdatedAt, configMetadataRaw]);
 
   // Note ID helper
   const getNoteId = useCallback((note: Note) => {
@@ -278,7 +284,7 @@ export function useNotes() {
     }
   }, [hasPending, syncStatus]);
 
-  // ── Notes memoization ─────────────────────────────────────────────────────
+  // ── Notes memoization directly from PGlite Live Query ───────────────────────
   const notes = useMemo(() => {
     return notesQuery?.rows?.map(rowToNote) ?? [];
   }, [notesQuery?.rows]);
@@ -295,7 +301,7 @@ export function useNotes() {
     if (!userId || !dbRef.current) return;
     const db = dbRef.current;
 
-    if (!deleted && new Blob([content]).size > NOTE_SIZE_LIMIT) {
+    if (!deleted && (content.length > 2_500_000 && new Blob([content]).size > NOTE_SIZE_LIMIT)) {
       log.warn(`[useNotes:writeNote] note ${id} exceeds 5MB size limit — write blocked`);
       throw new Error('Note is too large (max. 5 MB). Please shorten the content.');
     }
@@ -344,6 +350,11 @@ export function useNotes() {
     const db = dbRef.current;
     const updatedAt = new Date().toISOString();
 
+    // Instant UI state update & local persistence
+    setMetadataState(newMetadata);
+    metadataRef.current = newMetadata;
+    try { localStorage.setItem('lama-metadata', JSON.stringify(newMetadata)); } catch {}
+
     const existing = await db.query<{ updated_at: string }>(
       `SELECT updated_at FROM app_config WHERE user_id = $1`,
       [userId]
@@ -358,8 +369,6 @@ export function useNotes() {
     }
 
     lastConfigWriteAt.current = finalUpdatedAt;
-    setMetadataState(newMetadata);
-    metadataRef.current = newMetadata;
 
     await db.query(
       /* sql */ `
@@ -386,11 +395,16 @@ export function useNotes() {
     const active = foldersQuery?.rows?.map(r => r.folder) ?? [];
     const ordered = metadata.folderOrder ?? [];
     const result = [...ordered];
-    active.forEach(f => {
-      if (!result.some(r => normalizeStr(r) === normalizeStr(f))) {
+    const seenNormalized = new Set(ordered.map(normalizeStr));
+
+    for (let i = 0; i < active.length; i++) {
+      const f = active[i];
+      const norm = normalizeStr(f);
+      if (!seenNormalized.has(norm)) {
+        seenNormalized.add(norm);
         result.push(f);
       }
-    });
+    }
     return result;
   }, [foldersQuery?.rows, metadata.folderOrder]);
 
@@ -402,8 +416,6 @@ export function useNotes() {
     setUserEmail,
     setSyncStatus,
     setSyncError,
-    currentFolder,
-    setCurrentFolder
   });
 
   const workspace = useNotesWorkspace({
@@ -431,9 +443,14 @@ export function useNotes() {
     getNoteId
   });
 
+  const pinnedSet = useMemo(
+    () => new Set((metadata.pinnedNotes ?? []).map(normalizeStr)),
+    [metadata.pinnedNotes],
+  );
+
   const isNotePinned = useCallback(
-    (note: Note) => (metadata.pinnedNotes ?? []).includes(getNoteId(note)),
-    [getNoteId, metadata.pinnedNotes],
+    (note: Note) => pinnedSet.has(normalizeStr(getNoteId(note))),
+    [getNoteId, pinnedSet],
   );
 
   // Debounce the search term so every keystroke doesn't trigger a full re-filter
@@ -447,21 +464,29 @@ export function useNotes() {
   const filteredNotes = useMemo(() => {
     const searchLower = debouncedSearch.toLowerCase();
     const normalizedCategory = selectedCategory ? normalizeStr(selectedCategory) : null;
-    return notes
-      .filter(note => {
-        if (debouncedSearch && !note.content.toLowerCase().includes(searchLower) && !note.filename.toLowerCase().includes(searchLower)) return false;
-        if (normalizedCategory && normalizeStr(note.folder) !== normalizedCategory) return false;
-        return true;
-      })
-      .sort((a, b) => {
-        const aPinned = isNotePinned(a);
-        const bPinned = isNotePinned(b);
-        if (aPinned && !bPinned) return -1;
-        if (!aPinned && bPinned) return 1;
-        const timeDiff = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-        if (timeDiff !== 0) return timeDiff;
-        return a.filename.localeCompare(b.filename);
-      });
+    
+    // Pre-filter notes
+    const matching: Note[] = [];
+    for (let i = 0; i < notes.length; i++) {
+      const note = notes[i];
+      if (debouncedSearch && !note.content.toLowerCase().includes(searchLower) && !note.filename.toLowerCase().includes(searchLower)) {
+        continue;
+      }
+      if (normalizedCategory && normalizeStr(note.folder) !== normalizedCategory) {
+        continue;
+      }
+      matching.push(note);
+    }
+
+    return matching.sort((a, b) => {
+      const aPinned = isNotePinned(a);
+      const bPinned = isNotePinned(b);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      const dateCompare = b.updatedAt.localeCompare(a.updatedAt);
+      if (dateCompare !== 0) return dateCompare;
+      return a.filename.localeCompare(b.filename);
+    });
   }, [notes, debouncedSearch, selectedCategory, isNotePinned]);
 
   const lastValidSelectedNote = useRef<Note | null>(null);
@@ -503,6 +528,7 @@ export function useNotes() {
     userEmail,
     currentFolder,
     getNoteId,
+    isNotePinned,
 
     // Auth
     ...auth,

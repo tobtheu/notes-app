@@ -15,7 +15,7 @@ import { useSettings } from './hooks/useSettings';
 import { useTheme } from './hooks/useTheme';
 import { useSessionExpiryHandler } from './hooks/useSessionExpiryHandler';
 import { getDb } from './lib/electric';
-import type { Note } from './types';
+import type { Note, FolderMetadata } from './types';
 import { Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { platform } from '@tauri-apps/plugin-os';
@@ -70,10 +70,12 @@ function App() {
     signUp,
     signOut,
     deleteAccount,
+    userId,
     userEmail,
     importFolder,
     importFiles,
     exportBackup,
+    resetDatabase,
     goLocalOnly,
   } = useNotes();
 
@@ -81,7 +83,6 @@ function App() {
     markdownEnabled,
     setMarkdownEnabled,
     accentColor,
-    setAccentColor,
     fontFamily,
     setFontFamily,
     fontSize,
@@ -96,6 +97,8 @@ function App() {
     setMonochromeIcons,
     showIconsWhenCollapsed,
     setShowIconsWhenCollapsed,
+    showNoteCounts,
+    setShowNoteCounts,
   } = useSettings(metadata.settings, saveSettings);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -108,7 +111,18 @@ function App() {
     setIsSettingsOpen,
   });
   const [isIOS, setIsIOS] = useState(false);
-  useEffect(() => { try { setIsIOS(platform() === 'ios'); } catch { } }, []);
+  useEffect(() => {
+    try {
+      const p = platform();
+      setIsIOS(p === 'ios');
+      document.documentElement.setAttribute('data-os', p);
+    } catch {
+      const isLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.userAgent || navigator.platform);
+      if (isLinux) {
+        document.documentElement.setAttribute('data-os', 'linux');
+      }
+    }
+  }, []);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [isFocusMode, setIsFocusMode] = useState(false);
@@ -128,6 +142,7 @@ function App() {
   const {
     isMobile: _isMobile,
     isLandscape,
+    isMaximized,
   } = useViewport(isSidebarCollapsed, setIsSidebarCollapsed);
 
   // Sidebar gestures logic
@@ -147,11 +162,11 @@ function App() {
   // Hide native iOS toolbar accessory bar whenever the user leaves the editor view
   useEffect(() => {
     if (isIOS && activeView !== 'editor') {
-      (window as any).webkit?.messageHandlers?.toolbarVisible?.postMessage(false);
+      window.webkit?.messageHandlers?.toolbarVisible?.postMessage(false);
     }
   }, [isIOS, activeView]);
 
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, autoTheme, setAutoTheme, preferredLightTheme } = useTheme();
 
   // Apply font size to <html> so all rem-based Tailwind classes scale with it
   useEffect(() => {
@@ -170,7 +185,7 @@ function App() {
   };
 
   const handleSelectNote = (note: Note) => {
-    (window as any).__noteOpenStartTime = performance.now();
+    window.__noteOpenStartTime = performance.now();
     setSelectedNote(getNoteId(note));
     setActiveView('editor');
   };
@@ -216,23 +231,18 @@ function App() {
   }, [createNote]);
 
   const handleNavigate = (id: string) => {
-    if (!id) return;
     setSelectedNote(id);
     setActiveView('editor');
   };
 
-  const handleSaveCategory = async (newName: string, folderMeta: any) => {
-    if (!editingCategory) return;
-    const oldName = editingCategory;
-
-    // 1. Rename on disk if needed
-    if (newName !== oldName) {
-      await renameFolder(oldName, newName);
-      setEditingCategory(prev => prev === oldName ? newName : prev);
+  const handleSaveCategory = (newName: string, folderMeta: FolderMetadata) => {
+    if (editingCategory) {
+      if (newName !== editingCategory) {
+        renameFolder(editingCategory, newName);
+      }
+      updateFolderMetadata(newName, folderMeta);
+      setEditingCategory(null);
     }
-
-    // 2. Update visual meta (icon, color)
-    await updateFolderMetadata(newName, folderMeta);
   };
 
   const handleDeleteCategory = async (mode: 'recursive' | 'move') => {
@@ -244,7 +254,13 @@ function App() {
 
   if (!currentFolder || syncStatus === 'unauthenticated') {
     return (
-      <div className="absolute inset-0 flex flex-col overflow-hidden" style={{ borderRadius: '12px', backgroundColor: 'var(--app-bg)' }}>
+      <div
+        className={clsx(
+          "absolute inset-0 flex flex-col overflow-hidden",
+          !isMaximized && !isIOS && !_isMobile && "rounded-[12px] border border-[var(--border-subtle)]"
+        )}
+        style={{ backgroundColor: 'var(--app-bg)' }}
+      >
         {!isIOS && (
           <TitleBar
             isSidebarCollapsed={true}
@@ -282,15 +298,45 @@ function App() {
     onOpenSettings: () => setIsSettingsOpen(true),
     monochromeIcons,
     showIconsWhenCollapsed,
+    showNoteCounts,
+    userId,
+    userEmail,
+    syncStatus,
+    hasPending,
   };
 
   const isAnyModalOpen = isSettingsOpen || editingCategory !== null || categoryToDelete !== null || isUpdateModalOpen;
+
+  const renderEditor = (extraClassName: string) => {
+    if (!selectedNote) return null;
+    return (
+      <Editor
+        className={extraClassName}
+        note={selectedNote}
+        allNotes={allNotes}
+        workspacePath={currentFolder || ''}
+        onSave={(id, filename, content, folder) => saveNote(id, filename, content, folder)}
+        onUpdateLocally={updateNoteLocally}
+        markdownEnabled={markdownEnabled}
+        toolbarVisible={toolbarVisible}
+        setToolbarVisible={setToolbarVisible}
+        spellcheckEnabled={spellcheckEnabled}
+        isFocusMode={isFocusMode}
+        onToggleFocus={() => setIsFocusMode(!isFocusMode)}
+        onSync={triggerSync}
+        onNavigate={(id, _anchor) => handleNavigate(id)}
+        isIOS={isIOS}
+        iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
+      />
+    );
+  };
 
   return (
     <div
       ref={containerRef}
       className={clsx(
         "absolute inset-0 flex text-[var(--text-main)] overflow-hidden transition-colors duration-500",
+        !isMaximized && !isIOS && !_isMobile && "rounded-[12px] border border-[var(--border-subtle)]",
         fontFamily === 'inter' && "font-inter",
         fontFamily === 'roboto' && "font-roboto",
         fontFamily === 'courier' && "font-courier",
@@ -389,29 +435,10 @@ function App() {
               />
 
               {/* EDITOR — on desktop, it is rendered inline */}
-              {selectedNote && !_isMobile && (
-                <Editor
-                  className={clsx(
-                    "flex-1",
-                    activeView === 'editor' ? "flex" : "hidden md:flex"
-                  )}
-                  note={selectedNote}
-                  allNotes={allNotes}
-                  workspacePath={currentFolder || ''}
-                  onSave={(id, filename, content, folder) => saveNote(id, filename, content, folder)}
-                  onUpdateLocally={updateNoteLocally}
-                  markdownEnabled={markdownEnabled}
-                  toolbarVisible={toolbarVisible}
-                  setToolbarVisible={setToolbarVisible}
-                  spellcheckEnabled={spellcheckEnabled}
-                  isFocusMode={isFocusMode}
-                  onToggleFocus={() => setIsFocusMode(!isFocusMode)}
-                  onSync={triggerSync}
-                  onNavigate={(id, _anchor) => handleNavigate(id)}
-                  isIOS={isIOS}
-                  iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
-                />
-              )}
+              {selectedNote && !_isMobile && renderEditor(clsx(
+                "flex-1",
+                activeView === 'editor' ? "flex" : "hidden md:flex"
+              ))}
 
               {!selectedNote && (
                 <EmptyStateTutorial
@@ -436,24 +463,7 @@ function App() {
           isIOS={isIOS}
           isMobile={_isMobile}
         >
-          <Editor
-            className="flex-1 flex"
-            note={selectedNote}
-            allNotes={allNotes}
-            workspacePath={currentFolder || ''}
-            onSave={(id, filename, content, folder) => saveNote(id, filename, content, folder)}
-            onUpdateLocally={updateNoteLocally}
-            markdownEnabled={markdownEnabled}
-            toolbarVisible={toolbarVisible}
-            setToolbarVisible={setToolbarVisible}
-            spellcheckEnabled={spellcheckEnabled}
-            isFocusMode={isFocusMode}
-            onToggleFocus={() => setIsFocusMode(!isFocusMode)}
-            onSync={triggerSync}
-            onNavigate={(id, _anchor) => handleNavigate(id)}
-            isIOS={isIOS}
-            iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
-          />
+          {renderEditor("flex-1 flex")}
         </MobileSwipeContainer>
       )}
 
@@ -464,14 +474,17 @@ function App() {
           isIOS={isIOS}
           theme={theme}
           setTheme={setTheme}
+          autoTheme={autoTheme}
+          onToggleAutoTheme={setAutoTheme}
+          preferredLightTheme={preferredLightTheme}
           markdownEnabled={markdownEnabled}
           onToggleMarkdown={setMarkdownEnabled}
-          accentColor={accentColor}
-          setAccentColor={setAccentColor}
           monochromeIcons={monochromeIcons}
           onToggleMonochromeIcons={setMonochromeIcons}
           showIconsWhenCollapsed={showIconsWhenCollapsed}
           onToggleShowIconsWhenCollapsed={setShowIconsWhenCollapsed}
+          showNoteCounts={showNoteCounts}
+          onToggleShowNoteCounts={setShowNoteCounts}
           fontFamily={fontFamily}
           setFontFamily={setFontFamily}
           fontSize={fontSize}
@@ -490,6 +503,7 @@ function App() {
           onImportFolder={isIOS ? undefined : importFolder}
           onImportFiles={isIOS ? undefined : importFiles}
           onExportBackup={isIOS ? undefined : () => exportBackup(allNotes)}
+          onResetDatabase={resetDatabase}
         />
       )}
 

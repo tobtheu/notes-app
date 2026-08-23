@@ -166,7 +166,7 @@ export function useSidebarGestures({
       containerElement.removeEventListener('touchmove', handleTouchMove);
       containerElement.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [containerElement]);
+  }, [containerElement, setIsSidebarCollapsed]);
 
   // Reset touch width overrides when collapsed state is updated externally
   useEffect(() => {

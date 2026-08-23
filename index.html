@@ -6,6 +6,28 @@
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Lama Notes</title>
+  <script>
+    (function() {
+      try {
+        var isAuto = localStorage.getItem('auto_theme') === 'true';
+        var savedTheme = localStorage.getItem('theme') || 'clay';
+        var preferredLight = localStorage.getItem('preferred_light_theme') || (savedTheme === 'sage' ? 'sage' : 'clay');
+        var eff = savedTheme;
+        if (isAuto) {
+          var isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          eff = isDark ? 'dark' : preferredLight;
+        }
+        document.documentElement.setAttribute('data-theme', eff);
+        if (eff === 'dark') {
+          document.documentElement.classList.add('dark');
+          document.documentElement.classList.remove('light');
+        } else {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.classList.add('light');
+        }
+      } catch(e) {}
+    })();
+  </script>
 </head>
 
 <body>

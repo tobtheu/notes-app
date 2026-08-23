@@ -44,7 +44,7 @@ services:
       # LOG_LEVEL: "debug"
 
     ports:
-      - "5133:3000"       # Electric HTTP sync port (used by the client SDK)
+      - "127.0.0.1:5133:3000"       # Electric HTTP sync port (bound to localhost for reverse proxy)
 
     volumes:
       - electric_storage:/electric/storage

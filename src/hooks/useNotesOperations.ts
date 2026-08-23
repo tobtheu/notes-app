@@ -6,7 +6,7 @@ import { getPathId, normalizeStr } from '../utils/path';
 interface UseNotesOperationsProps {
     dbRef: React.MutableRefObject<PGliteWithLive | null>;
     userId: string | null;
-    metadata: AppMetadata;
+    metadata?: AppMetadata;
     metadataRef: React.MutableRefObject<AppMetadata>;
     notes: Note[];
     sortedFolders: string[];
@@ -22,7 +22,6 @@ interface UseNotesOperationsProps {
 export function useNotesOperations({
     dbRef,
     userId,
-    metadata,
     metadataRef,
     notes,
     sortedFolders,
@@ -37,12 +36,15 @@ export function useNotesOperations({
 
     const savingNotes = useRef<Record<string, Promise<string> | undefined>>({});
 
+    /**
+     * Unified, non-destructive note save.
+     * Updates note content & timestamp with stable ID (no destructive renaming).
+     */
     const saveNote = useCallback(async (
         currentId: string,
-        filename: string,
+        _filename: string,
         content: string,
-        folder: string | null = null,
-        skipRename = false,
+        _folder: string | null = null,
     ): Promise<string> => {
         if (!userId) return currentId;
 
@@ -55,79 +57,55 @@ export function useNotesOperations({
         savingNotes.current[currentId] = savePromise;
 
         try {
-            const folderStr = folder ?? '';
-            let targetFilename = filename;
-
-            if (!skipRename) {
-                const firstLine = content.split('\n')[0].replace(/^#\s*/, '').trim();
-                const safeTitle = firstLine.replace(/[^a-z0-9äöüß ]/gi, '').trim().substring(0, 50);
-                if (safeTitle) targetFilename = `${safeTitle}.md`;
-            }
-
-            const newId = getPathId(targetFilename, folderStr);
             const updatedAt = new Date().toISOString();
-
-            if (newId !== currentId && !skipRename) {
-                const currentNote = notes.find(n => getNoteId(n) === currentId);
-                if (currentNote) {
-                    const collision = notes.some(n =>
-                        getNoteId(n) === newId && getNoteId(n) !== currentId,
-                    );
-                    if (!collision) {
-                        await writeNote(currentId, currentNote.content, updatedAt, true);
-                        await writeNote(newId, content, updatedAt, false);
-
-                        const current = metadataRef.current;
-                        if (current.pinnedNotes?.some(p => normalizeStr(p) === currentId)) {
-                            const newMeta = { ...current };
-                            newMeta.pinnedNotes = (newMeta.pinnedNotes ?? []).map(p =>
-                                normalizeStr(p) === currentId ? newId : p,
-                            );
-                            await writeConfig(newMeta);
-                        }
-
-                        if (selectedNoteId === currentId) setSelectedNoteId(newId);
-                        resolvePromise(newId);
-                        return newId;
-                    }
-                }
-            }
-
             await writeNote(currentId, content, updatedAt, false);
             resolvePromise(currentId);
             return currentId;
         } finally {
             delete savingNotes.current[currentId];
         }
-    }, [userId, notes, getNoteId, metadataRef, selectedNoteId, writeNote, writeConfig, setSelectedNoteId]);
+    }, [userId, writeNote]);
 
+    /**
+     * Instant, atomic note creation.
+     * Generates a clean filename (Untitled note.md) in the active folder and opens the editor immediately.
+     */
     const createNote = useCallback(async () => {
         if (!userId) return;
         const folderStr = selectedCategory ?? '';
+        const normFolder = normalizeStr(folderStr);
+        const existingFilenames = new Set(
+            notes.filter(n => normalizeStr(n.folder) === normFolder).map(n => n.filename)
+        );
+
         let filename = 'Untitled note.md';
         let counter = 1;
-        while (notes.some(n => n.filename === filename && normalizeStr(n.folder) === normalizeStr(folderStr))) {
+        while (existingFilenames.has(filename)) {
             filename = `Untitled note ${counter}.md`;
             counter++;
         }
         const id = getPathId(filename, folderStr);
         const updatedAt = new Date().toISOString();
-        await writeNote(id, '# ', updatedAt, false);
-        setSelectedNoteId(id);
-    }, [userId, notes, selectedCategory, writeNote, setSelectedNoteId]);
 
+        // 1. Select immediately so the editor mounts in <1ms
+        setSelectedNoteId(id);
+
+        // 2. Direct single-write into PGlite database
+        await writeNote(id, '# ', updatedAt, false);
+    }, [userId, notes, selectedCategory, setSelectedNoteId, writeNote]);
+
+    /**
+     * Delete note with soft-delete flag in PGlite and clean up metadata pins.
+     */
     const deleteNote = useCallback(async (id: string) => {
         const normalizedId = normalizeStr(id);
         const updatedAt = new Date().toISOString();
         const note = notes.find(n => getNoteId(n) === normalizedId);
         if (!note) return;
 
-        await writeNote(normalizedId, note.content, updatedAt, true);
+        if (selectedNoteId === normalizedId) setSelectedNoteId(null);
 
-        const mirrorFolder = localStorage.getItem('notes-folder');
-        if (mirrorFolder) {
-            window.tauriAPI.deleteMirrorFile({ mirrorFolder, noteId: normalizedId }).catch(() => {});
-        }
+        await writeNote(normalizedId, note.content, updatedAt, true);
 
         // Clean up pin in metadata
         const current = metadataRef.current;
@@ -138,8 +116,6 @@ export function useNotesOperations({
             );
             await writeConfig(newMeta);
         }
-
-        if (selectedNoteId === normalizedId) setSelectedNoteId(null);
     }, [notes, getNoteId, selectedNoteId, writeNote, setSelectedNoteId, writeConfig, metadataRef]);
 
     const updateNoteLocally = useCallback(async (
@@ -179,18 +155,10 @@ export function useNotesOperations({
             await writeConfig(newMeta);
         }
 
-        const mirrorFolder = localStorage.getItem('notes-folder');
-        if (mirrorFolder) {
-            window.tauriAPI.deleteMirrorFile({ mirrorFolder, noteId }).catch(() => {});
-        }
         if (selectedNoteId === noteId) setSelectedNoteId(newId);
     }, [notes, getNoteId, metadataRef, selectedNoteId, writeNote, writeConfig, setSelectedNoteId]);
 
     const createFolder = useCallback(async (folderName: string) => {
-        const mirrorFolder = localStorage.getItem('notes-folder');
-        if (mirrorFolder) {
-            await window.tauriAPI.createFolder(mirrorFolder, `${mirrorFolder}/${folderName}`);
-        }
         const current = metadataRef.current;
         const order = current.folderOrder ?? [];
         if (!order.some(f => normalizeStr(f) === normalizeStr(folderName))) {
@@ -198,22 +166,12 @@ export function useNotesOperations({
         }
     }, [metadataRef, writeConfig]);
 
-    const deleteFolder = useCallback(async (folderRelative: string, mode: 'recursive' | 'move') => {
+    const deleteFolder = useCallback(async (folderRelative: string, _mode: 'recursive' | 'move') => {
         const normalizedTarget = normalizeStr(folderRelative);
 
         const folderNotes = notes.filter(n => normalizeStr(n.folder) === normalizedTarget);
         const updatedAt = new Date().toISOString();
         await Promise.all(folderNotes.map(n => writeNote(getNoteId(n), n.content, updatedAt, true)));
-
-        const mirrorFolder = localStorage.getItem('notes-folder');
-        if (mirrorFolder) {
-            const folderAbs = `${mirrorFolder}/${folderRelative}`;
-            if (mode === 'recursive') {
-                window.tauriAPI.deleteFolderRecursive(mirrorFolder, folderAbs).catch(() => {});
-            } else {
-                window.tauriAPI.deleteFolderMoveContents({ folderPath: folderAbs, rootPath: mirrorFolder }).catch(() => {});
-            }
-        }
 
         const current = metadataRef.current;
         const newMeta = { ...current };
@@ -264,11 +222,6 @@ export function useNotesOperations({
         }
         await writeConfig(newMeta);
 
-        const mirrorFolder = localStorage.getItem('notes-folder');
-        if (mirrorFolder) {
-            window.tauriAPI.renameFolder({ rootPath: mirrorFolder, oldName, newName }).catch(() => {});
-        }
-
         if (selectedCategory === oldName) setSelectedCategory(newName);
         return { success: true };
     }, [notes, getNoteId, metadataRef, selectedCategory, writeNote, writeConfig, setSelectedCategory]);
@@ -276,21 +229,31 @@ export function useNotesOperations({
     const reorderFolders = useCallback(async (newOrder: string[]) => {
         const current = metadataRef.current;
         const currentOrder = current.folderOrder ?? sortedFolders;
-        const newOrderNorm = newOrder.map(f => normalizeStr(f));
+        const seen = new Set(newOrder.map(normalizeStr));
         const merged = [...newOrder];
-        currentOrder.forEach(f => {
-            if (!newOrderNorm.includes(normalizeStr(f))) merged.push(f);
-        });
+        for (let i = 0; i < currentOrder.length; i++) {
+            const f = currentOrder[i];
+            const norm = normalizeStr(f);
+            if (!seen.has(norm)) {
+                seen.add(norm);
+                merged.push(f);
+            }
+        }
         await writeConfig({ ...current, folderOrder: merged });
     }, [metadataRef, sortedFolders, writeConfig]);
 
     const togglePinNote = useCallback(async (note: Note) => {
-        const notePath = getNoteId(note);
+        const notePath = normalizeStr(getNoteId(note));
         const current = metadataRef.current;
-        const pinned = (current.pinnedNotes ?? []).map(p => normalizeStr(p));
-        const newPins = pinned.includes(notePath)
-            ? pinned.filter(p => p !== notePath)
-            : [...pinned, notePath];
+        const pinned = (current.pinnedNotes ?? []).map(normalizeStr);
+        const pinnedSet = new Set(pinned);
+        
+        let newPins: string[];
+        if (pinnedSet.has(notePath)) {
+            newPins = pinned.filter(p => p !== notePath);
+        } else {
+            newPins = [...pinned, notePath];
+        }
         await writeConfig({ ...current, pinnedNotes: newPins });
     }, [getNoteId, metadataRef, writeConfig]);
 
@@ -309,11 +272,6 @@ export function useNotesOperations({
         await writeConfig({ ...current, settings: { ...current.settings, ...settings } });
     }, [writeConfig, metadataRef]);
 
-    const isNotePinned = useCallback(
-        (note: Note) => (metadata.pinnedNotes ?? []).includes(getNoteId(note)),
-        [getNoteId, metadata.pinnedNotes],
-    );
-
     return {
         saveNote,
         createNote,
@@ -327,6 +285,5 @@ export function useNotesOperations({
         togglePinNote,
         updateFolderMetadata,
         saveSettings,
-        isNotePinned
     };
 }

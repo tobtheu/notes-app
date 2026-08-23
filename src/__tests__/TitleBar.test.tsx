@@ -20,7 +20,7 @@ vi.mock('@tauri-apps/plugin-os', () => ({
 }));
 
 describe('TitleBar Component', () => {
-  it('renders with sidebar background color regardless of activeView', () => {
+  it('renders with shell background color regardless of activeView', () => {
     const { rerender } = render(
       <TitleBar
         isSidebarCollapsed={false}
@@ -29,7 +29,7 @@ describe('TitleBar Component', () => {
       />
     );
     const titleBar = document.getElementById('titlebar');
-    expect(titleBar?.style.backgroundColor).toBe('var(--sidebar-bg)');
+    expect(titleBar?.style.backgroundColor).toBe('var(--shell-bg)');
 
     // Rerender with activeView as editor
     rerender(
@@ -39,6 +39,6 @@ describe('TitleBar Component', () => {
         activeView="editor"
       />
     );
-    expect(titleBar?.style.backgroundColor).toBe('var(--sidebar-bg)');
+    expect(titleBar?.style.backgroundColor).toBe('var(--shell-bg)');
   });
 });

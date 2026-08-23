@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
     Folder, Plus, Settings, Settings2, Check, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 import clsx from 'clsx';
-import type { AppMetadata } from '../types';
+import type { AppMetadata, Note, SyncStatus } from '../types';
+import { normalizeStr } from '../utils/path';
 import {
     DndContext,
     closestCenter,
@@ -33,7 +34,8 @@ interface SidebarProps {
     isCollapsed: boolean;
     onToggleCollapse?: () => void;
     isIOS?: boolean;
-    onCreateNote: () => void;
+    allNotes?: Note[];
+    onCreateNote?: () => void;
     onCreateFolder?: (name: string) => void;
     onDeleteCategory: (name: string) => void;
     onEditCategory: (name: string) => void;
@@ -41,11 +43,17 @@ interface SidebarProps {
     onReorderFolders?: (newOrder: string[]) => void;
     onOpenSettings?: () => void;
     monochromeIcons?: boolean;
+    showIconsWhenCollapsed?: boolean;
+    showNoteCounts?: boolean;
+    userId?: string | null;
+    userEmail?: string | null;
+    syncStatus?: SyncStatus;
+    hasPending?: boolean;
 }
 
 /**
  * Sidebar Component
- * Primary navigation column. Contains the search/creation header and the scrollable folder list.
+ * Collapsible left navigation bar for folders and application settings.
  */
 export function Sidebar({
     sidebarRef,
@@ -54,22 +62,39 @@ export function Sidebar({
     metadata,
     selectedCategory,
     isCollapsed,
-    onCreateNote,
+    onToggleCollapse,
+    isIOS = false,
+    allNotes = [],
     onCreateFolder,
     onDeleteCategory,
     onEditCategory,
     onSelectCategory,
-    onReorderFolders = undefined,
+    onReorderFolders,
     onOpenSettings,
-    onToggleCollapse,
-    isIOS = false,
     monochromeIcons = false,
+    showIconsWhenCollapsed = false,
+    showNoteCounts = false,
+    userId,
+    userEmail,
+    syncStatus,
+    hasPending = false,
 }: SidebarProps) {
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
     const [activeId, setActiveId] = useState<string | null>(null);
     const [isReorderMode, setIsReorderMode] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    // Calculate note counts
+    const totalNotesCount = allNotes ? allNotes.length : 0;
+    const folderNoteCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        if (!allNotes) return counts;
+        for (const folder of folders) {
+            counts[folder] = allNotes.filter(n => normalizeStr(n.folder) === normalizeStr(folder)).length;
+        }
+        return counts;
+    }, [allNotes, folders]);
 
     // On iOS, scroll the folder creation input into view when keyboard opens
     useEffect(() => {
@@ -99,8 +124,8 @@ export function Sidebar({
     }, [isCreatingFolder, isIOS]);
 
     const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-        useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 6 } }),
+        useSensor(PointerSensor, { activationConstraint: { distance: 3 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
@@ -113,9 +138,6 @@ export function Sidebar({
         }
     };
 
-    /**
-     * DnD Event Handlers
-     */
     const handleDragStart = (event: any) => {
         setActiveId(event.active.id);
     };
@@ -135,156 +157,155 @@ export function Sidebar({
     };
 
     return (
-        <div
+        <aside
             ref={sidebarRef}
             className={clsx(
-                "flex flex-col h-full border-r border-gray-100 dark:border-gray-800 shrink-0 overflow-x-hidden transition-all duration-300",
-                isCollapsed ? "w-16" : "w-64",
+                "sidebar-fluid flex flex-col h-full shrink-0 overflow-hidden select-none transition-all duration-300",
+                isCollapsed
+                    ? (showIconsWhenCollapsed ? "w-14 min-w-[3.5rem]" : "w-0 min-w-0 opacity-0 pointer-events-none -mr-1.5 border-none p-0")
+                    : "w-48 min-w-[12rem]",
                 className
             )}
-            style={{ backgroundColor: 'var(--sidebar-bg)' }}
+            style={{ backgroundColor: 'var(--shell-bg)' }}
         >
-            {/* --- ACTIONS HEADER --- */}
-            <div className="px-2 pb-2" style={isIOS ? { paddingTop: 'var(--safe-top, 16px)' } : { paddingTop: '1rem' }}>
-                {/* iOS: collapse/expand toggle above new-note button */}
-                {isIOS && onToggleCollapse && (
-                    <div className={clsx("mb-4 px-1 lg:px-2", isCollapsed ? "flex justify-center" : "flex justify-end")}>
-                        <button
-                            type="button"
-                            onClick={onToggleCollapse}
-                            className="p-2 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800 transition-all active:scale-95"
-                            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-                        >
-                            {isCollapsed ? <PanelLeftOpen size={isIOS ? 24 : 20} /> : <PanelLeftClose size={isIOS ? 24 : 20} />}
-                        </button>
-                    </div>
-                )}
-                <div className={clsx("mb-4 px-1 lg:px-2", isCollapsed ? "flex flex-col items-center" : "block")}>
+            {/* iOS: collapse/expand toggle */}
+            {isIOS && onToggleCollapse && (
+                <div className={clsx("px-2 pt-2", isCollapsed ? "flex justify-center" : "flex justify-end")}>
                     <button
-                        onClick={onCreateNote}
-                        className={clsx(
-                            "flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white transition-all shadow-md shadow-primary-500/20 font-medium active:scale-[0.98]",
-                            isCollapsed ? "w-10 h-10 rounded-full" : "w-full py-2.5 rounded-xl"
-                        )}
-                        title="New Note"
+                        type="button"
+                        onClick={onToggleCollapse}
+                        className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-all active:scale-95"
+                        title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                     >
-                        <Plus size={isIOS ? 22 : 18} />
-                        {!isCollapsed && <span>New Note</span>}
+                        {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+                    </button>
+                </div>
+            )}
+
+            {/* Top Folders Navigation Area */}
+            <div className="flex-1 overflow-y-auto px-1 py-1 custom-scrollbar overflow-x-hidden space-y-3">
+                {/* Primary "All Notes" item */}
+                <div className="space-y-0.5 text-xs">
+                    <button
+                        type="button"
+                        onClick={() => onSelectCategory(null)}
+                        className={clsx(
+                            "folder-item-animated w-full flex items-center rounded-xl font-medium outline-none",
+                            isCollapsed ? "justify-center p-2" : "gap-2 px-2.5 py-1.5",
+                            !selectedCategory
+                                ? "bg-[var(--card-active)] shadow-sm text-[var(--text-main)] font-semibold border border-[var(--border-subtle)]"
+                                : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)] border border-transparent"
+                        )}
+                        title="All Notes"
+                    >
+                        <Folder size={isCollapsed ? 18 : 15} className="text-[var(--accent-color)] shrink-0" />
+                        {!isCollapsed && (
+                            <>
+                                <span className="truncate">All Notes</span>
+                                {showNoteCounts && (
+                                    <span className="ml-auto text-[10px] font-mono text-[var(--text-muted)]">{totalNotesCount}</span>
+                                )}
+                            </>
+                        )}
                     </button>
                 </div>
 
-                {!isCollapsed && (
-                    <div className="px-1 lg:px-2 mb-2 flex items-center justify-between group">
-                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                            Folders
-                        </span>
-                        <div className="flex items-center gap-1">
-                            {isReorderMode ? (
-                                <button
-                                    type="button"
-                                    onClick={() => setIsReorderMode(false)}
-                                    className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-500 text-white active:bg-primary-600 transition-colors"
-                                >
-                                    <Check size={11} />
-                                    Fertig
-                                </button>
-                            ) : (
-                                <>
-                                    {/* Desktop: new folder button — always visible */}
+                {/* Folders Section Container */}
+                <div className="pt-2">
+                    {/* Header (hidden when collapsed) */}
+                    {!isCollapsed && (
+                        <div className="flex items-center justify-between px-2 mb-1 text-[10px] font-semibold tracking-wider uppercase text-[var(--text-muted)]">
+                            <span>FOLDERS</span>
+                            <div className="flex items-center gap-0.5">
+                                {isReorderMode ? (
                                     <button
                                         type="button"
-                                        onClick={() => setIsCreatingFolder(true)}
-                                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors hidden lg:block"
-                                        title="New Folder"
+                                        onClick={() => setIsReorderMode(false)}
+                                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[var(--accent-color)] text-white active:opacity-90"
                                     >
-                                        <Plus size={14} />
+                                        <Check size={10} />
+                                        <span>Done</span>
                                     </button>
-                                    {/* Mobile: reorder mode toggle */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsReorderMode(true)}
-                                        className="p-1 rounded text-gray-400 active:text-primary-500 transition-colors lg:hidden"
-                                        title="Reorder"
-                                    >
-                                        <Settings2 size={14} />
-                                    </button>
-                                </>
-                            )}
+                                ) : (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsCreatingFolder(true)}
+                                            className="smooth-transition text-[var(--text-muted)] hover:text-[var(--text-main)] p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                                            title="New Folder"
+                                        >
+                                            <Plus size={13} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsReorderMode(true)}
+                                            className="smooth-transition text-[var(--text-muted)] hover:text-[var(--text-main)] p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 lg:hidden"
+                                            title="Reorder"
+                                        >
+                                            <Settings2 size={13} />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                )}
-            </div>
+                    )}
 
-            {/* --- SCROLLABLE NAVIGATION CONTENT --- */}
-            <div className="flex-1 overflow-y-auto px-2 pb-4 custom-scrollbar overflow-x-hidden">
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                    onDragCancel={() => setActiveId(null)}
-                >
-                    <div className="space-y-0 mb-2 px-1">
-                        {/* Static "All Notes" folder */}
-                        <button
-                            onClick={() => onSelectCategory(null)}
-                            className={clsx(
-                                "w-full flex items-center transition-colors rounded-lg",
-                                isCollapsed ? "justify-center py-1.5" : clsx("px-3 gap-3 text-sm font-medium", isIOS ? "py-2.5" : "py-2.5"),
-                                !selectedCategory ? "bg-white dark:bg-gray-700 shadow-sm text-gray-700 dark:text-gray-100" : "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                            )}
-                            title="All Notes"
-                        >
-                            <Folder size={isCollapsed ? (isIOS ? 24 : 20) : (isIOS ? 22 : 18)} className={!selectedCategory ? "text-primary-500" : "text-gray-500 dark:text-gray-400"} />
-                            {!isCollapsed && <span>All Notes</span>}
-                        </button>
+                    {/* Sortable user folders list — Always rendered in both expanded & icon-collapsed mode */}
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        onDragCancel={() => setActiveId(null)}
+                    >
+                        <nav className="space-y-0.5 text-xs font-medium">
+                            <SortableContext
+                                items={folders}
+                                strategy={verticalListSortingStrategy}
+                            >
+                                {folders.map(folder => (
+                                    <SortableFolderItem
+                                        key={folder}
+                                        id={folder}
+                                        folder={folder}
+                                        metadata={metadata}
+                                        selectedCategory={selectedCategory}
+                                        isCollapsed={isCollapsed}
+                                        isReorderMode={isReorderMode}
+                                        isIOS={isIOS}
+                                        monochromeIcons={monochromeIcons}
+                                        showNoteCounts={showNoteCounts}
+                                        noteCount={folderNoteCounts[folder] || 0}
+                                        onSelectCategory={onSelectCategory}
+                                        onEditCategory={onEditCategory}
+                                        onDeleteCategory={onDeleteCategory}
+                                    />
+                                ))}
+                            </SortableContext>
 
-                        {/* Sortable user folders */}
-                        <SortableContext
-                            items={folders}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            {folders.map(folder => (
-                                <SortableFolderItem
-                                    key={folder}
-                                    id={folder}
-                                    folder={folder}
-                                    metadata={metadata}
-                                    selectedCategory={selectedCategory}
-                                    isCollapsed={isCollapsed}
-                                    isReorderMode={isReorderMode}
-                                    isIOS={isIOS}
-                                    monochromeIcons={monochromeIcons}
-                                    onSelectCategory={onSelectCategory}
-                                    onEditCategory={onEditCategory}
-                                    onDeleteCategory={onDeleteCategory}
-                                />
-                            ))}
-                        </SortableContext>
+                            <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.4' } } }) }}>
+                                {activeId ? (
+                                    <FolderItem
+                                        folder={activeId}
+                                        metadata={metadata}
+                                        selectedCategory={selectedCategory}
+                                        isCollapsed={isCollapsed}
+                                        monochromeIcons={monochromeIcons}
+                                        showNoteCounts={showNoteCounts}
+                                        noteCount={folderNoteCounts[activeId] || 0}
+                                        isOverlay
+                                    />
+                                ) : null}
+                            </DragOverlay>
 
-                        {/* Rendering the active item while dragging */}
-                        <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.4' } } }) }}>
-                            {activeId ? (
-                                <FolderItem
-                                    folder={activeId}
-                                    metadata={metadata}
-                                    selectedCategory={selectedCategory}
-                                    isCollapsed={isCollapsed}
-                                    monochromeIcons={monochromeIcons}
-                                    isOverlay
-                                />
-                            ) : null}
-                        </DragOverlay>
-
-                        {/* Inline creation input */}
-                        {!isCollapsed && (
-                            isCreatingFolder ? (
-                                <form onSubmit={handleCreateFolder} className="px-1 py-1 flex flex-col gap-2">
+                            {/* Inline creation input */}
+                            {!isCollapsed && isCreatingFolder && (
+                                <form onSubmit={handleCreateFolder} className="px-1 py-1 flex flex-col gap-1">
                                     <input
                                         ref={inputRef}
                                         type="text"
-                                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-base dark:text-gray-100 outline-none focus:ring-2 focus:ring-primary-500/20 transition-all"
-                                        placeholder="New folder..."
+                                        className="w-full px-2.5 py-1.5 bg-[var(--canvas-bg)] border border-[var(--border-subtle)] rounded-xl text-xs text-[var(--text-main)] outline-none focus:ring-1 focus:ring-[var(--accent-color)]"
+                                        placeholder="Folder name..."
                                         autoFocus
                                         value={newFolderName}
                                         onChange={(e) => setNewFolderName(e.target.value)}
@@ -292,44 +313,64 @@ export function Sidebar({
                                             if (!newFolderName.trim()) setIsCreatingFolder(false);
                                         }}
                                     />
-                                    <div className="lg:hidden flex items-center justify-between gap-2">
-                                        <span className="text-xs text-gray-400">or press Enter</span>
-                                        <button
-                                            type="submit"
-                                            className="px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
-                                        >
-                                            Fertig
-                                        </button>
-                                    </div>
                                 </form>
-                            ) : (
-                                <button
-                                    onClick={() => setIsCreatingFolder(true)}
-                                    className="w-full flex items-center px-3 py-2.5 gap-3 text-sm font-medium text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800/50 rounded-lg transition-all border border-dashed border-gray-200 dark:border-gray-700/50 mt-1 mb-2 group lg:hidden"
-                                >
-                                    <Plus size={isIOS ? 22 : 18} className="text-gray-300 group-hover:text-primary-500 transition-colors" />
-                                    <span>Add Folder...</span>
-                                </button>
-                            )
-                        )}
-                    </div>
-                </DndContext>
+                            )}
+                        </nav>
+                    </DndContext>
+                </div>
             </div>
 
-            {/* --- FOOTER / SETTINGS --- */}
-            <div className="pt-2 pb-[calc(8px+var(--safe-bottom,0vh))] px-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between shrink-0 gap-1 box-content">
-                <button
-                    onClick={onOpenSettings}
-                    className={clsx(
-                        "flex items-center text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors",
-                        isCollapsed ? "justify-center p-3" : "flex-1 px-3 py-2.5 gap-3 text-sm font-medium"
-                    )}
-                    title="Settings"
-                >
-                    <Settings size={isCollapsed ? (isIOS ? 24 : 20) : (isIOS ? 22 : 18)} />
-                    {!isCollapsed && <span>Settings</span>}
-                </button>
-            </div>
-        </div>
+            {/* --- SIDEBAR BOTTOM SETTINGS / SYNC ROW --- */}
+            {(() => {
+                const isLocalMode = !userId || userId === 'local' || !userEmail;
+                const syncInfo = (() => {
+                    if (isLocalMode) {
+                        return {
+                            label: 'Lokaler Modus',
+                            dotClass: 'bg-gray-400 dark:bg-gray-500',
+                        };
+                    }
+                    if (syncStatus === 'pending' || hasPending) {
+                        return {
+                            label: 'Synchronisiere...',
+                            dotClass: 'bg-amber-500 animate-pulse',
+                        };
+                    }
+                    if (syncStatus === 'error') {
+                        return {
+                            label: 'Sync-Fehler',
+                            dotClass: 'bg-red-500',
+                        };
+                    }
+                    if (syncStatus === 'offline') {
+                        return {
+                            label: 'Offline',
+                            dotClass: 'bg-gray-400',
+                        };
+                    }
+                    return {
+                        label: 'Cloud Synced',
+                        dotClass: 'bg-emerald-500',
+                    };
+                })();
+
+                return (
+                    <div className="px-2.5 py-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--text-muted)] shrink-0 select-none">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className={clsx("w-2 h-2 rounded-full shrink-0", syncInfo.dotClass)} />
+                            {!isCollapsed && <span className="text-[11px] font-medium truncate">{syncInfo.label}</span>}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onOpenSettings}
+                            className="smooth-transition p-1 text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 shrink-0"
+                            title="Settings"
+                        >
+                            <Settings size={14} />
+                        </button>
+                    </div>
+                );
+            })()}
+        </aside>
     );
 }

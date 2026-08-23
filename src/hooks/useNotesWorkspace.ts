@@ -1,10 +1,20 @@
 import { useCallback } from 'react';
-import type { SyncStatus } from '../types';
+import type { SyncStatus, Note } from '../types';
 import type { PGliteWithLive } from '@electric-sql/pglite/live';
 import { getDb } from '../lib/electric';
 import { getPathId } from '../utils/path';
 import { enqueue, flushQueue } from '../lib/offlineQueue';
 import { log } from '../lib/logger';
+import { open } from '@tauri-apps/plugin-dialog';
+import { readTextFile } from '@tauri-apps/plugin-fs';
+import { exportNotesToDirectory } from '../utils/exportBackup';
+
+export interface ImportProgress {
+    stage: 'selecting' | 'scanning' | 'importing' | 'done';
+    current: number;
+    total: number;
+    currentFile?: string;
+}
 
 interface UseNotesWorkspaceProps {
     dbRef: React.MutableRefObject<PGliteWithLive | null>;
@@ -89,85 +99,123 @@ export function useNotesWorkspace({
     }, [userId, dbRef, setCurrentFolder]);
 
     const goLocalOnly = useCallback(async () => {
-        log.info('[useNotes:goLocalOnly] starting local-only flow...');
+        log.info('[useNotes:goLocalOnly] starting direct local-only flow without folder prompt...');
         const db = await getDb();
         dbRef.current = db;
 
-        log.info('[useNotes:goLocalOnly] opening folder picker...');
-        let folder = await window.tauriAPI.selectFolder();
-        log.info('[useNotes:goLocalOnly] folder picker result:', folder);
-        if (!folder) {
-            log.info('[useNotes:goLocalOnly] no folder selected → using default');
-            const docDir = await window.tauriAPI.getDocumentDir();
-            folder = `${docDir}/Lama Notes`.replace(/\\/g, '/');
-            await window.tauriAPI.createFolder(docDir, folder);
-            log.info('[useNotes:goLocalOnly] default folder created:', folder);
-        }
+        const docDir = await window.tauriAPI.getDocumentDir();
+        const defaultPath = `${docDir}/Lama Notes`.replace(/\\/g, '/');
+        await window.tauriAPI.createFolder(docDir, defaultPath);
 
-        localStorage.setItem('notes-folder', folder);
+        localStorage.setItem('notes-folder', defaultPath);
         localStorage.setItem('lama-mode', 'local');
-        setCurrentFolder(folder);
+        setCurrentFolder(defaultPath);
         setUserId('local');
-        log.info('[useNotes:goLocalOnly] folder set:', folder, '— scanning for .md files...');
-
-        try {
-            const scanned = await (window.tauriAPI as any).scanImportFolder(folder) as
-                { relPath: string; content: string; updatedAt: string }[];
-            log.info('[useNotes:goLocalOnly] scanned files:', scanned.length);
-            for (const file of scanned) {
-                const parts = file.relPath.replace(/\\/g, '/').split('/');
-                const filename = parts.pop() ?? file.relPath;
-                const fileFolder = parts.join('/');
-                const id = getPathId(filename, fileFolder);
-                const content = file.content.replace(/^---\n[\s\S]*?\n---\n?/, '').trimStart();
-                log.info('[useNotes:goLocalOnly] importing:', id);
-                await db.query(
-                    `INSERT INTO notes (id, user_id, content, updated_at, deleted)
-                     VALUES ($1, $2, $3, $4, false)
-                     ON CONFLICT (id, user_id) DO NOTHING`,
-                    [id, 'local', content, file.updatedAt],
-                );
-            }
-        } catch (e) {
-            log.warn('[useNotes:goLocalOnly] scan/import error (folder may be empty):', e);
-        }
 
         setSyncStatus('offline');
-        log.info('[useNotes:goLocalOnly] done — status: offline, userId: local');
+        log.info('[useNotes:goLocalOnly] done — instant offline local mode started');
     }, [dbRef, setCurrentFolder, setUserId, setSyncStatus]);
 
-    const importFolder = useCallback(async (): Promise<number> => {
+    const importFolder = useCallback(async (onProgress?: (progress: ImportProgress) => void): Promise<number> => {
         if (!userId || !dbRef.current) return 0;
 
+        onProgress?.({ stage: 'selecting', current: 0, total: 0 });
         const folder = await window.tauriAPI.selectFolder();
         if (!folder) return 0;
 
+        onProgress?.({ stage: 'scanning', current: 0, total: 0 });
         const scanned = await (window.tauriAPI as any).scanImportFolder(folder);
-        if (!scanned?.length) return 0;
+        if (!scanned?.length) {
+            onProgress?.({ stage: 'done', current: 0, total: 0 });
+            return 0;
+        }
 
         const db = dbRef.current;
         let imported = 0;
-
+        const total = scanned.length;
         const folderName = folder.replace(/\\/g, '/').split('/').filter(Boolean).pop() ?? '';
 
-        for (const file of scanned as { relPath: string; content: string; updatedAt: string }[]) {
+        onProgress?.({ stage: 'importing', current: 0, total });
+        for (let i = 0; i < total; i++) {
+            const file = (scanned as { relPath: string; content: string; updatedAt: string }[])[i];
             const filename = file.relPath.replace(/\\/g, '/').split('/').pop() ?? file.relPath;
             const id = getPathId(filename, folderName);
             const content = file.content.replace(/^---\n[\s\S]*?\n---\n?/, '').trimStart();
 
             await writeNote(id, content, file.updatedAt, false);
             imported++;
+            onProgress?.({ stage: 'importing', current: imported, total, currentFile: filename });
         }
 
         if (navigator.onLine) await flushQueue(db);
+        onProgress?.({ stage: 'done', current: imported, total });
         return imported;
     }, [userId, dbRef, writeNote]);
+
+    const importFiles = useCallback(async (onProgress?: (progress: ImportProgress) => void): Promise<number> => {
+        if (!userId || !dbRef.current) return 0;
+
+        onProgress?.({ stage: 'selecting', current: 0, total: 0 });
+        const selected = await open({
+            multiple: true,
+            directory: false,
+            filters: [{ name: 'Markdown / Text', extensions: ['md', 'markdown', 'txt'] }]
+        });
+        if (!selected) return 0;
+
+        const filePaths = Array.isArray(selected) ? selected : [selected];
+        if (filePaths.length === 0) return 0;
+
+        const db = dbRef.current;
+        let imported = 0;
+        const total = filePaths.length;
+
+        onProgress?.({ stage: 'importing', current: 0, total });
+        for (let i = 0; i < total; i++) {
+            const filePath = filePaths[i];
+            const filename = filePath.replace(/\\/g, '/').split('/').pop() || 'imported-note.md';
+            try {
+                const rawContent = await readTextFile(filePath);
+                const id = getPathId(filename, '');
+                const content = rawContent.replace(/^---\n[\s\S]*?\n---\n?/, '').trimStart();
+
+                await writeNote(id, content, new Date().toISOString(), false);
+                imported++;
+                onProgress?.({ stage: 'importing', current: imported, total, currentFile: filename });
+            } catch (err) {
+                log.warn('[useNotes:importFiles] failed to read/import:', filePath, err);
+            }
+        }
+
+        if (navigator.onLine) await flushQueue(db);
+        onProgress?.({ stage: 'done', current: imported, total });
+        return imported;
+    }, [userId, dbRef, writeNote]);
+
+    const exportBackup = useCallback(async (notesToExport: Note[]): Promise<number> => {
+        const folder = await window.tauriAPI.selectFolder();
+        if (!folder) return 0;
+        return exportNotesToDirectory(notesToExport, folder);
+    }, []);
+
+    const resetDatabase = useCallback(async (): Promise<void> => {
+        const db = dbRef.current ?? await getDb();
+        if (db) {
+            await db.query('DELETE FROM notes');
+            await db.query('DELETE FROM app_config');
+            await db.query('DELETE FROM pending_writes');
+        }
+        log.info('[useNotes:resetDatabase] local database tables cleared');
+    }, [dbRef]);
 
     return {
         setupDefaultWorkspace,
         selectFolder,
         changeFolder,
         goLocalOnly,
-        importFolder
+        importFolder,
+        importFiles,
+        exportBackup,
+        resetDatabase,
     };
 }

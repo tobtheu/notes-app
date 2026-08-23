@@ -20,72 +20,78 @@ export function EditorSection({
     onToggleLandscapeFullscreen
 }: EditorSectionProps) {
     return (
-        <div className="mt-8 border-t border-gray-100 dark:border-gray-700 pt-6">
-            <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Editor</h3>
-
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg mb-3">
-                <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Markdown Formatting</span>
-                    <span className="text-xs text-gray-500">Live preview and auto-formatting</span>
-                </div>
-                <button
-                    onClick={() => onToggleMarkdown(!markdownEnabled)}
-                    className={clsx(
-                        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
-                        markdownEnabled ? "bg-primary-600" : "bg-gray-300 dark:bg-gray-700"
-                    )}
-                >
-                    <span
-                        className={clsx(
-                            "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                            markdownEnabled ? "translate-x-6" : "translate-x-1"
-                        )}
-                    />
-                </button>
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Spellcheck</span>
-                    <span className="text-xs text-gray-500">Enable Windows spellcheck lines</span>
-                </div>
-                <button
-                    onClick={() => onToggleSpellcheck(!spellcheckEnabled)}
-                    className={clsx(
-                        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
-                        spellcheckEnabled ? "bg-primary-600" : "bg-gray-300 dark:bg-gray-700"
-                    )}
-                >
-                    <span
-                        className={clsx(
-                            "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                            spellcheckEnabled ? "translate-x-6" : "translate-x-1"
-                        )}
-                    />
-                </button>
-            </div>
-
-            {/* Landscape Fullscreen — iOS only */}
-            {isIOS && (
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg mt-3">
-                    <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Landscape Fullscreen</span>
-                        <span className="text-xs text-gray-500">Note in landscape mode across the full screen</span>
+        <div className="space-y-6 text-xs select-none pb-6">
+            {/* Formatting Tools Section */}
+            <div>
+                <label className="block font-semibold text-[var(--text-main)] mb-2.5">Editor Formatting & Tools</label>
+                <div className="space-y-3">
+                    {/* Markdown Formatting Toggle */}
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-[var(--text-main)] truncate">Markdown Formatting</div>
+                            <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">Live preview and rich markdown auto-formatting</div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => onToggleMarkdown(!markdownEnabled)}
+                            className={clsx(
+                                "w-10 h-5 rounded-full transition-colors relative shrink-0",
+                                markdownEnabled ? "bg-[var(--accent-color)]" : "bg-gray-300 dark:bg-gray-700"
+                            )}
+                        >
+                            <div className={clsx(
+                                "absolute top-1 w-3 h-3 rounded-full bg-white transition-transform",
+                                markdownEnabled ? "translate-x-6" : "translate-x-1"
+                            )} />
+                        </button>
                     </div>
-                    <button
-                        type="button"
-                        title={landscapeFullscreen ? "Disable landscape fullscreen" : "Enable landscape fullscreen"}
-                        onClick={() => onToggleLandscapeFullscreen?.(!landscapeFullscreen)}
-                        className={clsx(
-                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none",
-                            landscapeFullscreen ? "bg-primary-600" : "bg-gray-300 dark:bg-gray-700"
-                        )}
-                    >
-                        <span className={clsx(
-                            "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
-                            landscapeFullscreen ? "translate-x-6" : "translate-x-1"
-                        )} />
-                    </button>
+
+                    {/* Spellcheck Toggle */}
+                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--border-subtle)]">
+                        <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-[var(--text-main)] truncate">Spellcheck</div>
+                            <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">Highlight misspelled words while typing</div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => onToggleSpellcheck(!spellcheckEnabled)}
+                            className={clsx(
+                                "w-10 h-5 rounded-full transition-colors relative shrink-0",
+                                spellcheckEnabled ? "bg-[var(--accent-color)]" : "bg-gray-300 dark:bg-gray-700"
+                            )}
+                        >
+                            <div className={clsx(
+                                "absolute top-1 w-3 h-3 rounded-full bg-white transition-transform",
+                                spellcheckEnabled ? "translate-x-6" : "translate-x-1"
+                            )} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Display & Layout (iOS only) */}
+            {isIOS && (
+                <div className="pt-3 border-t border-[var(--border-subtle)] space-y-3">
+                    <label className="block font-semibold text-[var(--text-main)] mb-1">Display Mode</label>
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-[var(--text-main)] truncate">Landscape Fullscreen</div>
+                            <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">Expand editor across the full screen in landscape mode</div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => onToggleLandscapeFullscreen?.(!landscapeFullscreen)}
+                            className={clsx(
+                                "w-10 h-5 rounded-full transition-colors relative shrink-0",
+                                landscapeFullscreen ? "bg-[var(--accent-color)]" : "bg-gray-300 dark:bg-gray-700"
+                            )}
+                        >
+                            <div className={clsx(
+                                "absolute top-1 w-3 h-3 rounded-full bg-white transition-transform",
+                                landscapeFullscreen ? "translate-x-6" : "translate-x-1"
+                            )} />
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

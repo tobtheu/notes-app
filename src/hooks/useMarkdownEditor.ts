@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Selection } from 'prosemirror-state';
 import { useEditor, ReactNodeViewRenderer, mergeAttributes } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
@@ -26,6 +27,60 @@ import { CodeBlockComponent } from '../components/CodeBlockComponent';
 import { SlashCommands } from '../extensions/SlashCommands';
 
 const lowlight = createLowlight(common);
+
+const EDITOR_EXTENSIONS = [
+    // Suggestions & Slash Commands
+    SlashCommands,
+
+    // Core Block Parsing
+    TaskList.configure({
+        HTMLAttributes: { class: 'task-list' },
+    }),
+    TaskItem.configure({
+        nested: true,
+        HTMLAttributes: { class: 'task-item' },
+    }),
+
+    // Formatting
+    StarterKit.configure({
+        heading: false,
+        codeBlock: false,
+        link: false,
+        bulletList: false,
+        orderedList: false,
+    }),
+    BulletList.configure({
+        HTMLAttributes: { class: 'bullet-list' },
+    }),
+    OrderedList.configure({
+        HTMLAttributes: { class: 'ordered-list' },
+    }),
+    CodeBlockLowlight.extend({
+        addNodeView() { return ReactNodeViewRenderer(CodeBlockComponent); },
+    }).configure({ lowlight }),
+    Heading.extend({
+        renderHTML({ node, HTMLAttributes }) {
+            const text = node.textContent;
+            const id = text.toLowerCase().replace(/[^a-z0-9äöüß ]/gi, '').trim().replace(/\s+/g, '-');
+            return [`h${node.attrs.level}`, mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { id }), 0];
+        },
+    }),
+    Markdown.configure({
+        transformPastedText: true,
+        linkify: true,
+    }),
+    Highlight.configure({ multicolor: true }),
+    Link.configure({
+        openOnClick: false,
+        autolink: true,
+        HTMLAttributes: {
+            class: 'cursor-pointer text-primary-600 hover:text-primary-700 underline underline-offset-4',
+        },
+    }),
+    Table.extend({ addNodeView() { return ReactNodeViewRenderer(TableNode); } }).configure({ resizable: true }),
+    TableRow, TableHeader, TableCell,
+    Placeholder.configure({ placeholder: "Type '/' for commands..." }),
+];
 
 interface UseMarkdownEditorProps {
     content: string;
@@ -114,10 +169,6 @@ export function useMarkdownEditor({
             } else {
                 setKeyboardHeight(0);
             }
-            if (toolbarRef.current && kbHeight > 100) {
-                const shift = vv.offsetTop - kbHeight;
-                toolbarRef.current.style.transform = `translateY(${shift}px)`;
-            }
         };
         vv.addEventListener('resize', update);
         vv.addEventListener('scroll', update);
@@ -139,63 +190,7 @@ export function useMarkdownEditor({
 
     useEffect(() => { workspacePathRef.current = workspacePath; }, [workspacePath]);
 
-    const extensions = useMemo(() => {
-        const rawExtensions = [
-            // Suggestions & Slash Commands
-            SlashCommands,
-
-            // Core Block Parsing
-            TaskList.configure({
-                HTMLAttributes: { class: 'task-list' },
-            }),
-            TaskItem.configure({
-                nested: true,
-                HTMLAttributes: { class: 'task-item' },
-            }),
-
-            // Formatting
-            StarterKit.configure({
-                heading: false,
-                codeBlock: false,
-                link: false,
-                bulletList: false,
-                orderedList: false,
-            }),
-            BulletList.configure({
-                HTMLAttributes: { class: 'bullet-list' },
-            }),
-            OrderedList.configure({
-                HTMLAttributes: { class: 'ordered-list' },
-            }),
-            CodeBlockLowlight.extend({
-                addNodeView() { return ReactNodeViewRenderer(CodeBlockComponent); },
-            }).configure({ lowlight }),
-            Heading.extend({
-                renderHTML({ node, HTMLAttributes }) {
-                    const text = node.textContent;
-                    const id = text.toLowerCase().replace(/[^a-z0-9äöüß ]/gi, '').trim().replace(/\s+/g, '-');
-                    return [`h${node.attrs.level}`, mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, { id }), 0];
-                },
-            }),
-            Markdown.configure({
-                transformPastedText: true,
-                linkify: true,
-            }),
-            Highlight.configure({ multicolor: true }),
-            Link.configure({
-                openOnClick: false,
-                autolink: true,
-                HTMLAttributes: {
-                    class: 'cursor-pointer text-primary-600 hover:text-primary-700 underline underline-offset-4',
-                },
-            }),
-            Table.extend({ addNodeView() { return ReactNodeViewRenderer(TableNode); } }).configure({ resizable: true }),
-            TableRow, TableHeader, TableCell,
-            Placeholder.configure({ placeholder: "Type '/' for commands..." }),
-        ];
-
-        return rawExtensions;
-    }, []);
+    const extensions = EDITOR_EXTENSIONS;
 
     const editorMarkdownRef = useRef('');
 
@@ -209,14 +204,37 @@ export function useMarkdownEditor({
     const editor = useEditor({
         extensions,
         content,
+        autofocus: false,
         editorProps: {
             attributes: {
                 class: 'focus:outline-none min-h-[500px] pb-32 px-1',
                 spellcheck: spellcheckEnabled ? 'true' : 'false',
             },
+            handleScrollToSelection: (view) => {
+                // Prevent ProseMirror from scrolling the container if the editor does not have focus
+                if (!view.hasFocus()) {
+                    return true;
+                }
+                return false;
+            },
             handleDOMEvents: {
                 click: (_view, event) => {
                     const target = event.target as HTMLElement;
+
+                    // If a taskItem checkbox is clicked, ensure selection matches clicked item position to prevent viewport jump
+                    const taskItem = target.closest('li[data-type="taskItem"], li.task-item');
+                    if (taskItem && (target.tagName === 'INPUT' || target.tagName === 'LABEL' || target.closest('label'))) {
+                        try {
+                            const pos = _view.posAtDOM(taskItem, 0);
+                            if (typeof pos === 'number' && pos >= 0) {
+                                const tr = _view.state.tr.setSelection(
+                                    Selection.near(_view.state.doc.resolve(pos))
+                                );
+                                _view.dispatch(tr);
+                            }
+                        } catch {}
+                    }
+
                     const anchor = target.closest('a');
                     if (anchor && onNavigateRef.current) {
                         const href = anchor.getAttribute('href');
@@ -230,7 +248,13 @@ export function useMarkdownEditor({
                                 } else {
                                     const cleanHref = href.replace('note://', '').replace('id:', '');
                                     const [id, anchor] = cleanHref.split('#');
-                                    onNavigateRef.current(decodeURIComponent(id), anchor);
+                                    let decodedId = id;
+                                    try {
+                                        decodedId = decodeURIComponent(id);
+                                    } catch {
+                                        decodedId = id;
+                                    }
+                                    onNavigateRef.current(decodedId, anchor);
                                 }
                                 return true;
                             }
@@ -321,6 +345,14 @@ export function useMarkdownEditor({
                 return false;
             }
         },
+        onCreate: ({ editor }) => {
+            try {
+                const md = (editor.storage as any)?.markdown?.getMarkdown();
+                editorMarkdownRef.current = md || content || '';
+            } catch {
+                editorMarkdownRef.current = content || '';
+            }
+        },
         onUpdate: ({ editor }) => {
             const markdown = (editor.storage as any).markdown.getMarkdown();
             editorMarkdownRef.current = markdown;
@@ -340,9 +372,18 @@ export function useMarkdownEditor({
 
     useEffect(() => {
         if (!editor || content == null) return;
-        if (content !== editorMarkdownRef.current && !editor.isDestroyed && !editor.isFocused) {
-            editor.commands.setContent(content, { emitUpdate: false });
-            editorMarkdownRef.current = content;
+        const normalizedContent = content.trim();
+        const currentContent = editorMarkdownRef.current.trim();
+        if (normalizedContent !== currentContent && !editor.isDestroyed && !editor.isFocused) {
+            queueMicrotask(() => {
+                if (!editor.isDestroyed) {
+                    editor.commands.setContent(content, { emitUpdate: false });
+                    editorMarkdownRef.current = content;
+                    if (scrollContainerRef.current) {
+                        scrollContainerRef.current.scrollTop = 0;
+                    }
+                }
+            });
         }
     }, [editor, content]);
 

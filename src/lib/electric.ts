@@ -4,7 +4,8 @@ import { electricSync } from '@electric-sql/pglite-sync';
 import { initSchema } from './db';
 import { log } from './logger';
 
-const ELECTRIC_URL = import.meta.env.VITE_ELECTRIC_URL ?? 'http://localhost:5133';
+const envElectricUrl = (import.meta.env.VITE_ELECTRIC_URL as string) || '';
+const ELECTRIC_URL = (envElectricUrl && !envElectricUrl.includes('46.225.11.148')) ? envElectricUrl : 'https://sync.lamanotes.de';
 
 /**
  * Singleton PGlite instance — shared across the entire app.

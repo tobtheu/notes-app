@@ -50,10 +50,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_ELECTRIC_URL: ${{ secrets.VITE_ELECTRIC_URL }}
-          VITE_LAMA_SECRET: ${{ secrets.VITE_LAMA_SECRET }}
+          VITE_SUPABASE_URL: "https://api.lamanotes.de"
+          VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc3MDYwNDMzLCJleHAiOjIwOTI0MjA0MzN9.MfNPRgANFJG_PqejvzL269R4J-u7AaRBoNdEdGqaQJQ"
+          VITE_ELECTRIC_URL: "https://sync.lamanotes.de"
+          VITE_LAMA_SECRET: "LamaNotes_Safe_30b9d5a4"
         with:
           tagName: v__VERSION__ # the action replaces this with the version from tauri.conf.json
           releaseName: "NotizApp v__VERSION__"

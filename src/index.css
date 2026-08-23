@@ -747,6 +747,16 @@ li.task-item[data-checked="true"] > div {
 
 .prose p {
   @apply !text-sm !leading-relaxed;
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.prose code::before,
+.prose code::after,
+.prose :not(pre)>code::before,
+.prose :not(pre)>code::after {
+  content: "" !important;
+  display: none !important;
 }
 
 .prose :not(pre)>code {

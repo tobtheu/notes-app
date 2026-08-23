@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, act } from '@testing-library/react';
 import { NoteList } from '../components/NoteList';
 import type { Note } from '../types';
 
@@ -202,4 +202,43 @@ describe('NoteList Swipe Gesture', () => {
         expect(backgroundContainer.className).toContain('ml-auto');
         expect(backgroundContainer.className).toContain('max-w-[192px]');
     });
+
+    it('applies note-item-exit animation class and delays onDeleteNote call during collapse', async () => {
+        vi.useFakeTimers();
+        const onDelete = vi.fn();
+        const { container } = render(
+            <NoteList
+                notes={mockNotes}
+                folders={[]}
+                selectedNote={null}
+                onSelectNote={vi.fn()}
+                searchTerm=""
+                onSearchChange={vi.fn()}
+                onDeleteNote={onDelete}
+                onMoveNote={vi.fn()}
+                onTogglePin={vi.fn()}
+                isNotePinned={() => false}
+                getNoteId={(n) => n.filename}
+                selectedCategory={null}
+            />
+        );
+
+        const deleteButton = container.querySelector('[title="Delete Note"]') as HTMLElement;
+        expect(deleteButton).not.toBeNull();
+
+        fireEvent.click(deleteButton);
+
+        // Right after click, the wrapper should have the exit class
+        const wrapper = container.querySelector('.note-item-wrapper') as HTMLElement;
+        expect(wrapper.className).toContain('note-item-exit');
+        expect(onDelete).not.toHaveBeenCalled();
+
+        // Advance timers by 250ms (animation duration)
+        act(() => {
+            vi.advanceTimersByTime(250);
+        });
+        expect(onDelete).toHaveBeenCalledWith('note1.md');
+        vi.useRealTimers();
+    });
 });
+

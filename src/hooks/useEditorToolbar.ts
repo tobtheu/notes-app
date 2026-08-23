@@ -204,61 +204,64 @@ export function useEditorToolbar({
 
     // Dynamic width calculation effect
     useLayoutEffect(() => {
+        if (typeof ResizeObserver === 'undefined') return;
         if (!containerRef.current || !hiddenContainerRef.current || !hiddenOverflowRef.current) return;
 
-        let parent = containerRef.current.parentElement;
-        if (parent && parent.classList.contains('md:w-fit')) {
-            parent = parent.parentElement;
-        }
-        if (!parent) return;
+        // Find the outermost editor viewport to measure available width stably without transform interference
+        const editorArea = containerRef.current.closest('.flex-1') || document.body;
 
-        const observer = new ResizeObserver((entries) => {
-            for (let entry of entries) {
-                const containerWidth = entry.contentRect.width - 24;
-                const hiddenChildren = Array.from(hiddenContainerRef.current!.children) as HTMLElement[];
-                const overflowBtnWidth = hiddenOverflowRef.current!.getBoundingClientRect().width;
+        const measure = () => {
+            if (!hiddenContainerRef.current || !hiddenOverflowRef.current) return;
+            const containerWidth = (editorArea instanceof HTMLElement ? editorArea.clientWidth : window.innerWidth) - 32;
+            const hiddenChildren = Array.from(hiddenContainerRef.current.children) as HTMLElement[];
+            const overflowBtnWidth = hiddenOverflowRef.current.offsetWidth || 28;
 
-                if (hiddenChildren.length === 0) return;
+            if (hiddenChildren.length === 0) return;
 
-                const gap = 4;
-                let totalWidth = 0;
-                let fitCount = 0;
+            const gap = 4;
+            let totalWidth = 0;
+            let fitCount = 0;
 
-                const childWidths = hiddenChildren.map(c => c.getBoundingClientRect().width);
+            // Use offsetWidth which is immune to CSS transform: scale() during animations
+            const childWidths = hiddenChildren.map(c => c.offsetWidth || 28);
 
+            for (let i = 0; i < hiddenChildren.length; i++) {
+                const itemWidth = childWidths[i];
+                const nextTotal = totalWidth + itemWidth + (i > 0 ? gap : 0);
+
+                if (nextTotal <= containerWidth) {
+                    totalWidth = nextTotal;
+                    fitCount++;
+                } else {
+                    break;
+                }
+            }
+
+            if (fitCount < hiddenChildren.length) {
+                totalWidth = 0;
+                fitCount = 0;
                 for (let i = 0; i < hiddenChildren.length; i++) {
                     const itemWidth = childWidths[i];
                     const nextTotal = totalWidth + itemWidth + (i > 0 ? gap : 0);
 
-                    if (nextTotal <= containerWidth) {
+                    if (nextTotal + overflowBtnWidth + gap <= containerWidth) {
                         totalWidth = nextTotal;
                         fitCount++;
                     } else {
                         break;
                     }
                 }
-
-                if (fitCount < hiddenChildren.length) {
-                    totalWidth = 0;
-                    fitCount = 0;
-                    for (let i = 0; i < hiddenChildren.length; i++) {
-                        const itemWidth = childWidths[i];
-                        const nextTotal = totalWidth + itemWidth + (i > 0 ? gap : 0);
-
-                        if (nextTotal + overflowBtnWidth + gap <= containerWidth) {
-                            totalWidth = nextTotal;
-                            fitCount++;
-                        } else {
-                            break;
-                        }
-                    }
-                }
-
-                setVisibleCount(fitCount);
             }
+
+            setVisibleCount(prev => (prev === fitCount ? prev : fitCount));
+        };
+
+        const observer = new ResizeObserver(() => {
+            measure();
         });
 
-        observer.observe(parent);
+        observer.observe(editorArea);
+        measure();
         return () => observer.disconnect();
     }, [filteredItems.length]);
 

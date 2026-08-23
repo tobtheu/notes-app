@@ -19,14 +19,17 @@ interface SettingsModalProps {
     onChangePath?: () => void;
     theme: Theme;
     setTheme: (theme: Theme, origin?: ThemeOrigin) => void;
+    autoTheme?: boolean;
+    onToggleAutoTheme?: (enabled: boolean) => void;
+    preferredLightTheme?: 'clay' | 'sage';
     markdownEnabled: boolean;
     onToggleMarkdown: (enabled: boolean) => void;
-    accentColor?: string;
-    setAccentColor?: (color: string) => void;
     monochromeIcons: boolean;
     onToggleMonochromeIcons: (v: boolean) => void;
     showIconsWhenCollapsed?: boolean;
     onToggleShowIconsWhenCollapsed?: (v: boolean) => void;
+    showNoteCounts?: boolean;
+    onToggleShowNoteCounts?: (v: boolean) => void;
     fontFamily: 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system';
     setFontFamily: (fontFamily: 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system') => void;
     fontSize: 'small' | 'medium' | 'large';
@@ -43,9 +46,10 @@ interface SettingsModalProps {
     onSignUp?: (email: string, password: string) => Promise<{ userId: string; email: string }>;
     onSignOut?: (deleteLocal: boolean) => Promise<void>;
     onDeleteAccount?: () => Promise<void>;
-    onImportFolder?: () => Promise<number>;
-    onImportFiles?: () => Promise<number>;
+    onImportFolder?: (onProgress?: (prog: any) => void) => Promise<number>;
+    onImportFiles?: (onProgress?: (prog: any) => void) => Promise<number>;
     onExportBackup?: () => Promise<number>;
+    onResetDatabase?: () => Promise<void>;
     onInstallUpdate?: () => Promise<void>;
 }
 
@@ -62,14 +66,17 @@ export function SettingsModal(props: SettingsModalProps) {
         isIOS = false,
         theme,
         setTheme,
-        accentColor,
-        setAccentColor,
+        autoTheme,
+        onToggleAutoTheme,
+        preferredLightTheme,
         markdownEnabled,
         onToggleMarkdown,
         monochromeIcons,
         onToggleMonochromeIcons,
         showIconsWhenCollapsed,
         onToggleShowIconsWhenCollapsed,
+        showNoteCounts,
+        onToggleShowNoteCounts,
         fontFamily,
         setFontFamily,
         fontSize,
@@ -80,7 +87,7 @@ export function SettingsModal(props: SettingsModalProps) {
         onToggleLandscapeFullscreen,
         syncStatus,
         hasPending = false,
-        userEmail,
+        userEmail
     } = props;
 
     const [activeTab, setActiveTab] = useState<TabKey>('appearance');
@@ -114,12 +121,18 @@ export function SettingsModal(props: SettingsModalProps) {
         importState,
         importCount,
         handleImportFolder,
+        importFolderProgress,
         importFilesState,
         importFilesCount,
+        importFilesProgress,
         handleImportFiles,
         exportState,
         exportCount,
         handleExportBackup,
+        resetDbState,
+        resetDbStep,
+        setResetDbStep,
+        handleResetDatabase,
         authMode,
         setAuthMode,
         authEmail,
@@ -261,12 +274,15 @@ export function SettingsModal(props: SettingsModalProps) {
                                 <AppearanceSection
                                     theme={theme}
                                     setTheme={setTheme}
-                                    accentColor={accentColor}
-                                    setAccentColor={setAccentColor}
+                                    autoTheme={autoTheme}
+                                    onToggleAutoTheme={onToggleAutoTheme}
+                                    preferredLightTheme={preferredLightTheme}
                                     monochromeIcons={monochromeIcons}
                                     onToggleMonochromeIcons={onToggleMonochromeIcons}
                                     showIconsWhenCollapsed={showIconsWhenCollapsed}
                                     onToggleShowIconsWhenCollapsed={onToggleShowIconsWhenCollapsed}
+                                    showNoteCounts={showNoteCounts}
+                                    onToggleShowNoteCounts={onToggleShowNoteCounts}
                                     fontFamily={fontFamily}
                                     setFontFamily={setFontFamily}
                                     fontSize={fontSize}
@@ -319,13 +335,19 @@ export function SettingsModal(props: SettingsModalProps) {
                                     hasImportFolderOption={!!props.onImportFolder}
                                     importState={importState}
                                     importCount={importCount}
+                                    importFolderProgress={importFolderProgress}
                                     onImportFolderClick={handleImportFolder}
                                     importFilesState={importFilesState}
                                     importFilesCount={importFilesCount}
+                                    importFilesProgress={importFilesProgress}
                                     onImportFilesClick={props.onImportFiles ? handleImportFiles : undefined}
                                     exportState={exportState}
                                     exportCount={exportCount}
                                     onExportBackup={props.onExportBackup ? handleExportBackup : undefined}
+                                    resetDbState={resetDbState}
+                                    resetDbStep={resetDbStep}
+                                    setResetDbStep={setResetDbStep}
+                                    onResetDatabaseClick={props.onResetDatabase ? handleResetDatabase : undefined}
                                 />
                             )}
 

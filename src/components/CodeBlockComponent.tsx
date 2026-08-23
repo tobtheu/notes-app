@@ -28,16 +28,16 @@ export const CodeBlockComponent: React.FC<NodeViewProps> = (props) => {
     };
 
     return (
-        <NodeViewWrapper className="relative group my-6">
+        <NodeViewWrapper className="relative group my-5">
             <div
-                className="absolute right-4 top-4 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute right-3 top-3 flex items-center gap-1.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                 contentEditable={false}
             >
                 {/* --- LANGUAGE SELECTOR --- */}
                 <div className="relative">
                     <select
                         contentEditable={false}
-                        className="appearance-none bg-gray-800/80 hover:bg-gray-800 text-gray-300 text-[10px] font-bold uppercase tracking-wider pl-3 pr-7 py-1.5 rounded-md border border-white/10 backdrop-blur-md cursor-pointer outline-none transition-colors"
+                        className="appearance-none bg-[var(--canvas-bg)]/90 hover:bg-[var(--card-hover)] text-[var(--text-main)] text-[10px] font-bold uppercase tracking-wider pl-2.5 pr-6 py-1 rounded-xl border border-[var(--border-subtle)] shadow-xs backdrop-blur-md cursor-pointer outline-none transition-colors"
                         value={defaultLanguage || 'auto'}
                         onChange={event => updateAttributes({ language: event.target.value })}
                     >
@@ -48,25 +48,26 @@ export const CodeBlockComponent: React.FC<NodeViewProps> = (props) => {
                             </option>
                         ))}
                     </select>
-                    <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
                 </div>
 
                 {/* --- COPY BUTTON --- */}
                 <button
+                    type="button"
                     onClick={handleCopy}
                     className={clsx(
-                        "p-1.5 rounded-md border backdrop-blur-md transition-all",
+                        "p-1.5 rounded-xl border backdrop-blur-md transition-all shadow-xs",
                         copied
-                            ? "bg-green-500/20 border-green-500/50 text-green-400"
-                            : "bg-gray-800/80 hover:bg-gray-800 border-white/10 text-gray-300"
+                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-500"
+                            : "bg-[var(--canvas-bg)]/90 hover:bg-[var(--card-hover)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
                     )}
                     title="Copy code"
                 >
-                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                    {copied ? <Check size={13} /> : <Copy size={13} />}
                 </button>
             </div>
 
-            <pre className="rounded-xl overflow-hidden shadow-lg border border-gray-200 dark:border-gray-800">
+            <pre className="p-4 rounded-2xl overflow-x-auto bg-[var(--card-hover)] border border-[var(--border-subtle)] font-mono text-xs text-[var(--text-main)] shadow-xs leading-relaxed">
                 {/* The actual code content rendered by Tiptap */}
                 {/* @ts-ignore */}
                 <NodeViewContent as="code" className={clsx(defaultLanguage && `language-${defaultLanguage}`)} />

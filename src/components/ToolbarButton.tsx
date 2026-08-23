@@ -16,10 +16,11 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
     label,
     action,
     isActive,
-    iconSize = 16,
+    iconSize = 14,
     btnPadding = "p-1.5"
 }) => (
     <button
+        type="button"
         onMouseDown={(e) => {
             e.preventDefault();
         }}
@@ -29,14 +30,14 @@ export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
             action();
         }}
         className={clsx(
-            "rounded-md transition-colors flex items-center justify-center shrink-0",
+            "smooth-transition rounded-xl flex items-center justify-center shrink-0 w-7 h-7 active:scale-95",
             btnPadding,
             isActive
-                ? "bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400"
-                : "text-gray-500 dark:text-gray-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 dark:hover:text-primary-400"
+                ? "bg-[var(--card-active)] text-[var(--accent-color)] shadow-sm font-semibold"
+                : "text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/10"
         )}
         title={label}
     >
-        <Icon size={iconSize} strokeWidth={2.5} />
+        <Icon size={iconSize} />
     </button>
 );

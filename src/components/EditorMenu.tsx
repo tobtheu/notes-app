@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import clsx from 'clsx';
 import { MoreVertical, FileDown, Eye, EyeOff, Zap } from 'lucide-react';
 
 interface EditorMenuProps {
@@ -77,27 +76,27 @@ export function EditorMenu({
                 </button>
 
                 {isMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 p-1.5 animate-in fade-in zoom-in duration-200 z-[100] backdrop-blur-xl" style={{ backgroundColor: 'var(--app-bg)' }}>
+                    <div className="absolute right-0 mt-2 w-56 rounded-2xl shadow-xl border border-[var(--border-subtle)] p-1.5 animate-popover-expand z-[100] backdrop-blur-xl" style={{ backgroundColor: 'var(--canvas-bg)' }}>
                         <button
                             type="button"
                             onClick={() => { onToggleFocus(); setIsMenuOpen(false); }}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
+                            className="w-full flex items-center gap-3 px-3 py-2 text-xs text-[var(--text-main)] hover:bg-[var(--card-hover)] rounded-xl transition-colors group"
                         >
-                            <div className="w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 transition-colors group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400">
-                                <Zap size={16} />
+                            <div className="w-7 h-7 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-[var(--text-muted)] transition-colors group-hover:text-[var(--accent-color)]">
+                                <Zap size={15} />
                             </div>
-                            <span className="font-medium text-primary-600 dark:text-primary-400">Focus Mode</span>
+                            <span className="font-medium">Focus Mode</span>
                         </button>
 
-                        <div className="h-px bg-gray-100 dark:bg-gray-700 my-1 mx-1.5" />
+                        <div className="h-px bg-[var(--border-subtle)] my-1 mx-1.5" />
 
                         <button
                             type="button"
                             onClick={() => { onExport(); setIsMenuOpen(false); }}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
+                            className="w-full flex items-center gap-3 px-3 py-2 text-xs text-[var(--text-main)] hover:bg-[var(--card-hover)] rounded-xl transition-colors group"
                         >
-                            <div className="w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 transition-colors group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400">
-                                <FileDown size={16} />
+                            <div className="w-7 h-7 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-[var(--text-muted)] transition-colors group-hover:text-[var(--accent-color)]">
+                                <FileDown size={15} />
                             </div>
                             <span className="font-medium">Export PDF</span>
                         </button>
@@ -105,15 +104,10 @@ export function EditorMenu({
                         <button
                             type="button"
                             onClick={() => { setToolbarVisible(!toolbarVisible); setIsMenuOpen(false); }}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg transition-colors group"
+                            className="w-full flex items-center gap-3 px-3 py-2 text-xs text-[var(--text-main)] hover:bg-[var(--card-hover)] rounded-xl transition-colors group"
                         >
-                            <div className={clsx(
-                                "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                                toolbarVisible
-                                    ? "bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
-                                    : "bg-gray-100 dark:bg-gray-700 text-gray-500 group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 group-hover:text-primary-400"
-                            )}>
-                                {toolbarVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                            <div className="w-7 h-7 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-[var(--text-muted)] transition-colors group-hover:text-[var(--accent-color)]">
+                                {toolbarVisible ? <EyeOff size={15} /> : <Eye size={15} />}
                             </div>
                             <span className="font-medium">{toolbarVisible ? 'Hide' : 'Show'} Toolbar</span>
                         </button>

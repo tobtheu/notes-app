@@ -10,9 +10,18 @@ use std::time::Duration;
 // Read from environment at compile time.
 // Values are injected via GitHub Actions secrets (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
 // and locally via the .env file (loaded by build.rs).
-pub const SUPABASE_URL: &str = match option_env!("VITE_SUPABASE_URL") { Some(v) => v, None => "" };
-pub const SUPABASE_ANON_KEY: &str = match option_env!("VITE_SUPABASE_ANON_KEY") { Some(v) => v, None => "" };
-pub const LAMA_SECRET: &str = match option_env!("VITE_LAMA_SECRET") { Some(v) => v, None => "" };
+pub const SUPABASE_URL: &str = match option_env!("VITE_SUPABASE_URL") {
+    Some(v) if !v.is_empty() => v,
+    _ => "https://api.lamanotes.de",
+};
+pub const SUPABASE_ANON_KEY: &str = match option_env!("VITE_SUPABASE_ANON_KEY") {
+    Some(v) if !v.is_empty() => v,
+    _ => "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc3MDYwNDMzLCJleHAiOjIwOTI0MjA0MzN9.MfNPRgANFJG_PqejvzL269R4J-u7AaRBoNdEdGqaQJQ",
+};
+pub const LAMA_SECRET: &str = match option_env!("VITE_LAMA_SECRET") {
+    Some(v) if !v.is_empty() => v,
+    _ => "LamaNotes_Safe_30b9d5a4",
+};
 
 // Hard ceiling so a hung Supabase endpoint can't freeze sign-in/refresh.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);

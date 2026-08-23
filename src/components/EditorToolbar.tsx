@@ -14,20 +14,12 @@ interface EditorToolbarProps {
 
 /**
  * EditorToolbar Component
- * A floating formatting bar for the Tiptap editor.
- * Features:
- * - Basic formatting (Bold, Italic, Highlight)
- * - Headings and Lists
- * - Advanced items (Blockquote, Code, Table)
- * - Custom Modal integration for Links and Images
- * - Responsive "Compact" vs "Full" modes
- * - Dynamic overflow calculation collapsing hidden items into a 3-dot dropdown
+ * Floating pill formatting bar for the Tiptap editor matching the Minimalist Redesign Mockup.
  */
 export const EditorToolbar: React.FC<EditorToolbarProps> = (props) => {
     const { editor } = props;
 
     const {
-        isCompact,
         iconSize,
         btnPadding,
         visibleItems,
@@ -44,15 +36,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (props) => {
     if (!editor) return null;
 
     return (
-        <div className="relative w-full md:w-fit max-w-[calc(100vw-2rem)] shrink-0">
+        <div className="relative w-full md:w-fit max-w-[calc(100vw-2rem)] shrink-0 select-none">
             {/* Hidden measuring container */}
             <div
                 ref={hiddenContainerRef}
-                className="absolute top-0 left-0 flex items-center gap-1 p-1 invisible pointer-events-none"
+                className="absolute top-0 left-0 flex items-center gap-0.5 p-1 invisible pointer-events-none"
             >
                 {filteredItems.map(item => {
                     if (item.type === 'divider') {
-                        return <div key={item.id} className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />;
+                        return <div key={item.id} className="w-px h-3.5 bg-gray-300 dark:bg-gray-700 mx-1 shrink-0" />;
                     }
                     return (
                         <ToolbarButton
@@ -73,7 +65,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (props) => {
                 ref={hiddenOverflowRef}
                 className="absolute top-0 left-0 invisible pointer-events-none p-1"
             >
-                <button className={clsx("rounded-md", btnPadding)}>
+                <button className={clsx("rounded-xl w-7 h-7 flex items-center justify-center", btnPadding)}>
                     <MoreHorizontal size={iconSize} />
                 </button>
             </div>
@@ -81,15 +73,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (props) => {
             {/* Visible Container */}
             <div
                 ref={containerRef}
-                className={clsx(
-                    "flex items-center gap-1 p-1 shadow-xl border border-gray-200 dark:border-gray-700 rounded-lg animate-in fade-in zoom-in duration-200 w-full",
-                    isCompact ? "bg-opacity-90 backdrop-blur-sm" : ""
-                )}
-                style={{ backgroundColor: 'var(--app-bg)' }}
+                className="flex items-center gap-0.5 px-2 py-1 shadow-toolbar-light dark:shadow-toolbar-dark border border-[var(--border-subtle)] rounded-2xl backdrop-blur-md w-full md:w-auto"
+                style={{ backgroundColor: 'var(--toolbar-bg)' }}
             >
                 {visibleItems.map(item => {
                     if (item.type === 'divider') {
-                        return <div key={item.id} className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0" />;
+                        return <div key={item.id} className="w-px h-3.5 bg-gray-300 dark:bg-gray-700 mx-1 shrink-0" />;
                     }
                     return (
                         <ToolbarButton
@@ -107,31 +96,33 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (props) => {
                 {overflowItems.length > 0 && (
                     <div className="relative ml-auto shrink-0">
                         <button
+                            type="button"
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                             className={clsx(
-                                "rounded-md transition-colors flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 dark:hover:text-primary-400",
+                                "smooth-transition rounded-xl flex items-center justify-center w-7 h-7 active:scale-95 text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/10",
                                 btnPadding,
-                                isDropdownOpen && "bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400"
+                                isDropdownOpen && "bg-[var(--card-active)] text-[var(--accent-color)]"
                             )}
                             title="More Options"
                         >
-                            <MoreHorizontal size={iconSize} strokeWidth={2.5} />
+                            <MoreHorizontal size={iconSize} />
                         </button>
                         {isDropdownOpen && (
                             <div
                                 ref={dropdownRef}
-                                className="absolute bottom-full right-0 mb-2 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl min-w-[150px] z-50 flex flex-col gap-0.5 animate-in fade-in slide-in-from-bottom-2 duration-150"
-                                style={{ backgroundColor: 'var(--app-bg)' }}
+                                className="absolute bottom-full right-0 mb-2 py-1 border border-[var(--border-subtle)] rounded-2xl shadow-xl min-w-[150px] z-50 flex flex-col gap-0.5 animate-popover-expand backdrop-blur-xl"
+                                style={{ backgroundColor: 'var(--canvas-bg)' }}
                             >
                                 {overflowItems.map(item => {
                                     if (item.type === 'divider') {
-                                        return <div key={item.id} className="h-px bg-gray-250 dark:bg-gray-700 my-1 mx-2" />;
+                                        return <div key={item.id} className="h-px bg-[var(--border-subtle)] my-1 mx-2" />;
                                     }
                                     const Icon = item.icon!;
                                     return (
                                         <button
                                             key={item.id}
+                                            type="button"
                                             onMouseDown={(e) => e.preventDefault()}
                                             onClick={(e) => {
                                                 e.preventDefault();
@@ -140,13 +131,13 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (props) => {
                                                 setIsDropdownOpen(false);
                                             }}
                                             className={clsx(
-                                                "flex items-center gap-2 px-3 py-1.5 text-sm text-left w-full transition-colors rounded-md",
+                                                "flex items-center gap-2 px-3 py-1.5 text-xs text-left w-full transition-colors rounded-xl",
                                                 item.isActive
-                                                    ? "bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400 font-medium"
-                                                    : "text-gray-500 dark:text-gray-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 dark:hover:text-primary-400"
+                                                    ? "bg-[var(--card-active)] text-[var(--accent-color)] font-semibold"
+                                                    : "text-[var(--text-main)] hover:bg-[var(--card-hover)]"
                                             )}
                                         >
-                                            <Icon size={14} />
+                                            <Icon size={13} />
                                             <span className="truncate">{item.label}</span>
                                         </button>
                                     );

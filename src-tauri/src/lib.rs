@@ -298,7 +298,7 @@ async fn delete_folder_move_contents(_app: tauri::AppHandle, folder_path: String
 
     let files = get_files_recursively(folder);
     for file in files {
-        if file.extension().map_or(false, |ext| ext == "md") {
+        if file.extension().is_some_and(|ext| ext == "md") {
             let basename = file.file_name().unwrap();
             let mut target_path = root.join(basename);
             let mut counter = 1;
@@ -501,7 +501,7 @@ fn scan_md_files(dir: &Path, root: &Path) -> Vec<ScannedNote> {
         if path.is_dir() {
             // Recurse into subdirectory
             results.extend(scan_md_files(&path, root));
-        } else if path.is_file() && path.extension().map_or(false, |e| e == "md") {
+        } else if path.is_file() && path.extension().is_some_and(|e| e == "md") {
             let content = fs::read_to_string(&path).unwrap_or_default();
             let rel = path.strip_prefix(root).unwrap_or(&path);
             let rel_path = rel.to_string_lossy().replace('\\', "/");
@@ -510,7 +510,7 @@ fn scan_md_files(dir: &Path, root: &Path) -> Vec<ScannedNote> {
                 .map(|t| {
                     let secs = t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
                     chrono::DateTime::from_timestamp(secs as i64, 0)
-                        .unwrap_or_else(|| Utc::now())
+                        .unwrap_or_else(Utc::now)
                         .to_rfc3339()
                 })
                 .unwrap_or_else(|_| Utc::now().to_rfc3339());
@@ -530,12 +530,6 @@ async fn scan_import_folder(folder_path: String) -> Result<Vec<ScannedNote>, Str
     Ok(scan_md_files(root, root))
 }
 
-#[tauri::command]
-async fn export_pdf(_app: tauri::AppHandle, html: String) -> Result<bool, String> {
-    info!("[lib.rs] export_pdf called, html length: {}", html.len());
-    Ok(true)
-}
-
 // ---------------------------------------------------------------------------
 // App entry point
 // ---------------------------------------------------------------------------
@@ -544,8 +538,13 @@ async fn export_pdf(_app: tauri::AppHandle, html: String) -> Result<bool, String
 pub fn run() {
     #[cfg(target_os = "linux")]
     {
-        // Disable DMA-BUF renderer to prevent EGL display creation crashes on some Linux graphics drivers/compositors
-        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        // Force GPU hardware compositing and 2D canvas acceleration on WebKitGTK Linux
+        if std::env::var("WEBKIT_FORCE_COMPOSITING_MODE").is_err() {
+            std::env::set_var("WEBKIT_FORCE_COMPOSITING_MODE", "1");
+        }
+        if std::env::var("WEBKIT_FORCE_ACCELERATED_2D_CANVAS").is_err() {
+            std::env::set_var("WEBKIT_FORCE_ACCELERATED_2D_CANVAS", "1");
+        }
     }
 
     #[cfg(target_os = "ios")]
@@ -561,7 +560,8 @@ pub fn run() {
             }))
             .plugin(tauri_plugin_positioner::init())
             .plugin(tauri_plugin_shell::init())
-            .plugin(tauri_plugin_updater::Builder::new().build());
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_window_state::Builder::default().build());
     }
 
     builder
@@ -602,8 +602,6 @@ pub fn run() {
             get_supabase_credentials,
             refresh_supabase_token,
             #[cfg(not(any(target_os = "ios", target_os = "android")))]
-            export_pdf,
-            #[cfg(not(any(target_os = "ios", target_os = "android")))]
             scan_import_folder,
         ])
         .manage(WatcherState(Arc::new(Mutex::new(None))))
@@ -626,9 +624,9 @@ pub fn run() {
                         .unwrap_or(true);
 
                     if first_launch {
-                        let _ = window.set_size(LogicalSize::new(1270u32, 900u32));
+                        let _ = window.set_size(LogicalSize::new(1050u32, 750u32));
                         if let Some(s) = store {
-                            let _ = s.set("sized", serde_json::json!(true));
+                            s.set("sized", serde_json::json!(true));
                             let _ = s.save();
                         }
                     }

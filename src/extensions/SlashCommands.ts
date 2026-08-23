@@ -36,6 +36,43 @@ export const SlashCommands = Extension.create({
                 editor: this.editor,
                 char: '/',
                 pluginKey: new PluginKey('slashCommands'),
+                startOfLine: true,
+                allow: ({ state, range }) => {
+                    const $from = state.doc.resolve(range.from);
+
+                    // Do not trigger inside lists (bullet, ordered, task), code blocks, or tables
+                    for (let d = $from.depth; d > 0; d--) {
+                        const typeName = $from.node(d).type.name;
+                        if ([
+                            'listItem',
+                            'taskItem',
+                            'bulletList',
+                            'orderedList',
+                            'taskList',
+                            'codeBlock',
+                            'code_block',
+                            'table',
+                            'tableCell',
+                            'tableHeader',
+                            'tableRow',
+                        ].includes(typeName)) {
+                            return false;
+                        }
+                    }
+
+                    // Only trigger if at the very beginning of the parent block or after a hard break
+                    if ($from.parentOffset === 0) {
+                        return true;
+                    }
+
+                    if ($from.nodeBefore?.type.name === 'hardBreak') {
+                        return true;
+                    }
+
+                    // Preceding text on this line must be whitespace only
+                    const textBefore = $from.parent.textBetween(0, $from.parentOffset, undefined, '\n');
+                    return textBefore.trim() === '';
+                },
                 command: ({ editor, range, props }: any) => {
                     props.command({ editor, range });
                 },
