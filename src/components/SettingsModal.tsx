@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Palette, Edit3, Cloud, HardDrive, Info } from 'lucide-react';
+import { Palette, Edit3, Cloud, HardDrive, Info, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { SyncStatus } from '../hooks/useNotes';
 import type { Theme, ThemeOrigin } from '../hooks/useTheme';
+import type { Note } from '../types';
 import { useSettingsModal } from '../hooks/useSettingsModal';
 
 import { CloudSyncSection } from './CloudSyncSection';
 import { AppearanceSection } from './AppearanceSection';
 import { StorageSection } from './StorageSection';
 import { EditorSection } from './EditorSection';
+import { TrashSection } from './TrashSection';
 import { AboutSection } from './AboutSection';
 
 interface SettingsModalProps {
@@ -38,6 +40,11 @@ interface SettingsModalProps {
     onToggleSpellcheck: (enabled: boolean) => void;
     landscapeFullscreen?: boolean;
     onToggleLandscapeFullscreen?: (enabled: boolean) => void;
+    // Trash props
+    trashNotes?: Note[];
+    onRestoreNote?: (id: string) => Promise<void> | void;
+    onPermanentlyDeleteNote?: (id: string) => Promise<void> | void;
+    onEmptyTrash?: () => Promise<void> | void;
     // ElectricSQL sync props
     syncStatus?: SyncStatus;
     hasPending?: boolean;
@@ -53,7 +60,7 @@ interface SettingsModalProps {
     onInstallUpdate?: () => Promise<void>;
 }
 
-type TabKey = 'appearance' | 'editor' | 'sync' | 'storage' | 'about';
+type TabKey = 'appearance' | 'editor' | 'sync' | 'storage' | 'trash' | 'about';
 
 /**
  * SettingsModal Component
@@ -87,7 +94,11 @@ export function SettingsModal(props: SettingsModalProps) {
         onToggleLandscapeFullscreen,
         syncStatus,
         hasPending = false,
-        userEmail
+        userEmail,
+        trashNotes = [],
+        onRestoreNote,
+        onPermanentlyDeleteNote,
+        onEmptyTrash,
     } = props;
 
     const [activeTab, setActiveTab] = useState<TabKey>('appearance');
@@ -240,6 +251,20 @@ export function SettingsModal(props: SettingsModalProps) {
 
                             <button
                                 type="button"
+                                onClick={() => setActiveTab('trash')}
+                                className={clsx(
+                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
+                                    activeTab === 'trash'
+                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
+                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
+                                )}
+                            >
+                                <Trash2 size={16} />
+                                <span>Papierkorb</span>
+                            </button>
+
+                            <button
+                                type="button"
                                 onClick={() => setActiveTab('about')}
                                 className={clsx(
                                     "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
@@ -263,6 +288,7 @@ export function SettingsModal(props: SettingsModalProps) {
                             {activeTab === 'editor' && 'Editor'}
                             {activeTab === 'sync' && 'Cloud Sync'}
                             {activeTab === 'storage' && 'Backup & Data'}
+                            {activeTab === 'trash' && 'Papierkorb'}
                             {activeTab === 'about' && 'About'}
                         </h2>
                     </div>
@@ -351,7 +377,17 @@ export function SettingsModal(props: SettingsModalProps) {
                                 />
                             )}
 
-                            {/* TAB 5: ABOUT */}
+                            {/* TAB 5: TRASH */}
+                            {activeTab === 'trash' && (
+                                <TrashSection
+                                    trashNotes={trashNotes}
+                                    onRestoreNote={onRestoreNote ?? (() => {})}
+                                    onPermanentlyDeleteNote={onPermanentlyDeleteNote ?? (() => {})}
+                                    onEmptyTrash={onEmptyTrash ?? (() => {})}
+                                />
+                            )}
+
+                            {/* TAB 6: ABOUT */}
                             {activeTab === 'about' && (
                                 <AboutSection
                                     isIOS={isIOS}

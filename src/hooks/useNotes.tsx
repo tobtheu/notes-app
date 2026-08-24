@@ -210,6 +210,20 @@ export function useNotes() {
     userId ? [userId] : [],
   );
 
+  // ── Live queries — Trash Notes ────────────────────────────────────────────
+  const trashQuery = useLiveQuery<{
+    id: string; content: string; updated_at: string;
+  }>(
+    userId
+      ? `SELECT id, content, updated_at FROM notes WHERE user_id = $1 AND deleted = true ORDER BY updated_at DESC`
+      : `SELECT id, content, updated_at FROM notes WHERE 1=0`,
+    userId ? [userId] : [],
+  );
+
+  const trashNotes = useMemo(() => {
+    return trashQuery?.rows?.map(rowToNote) ?? [];
+  }, [trashQuery?.rows]);
+
   // ── App Config ───────────────────────────────────────────────────────────
   const configQuery = useLiveQuery<{ metadata: string | AppMetadata; updated_at: string }>(
     userId
@@ -507,10 +521,18 @@ export function useNotes() {
     }
   }, [selectedNoteId, selectedNote, getNoteId]);
 
+  // Auto-cleanup: remove soft-deleted notes older than 30 days
+  useEffect(() => {
+    if (userId && dbRef.current) {
+      operations.cleanExpiredTrashNotes().catch(e => log.error('[useNotes:autoCleanup] error:', e));
+    }
+  }, [userId, operations.cleanExpiredTrashNotes]);
+
   // ── Return ────────────────────────────────────────────────────────────────
   return {
     notes: filteredNotes,
     allNotes: notes,
+    trashNotes,
     folders: sortedFolders,
     metadata,
     selectedNoteId,

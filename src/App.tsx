@@ -77,6 +77,10 @@ function App() {
     exportBackup,
     resetDatabase,
     goLocalOnly,
+    trashNotes,
+    restoreNote,
+    permanentlyDeleteNote,
+    emptyTrash,
   } = useNotes();
 
   const {
@@ -524,6 +528,10 @@ function App() {
           onImportFiles={isIOS ? undefined : importFiles}
           onExportBackup={isIOS ? undefined : () => exportBackup(allNotes)}
           onResetDatabase={resetDatabase}
+          trashNotes={trashNotes}
+          onRestoreNote={restoreNote}
+          onPermanentlyDeleteNote={permanentlyDeleteNote}
+          onEmptyTrash={emptyTrash}
         />
       )}
 

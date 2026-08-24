@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { SettingsModal } from '../components/SettingsModal';
 
 describe('SettingsModal', () => {
-    it('renders and allows navigating between all 5 tabs without errors', () => {
+    it('renders and allows navigating between all 6 tabs without errors', () => {
         const mockClose = vi.fn();
         const mockSetTheme = vi.fn();
 
@@ -31,6 +31,9 @@ describe('SettingsModal', () => {
                 onImportFolder={vi.fn().mockResolvedValue(5)}
                 onImportFiles={vi.fn().mockResolvedValue(3)}
                 onExportBackup={vi.fn().mockResolvedValue(10)}
+                trashNotes={[
+                    { filename: 'Deleted Note.md', folder: '', content: '# Deleted\nContent', updatedAt: new Date().toISOString() }
+                ]}
             />
         );
 
@@ -53,7 +56,12 @@ describe('SettingsModal', () => {
         expect(screen.getByText('Ordner importieren')).toBeDefined();
         expect(screen.getByText('Dateien importieren')).toBeDefined();
 
-        // 5. Switch to About tab
+        // 5. Switch to Trash / Papierkorb tab (vorletzter Reiter)
+        fireEvent.click(screen.getByRole('button', { name: /Papierkorb/i }));
+        expect(screen.getByText('Deleted')).toBeDefined();
+        expect(screen.getByText('1 Notiz')).toBeDefined();
+
+        // 6. Switch to About tab (letzter Reiter)
         fireEvent.click(screen.getByRole('button', { name: /About/i }));
         expect(screen.getByText('Application Info')).toBeDefined();
         expect(screen.getByText('LamaNotes')).toBeDefined();

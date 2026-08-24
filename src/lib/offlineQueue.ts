@@ -39,7 +39,12 @@ export interface ConfigWritePayload {
   updated_at: string;
 }
 
-type WriteOperation = 'upsert';
+export interface NoteDeletePayload {
+  id: string;
+  user_id: string;
+}
+
+export type WriteOperation = 'upsert' | 'delete';
 
 // ── Serialization lock ────────────────────────────────────────────────────────
 // Ensures only one flushQueue runs at a time, preventing race conditions where
@@ -97,6 +102,34 @@ async function upsertWithTimeout(
   }
 }
 
+async function deleteWithTimeout(
+  table: 'notes' | 'app_config',
+  payload: NoteDeletePayload | NoteDeletePayload[],
+): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const items = Array.isArray(payload) ? payload : [payload];
+    if (items.length === 0) return;
+    const userId = items[0].user_id;
+    const ids = items.map(i => i.id);
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq('user_id', userId)
+      .in('id', ids)
+      .abortSignal(controller.signal);
+
+    if (error) {
+      log.error(`[offlineQueue] delete error for ${table}:`, error);
+      throw new Error(error.message);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Exponential backoff ───────────────────────────────────────────────────────
 // Delay in ms for attempt n: 5s, 10s, 20s, 40s, 80s, 160s, 300s (capped)
 function backoffMs(attempts: number): number {
@@ -104,7 +137,7 @@ function backoffMs(attempts: number): number {
 }
 
 /**
- * Enqueue a write. Writes are deduplicated by id — if there's already
+ * Enqueue a write or delete. Writes are deduplicated by id — if there's already
  * a pending write for the same row, it's replaced with the latest payload
  * and the retry counter is reset.
  */
@@ -112,7 +145,7 @@ export async function enqueue(
   db: PGliteWithLive,
   table: 'notes' | 'app_config',
   operation: WriteOperation,
-  payload: NoteWritePayload | ConfigWritePayload,
+  payload: NoteWritePayload | ConfigWritePayload | NoteDeletePayload,
 ): Promise<void> {
   const rowId = 'id' in payload ? payload.id : (payload as ConfigWritePayload).user_id;
   const writeId = `${table}:${rowId}`;
@@ -122,6 +155,8 @@ export async function enqueue(
     INSERT INTO pending_writes (id, table_name, operation, payload, next_retry_at)
     VALUES ($1, $2, $3, $4, NOW())
     ON CONFLICT (id) DO UPDATE SET
+      table_name     = EXCLUDED.table_name,
+      operation      = EXCLUDED.operation,
       payload        = EXCLUDED.payload,
       attempts       = 0,
       next_retry_at  = NOW(),
@@ -182,20 +217,23 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
   log.info(`[offlineQueue] flushing ${rows.length} pending write(s)...`);
   let flushed = 0;
 
-  // Group writes by table so each table can be upserted in a single Supabase call.
-  // On batch failure we fall back to per-row writes so we can track attempts/abandon
-  // individual rows without punishing the whole batch.
-  const byTable = new Map<'notes' | 'app_config', typeof rows>();
+  // Group writes by table + operation
+  const byGroup = new Map<string, typeof rows>();
   for (const row of rows) {
-    const table = row.table_name as 'notes' | 'app_config';
-    if (!byTable.has(table)) byTable.set(table, []);
-    byTable.get(table)!.push(row);
+    const key = `${row.table_name}:${row.operation}`;
+    if (!byGroup.has(key)) byGroup.set(key, []);
+    byGroup.get(key)!.push(row);
   }
 
-  for (const [table, group] of byTable) {
+  for (const [key, group] of byGroup) {
+    const [tableName, op] = key.split(':') as ['notes' | 'app_config', WriteOperation];
     const payloads = group.map(r => JSON.parse(r.payload));
     try {
-      await upsertWithTimeout(table, payloads);
+      if (op === 'delete') {
+        await deleteWithTimeout(tableName, payloads as NoteDeletePayload[]);
+      } else {
+        await upsertWithTimeout(tableName, payloads);
+      }
       // Batch succeeded — delete all rows from pending_writes in one query
       const ids = group.map(r => r.id);
       await db.query(
@@ -203,15 +241,19 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
         [ids],
       );
       flushed += group.length;
-      log.info(`[offlineQueue] ✓ batch-flushed ${group.length} ${table} write(s)`);
+      log.info(`[offlineQueue] ✓ batch-flushed ${group.length} ${tableName} ${op}(s)`);
     } catch (batchErr) {
       const batchMsg = batchErr instanceof Error ? batchErr.message : String(batchErr);
-      log.warn(`[offlineQueue] batch ${table} failed (${batchMsg}) — falling back to per-row`);
+      log.warn(`[offlineQueue] batch ${tableName} ${op} failed (${batchMsg}) — falling back to per-row`);
 
       for (const write of group) {
         try {
           const payload = JSON.parse(write.payload);
-          await upsertWithTimeout(table, payload);
+          if (op === 'delete') {
+            await deleteWithTimeout(tableName, payload);
+          } else {
+            await upsertWithTimeout(tableName, payload);
+          }
           await db.query(`DELETE FROM pending_writes WHERE id = $1`, [write.id]);
           flushed++;
           log.info(`[offlineQueue] ✓ flushed ${write.id}`);
