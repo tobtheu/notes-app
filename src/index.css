@@ -529,9 +529,12 @@ body {
   background: transparent !important;
 }
 
-/* Ensure Tauri webview handles transparency correctly */
-:root {
-  background-color: transparent !important;
+/* On Windows, ensure solid background matching current theme to prevent transparent corner gaps */
+html[data-os="windows"],
+html[data-os="windows"] body,
+html[data-os="windows"] #root {
+  background-color: var(--shell-bg) !important;
+  background: var(--shell-bg) !important;
 }
 
 html,

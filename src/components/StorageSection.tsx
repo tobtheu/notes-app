@@ -221,8 +221,8 @@ export function StorageSection({
                 )}
             </div>
 
-            {/* Database Reset Section (Testing) */}
-            {onResetDatabaseClick && (
+            {/* Database Reset Section (Testing - Dev Mode only) */}
+            {Boolean(import.meta.env.DEV) && onResetDatabaseClick && (
                 <div className="pt-3 border-t border-[var(--border-subtle)] space-y-2.5">
                     <label className="block font-semibold text-red-500 mb-1">Entwickler & Test-Optionen</label>
                     <div className="p-3 rounded-xl bg-red-500/5 border border-red-500/20 space-y-2">

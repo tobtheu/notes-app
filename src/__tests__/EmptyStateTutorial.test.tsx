@@ -7,9 +7,9 @@ describe('EmptyStateTutorial', () => {
         const onCreateNote = vi.fn();
         render(<EmptyStateTutorial onCreateNote={onCreateNote} />);
 
-        expect(screen.getByText('Willkommen bei LamaNotes')).toBeDefined();
+        expect(screen.getByText('Willkommen bei Lama Notes')).toBeDefined();
         expect(screen.getByText('Neue Notiz erstellen')).toBeDefined();
-        const logoImg = screen.getByAltText('LamaNotes');
+        const logoImg = screen.getByAltText('Lama Notes');
         expect(logoImg).toBeDefined();
     });
 

@@ -1,46 +1,67 @@
-# Notiz-App (Tauri V2)
+# Lama Notes
 
-A fast, lightweight, and modern note-taking application built with Tauri V2, React, and TypeScript. Focus on simplicity, privacy, and speed.
+A fast, lightweight, and modern local-first note-taking application built with Tauri V2, React 19, TypeScript, and Rust. Designed with a focus on simplicity, privacy, speed, and great writing ergonomics.
+
+---
 
 ## Key Features
 
-- Tauri V2 Powered: Blazing fast performance with a minimal security-first Rust backend.
-- Hybrid Markdown Editor: A powerful visual editor powered by Tiptap with full Markdown support.
-- Focus Mode: A minimalist writing interface that hides all distractions to help you focus on your thoughts.
-- Local-First Storage: Your notes stay on your machine. Stored as standard .md files for maximum compatibility.
-- GitHub Cloud Sync: Optional sync with GitHub repositories for backup and multi-device support.
-- Conflict Detection: Automatic detection of sync conflicts (e.g. from iCloud or concurrent GitHub edits).
-- Smart Internal Linking: Link notes together using note:// protocol. Supports deep-linking to specific headings.
-- Pinning System: Keep your most important thoughts at the top of your list.
-- Folder Organization: Simple and intuitive folder management for your workspace.
-- Customization: Adjustable accent colors, font sizes, and dark/light mode to suit your preferences.
-- Productivity Tools: Built-in spellchecking and toggleable toolbars.
-- Performance and Stability: Optimized scroll behavior, anti-flicker editor stabilization, and smart auto-save normalization.
-- Modern UI: Beautiful, responsive interface with a focus on typography and readability across desktop and mobile.
+- **Tauri V2 & Rust Powered:** Blazing fast native performance with minimal memory consumption compared to traditional Electron apps.
+- **Local-First Architecture (PGlite):** Embedded PostgreSQL running locally in your app for instant search, zero-latency operations, and complete offline capability.
+- **Optional Supabase Cloud Sync:** Secure multi-device synchronization with account authentication and conflict resolution.
+- **Hybrid Markdown WYSIWYG Editor:** Powerful writing experience powered by Tiptap with seamless Markdown formatting.
+  - **Slash Menu (`/`):** Fast formatting for headings, bullet points, task lists, code blocks, and tables without leaving the keyboard.
+  - **Interactive Task Lists & Tables:** Dynamic checklists and easy-to-use table management.
+  - **Code Highlighting:** Syntax-highlighted code blocks for developers.
+  - **Floating Bubble Toolbar:** Contextual formatting tools on text selection.
+- **Focus Mode:** Minimalist distraction-free writing environment that hides toolbars and sidebars.
+- **Organization & Structure:**
+  - Intuitive folder management to structure your ideas.
+  - Pinning system to keep key notes at the top.
+  - Instant real-time search across all notes.
+- **Data Freedom (Import & Export):**
+  - Import individual `.md` files or whole folders.
+  - Full backup export to ensure zero vendor lock-in.
+- **Personalization & Aesthetics:**
+  - Smooth Dark, Light, and Auto themes (including Clay & Sage presets).
+  - Multiple font options (Inter, Roboto, Courier, SF Mono, Serif, System) and adjustable font sizes.
+  - Configurable note counts, monochrome icon options, and iOS landscape optimizations.
+- **Built-in Auto-Updater & Diagnostics:** Integrated version checks, self-updating, and environment diagnostics.
+
+---
 
 ## Technology Stack
 
-- Frontend: React 18, TypeScript, Vite
-- Editor: Tiptap (ProseMirror based) with Markdown extensions
-- Styling: Modern CSS with CSS Variables for theme consistency
-- Backend: Rust (Tauri V2)
-- Icons: Lucide React
+- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS
+- **Editor:** Tiptap (ProseMirror based) with Markdown extensions
+- **Database / Local-First:** PGlite (Embedded Postgres)
+- **Sync / Auth:** Supabase
+- **Backend / Desktop Framework:** Rust (Tauri V2)
+- **Icons:** Lucide React
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (Latest LTS)
-- Rust (Stable)
-- Tauri Prerequisites for your OS (see official Tauri documentation)
+- **Node.js:** Latest LTS
+- **Rust:** Stable toolchain (`rustup`)
+- **Tauri Prerequisites:** Refer to the official [Tauri V2 Documentation](https://v2.tauri.app/start/prerequisites/) for your operating system.
 
 ### Installation
 
-1. Clone the repository
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/tobtheu/notes-app.git
+   cd notes-app
+   ```
+
 2. Install dependencies:
    ```bash
    npm install
    ```
+
 3. Run in development mode:
    ```bash
    npm run tauri dev
@@ -48,15 +69,22 @@ A fast, lightweight, and modern note-taking application built with Tauri V2, Rea
 
 ### Building for Production
 
-To build a standalone executable:
+To build a standalone desktop executable for your platform:
 ```bash
 npm run tauri build
 ```
 
+---
+
 ## Project Structure
 
-- src/: React frontend source code and modular UI components.
-- src/hooks/: Custom React hooks for state, note, and settings management.
-- src-tauri/: Rust backend and Tauri configuration.
-- src-tauri/src/lib.rs: Core file system, Git integration, and metadata logic.
-
+```text
+├── src/                # React frontend (UI components, hooks, stores, styles)
+│   ├── components/     # UI modules (Editor, Sidebar, Settings, Modals, etc.)
+│   ├── hooks/          # Custom hooks (Theme, Notes, Sync, Editor)
+│   └── utils/          # Data import/export, sanitization, and helper functions
+├── src-tauri/          # Rust backend (Tauri V2 configuration, plugins, sync logic)
+│   ├── src/            # Rust source code
+│   └── Cargo.toml      # Rust crate dependencies
+└── docs/               # Architecture notes, specs, and prototypes
+```

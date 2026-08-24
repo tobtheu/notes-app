@@ -80,6 +80,12 @@ function App() {
   } = useNotes();
 
   const {
+    theme: syncTheme,
+    setTheme: setSyncTheme,
+    autoTheme: syncAutoTheme,
+    setAutoTheme: setSyncAutoTheme,
+    preferredLightTheme: syncPrefLight,
+    setPreferredLightTheme: setSyncPrefLight,
     markdownEnabled,
     setMarkdownEnabled,
     accentColor,
@@ -111,12 +117,19 @@ function App() {
     setIsSettingsOpen,
   });
   const [isIOS, setIsIOS] = useState(false);
+  const [isWindows, setIsWindows] = useState(false);
   useEffect(() => {
     try {
       const p = platform();
       setIsIOS(p === 'ios');
+      setIsWindows(p === 'windows');
       document.documentElement.setAttribute('data-os', p);
     } catch {
+      const isWin = typeof navigator !== 'undefined' && /Win/.test(navigator.userAgent || navigator.platform);
+      if (isWin) {
+        setIsWindows(true);
+        document.documentElement.setAttribute('data-os', 'windows');
+      }
       const isLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.userAgent || navigator.platform);
       if (isLinux) {
         document.documentElement.setAttribute('data-os', 'linux');
@@ -166,7 +179,14 @@ function App() {
     }
   }, [isIOS, activeView]);
 
-  const { theme, setTheme, autoTheme, setAutoTheme, preferredLightTheme } = useTheme();
+  const { theme, setTheme, autoTheme, setAutoTheme, preferredLightTheme } = useTheme({
+    theme: syncTheme,
+    onThemeChange: setSyncTheme,
+    autoTheme: syncAutoTheme,
+    onAutoThemeChange: setSyncAutoTheme,
+    preferredLightTheme: syncPrefLight,
+    onPreferredLightThemeChange: setSyncPrefLight,
+  });
 
   // Apply font size to <html> so all rem-based Tailwind classes scale with it
   useEffect(() => {
@@ -257,7 +277,7 @@ function App() {
       <div
         className={clsx(
           "absolute inset-0 flex flex-col overflow-hidden",
-          !isMaximized && !isIOS && !_isMobile && "rounded-[12px] border border-[var(--border-subtle)]"
+          !isMaximized && !isIOS && !_isMobile && !isWindows && "rounded-[12px] border border-[var(--border-subtle)]"
         )}
         style={{ backgroundColor: 'var(--app-bg)' }}
       >
@@ -336,7 +356,7 @@ function App() {
       ref={containerRef}
       className={clsx(
         "absolute inset-0 flex text-[var(--text-main)] overflow-hidden transition-colors duration-500",
-        !isMaximized && !isIOS && !_isMobile && "rounded-[12px] border border-[var(--border-subtle)]",
+        !isMaximized && !isIOS && !_isMobile && !isWindows && "rounded-[12px] border border-[var(--border-subtle)]",
         fontFamily === 'inter' && "font-inter",
         fontFamily === 'roboto' && "font-roboto",
         fontFamily === 'courier' && "font-courier",

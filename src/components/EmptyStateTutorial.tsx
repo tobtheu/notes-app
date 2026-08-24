@@ -24,14 +24,14 @@ export const EmptyStateTutorial: React.FC<EmptyStateTutorialProps> = ({
                 {/* Hero Icon */}
                 <img
                     src={logo}
-                    alt="LamaNotes"
+                    alt="Lama Notes"
                     className="w-14 h-14 rounded-2xl shadow-md object-contain select-none pointer-events-none"
                 />
 
                 {/* Header Text */}
                 <div className="space-y-1.5">
                     <h2 className="text-lg sm:text-xl font-bold text-[var(--text-main)] tracking-tight">
-                        Willkommen bei LamaNotes
+                        Willkommen bei Lama Notes
                     </h2>
                     <p className="text-xs text-[var(--text-muted)] leading-relaxed max-w-sm">
                         Wähle eine Notiz aus der Liste oder erstelle direkt ein neues Dokument, um loszulegen.

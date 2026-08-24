@@ -13,17 +13,28 @@ export interface UseThemeReturn {
     preferredLightTheme: LightTheme;
 }
 
+export interface UseThemeOptions {
+    theme?: Theme;
+    onThemeChange?: (theme: Theme) => void;
+    autoTheme?: boolean;
+    onAutoThemeChange?: (enabled: boolean) => void;
+    preferredLightTheme?: LightTheme;
+    onPreferredLightThemeChange?: (theme: LightTheme) => void;
+}
+
 /**
  * useTheme Hook
  * Manages application appearance theme ('clay', 'sage', 'dark') and automatic system switching.
  * Default on first launch is 'clay'.
  */
-export function useTheme(): UseThemeReturn {
+export function useTheme(options?: UseThemeOptions): UseThemeReturn {
     const [autoTheme, setAutoThemeState] = useState<boolean>(() => {
+        if (options?.autoTheme !== undefined) return options.autoTheme;
         return localStorage.getItem('auto_theme') === 'true';
     });
 
     const [preferredLightTheme, setPreferredLightTheme] = useState<LightTheme>(() => {
+        if (options?.preferredLightTheme !== undefined) return options.preferredLightTheme;
         const saved = localStorage.getItem('preferred_light_theme');
         if (saved === 'sage' || saved === 'clay') return saved;
         const oldTheme = localStorage.getItem('theme');
@@ -32,6 +43,7 @@ export function useTheme(): UseThemeReturn {
     });
 
     const [theme, setThemeState] = useState<Theme>(() => {
+        if (options?.theme !== undefined) return options.theme;
         const isAuto = localStorage.getItem('auto_theme') === 'true';
         const prefLight = (localStorage.getItem('preferred_light_theme') === 'sage') ? 'sage' : 'clay';
         if (isAuto && typeof window !== 'undefined') {
@@ -125,6 +137,25 @@ export function useTheme(): UseThemeReturn {
         return () => mediaQuery.removeEventListener('change', handleSystemChange);
     }, [autoTheme, preferredLightTheme, performThemeTransition]);
 
+    // Sync incoming external options (e.g. cloud sync)
+    useEffect(() => {
+        if (options?.autoTheme !== undefined && options.autoTheme !== autoTheme) {
+            setAutoThemeState(options.autoTheme);
+        }
+    }, [options?.autoTheme, autoTheme]);
+
+    useEffect(() => {
+        if (options?.preferredLightTheme !== undefined && options.preferredLightTheme !== preferredLightTheme) {
+            setPreferredLightTheme(options.preferredLightTheme);
+        }
+    }, [options?.preferredLightTheme, preferredLightTheme]);
+
+    useEffect(() => {
+        if (options?.theme !== undefined && options.theme !== theme) {
+            performThemeTransition(options.theme);
+        }
+    }, [options?.theme, theme, performThemeTransition]);
+
     // Apply on initial load and sync localStorage
     useEffect(() => {
         applyThemeToDOM(theme);
@@ -137,7 +168,10 @@ export function useTheme(): UseThemeReturn {
         if (nextTheme === 'clay' || nextTheme === 'sage') {
             setPreferredLightTheme(nextTheme);
             localStorage.setItem('preferred_light_theme', nextTheme);
+            options?.onPreferredLightThemeChange?.(nextTheme);
         }
+
+        options?.onThemeChange?.(nextTheme);
 
         if (autoTheme) {
             const isSystemDark = typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)')?.matches;
@@ -158,6 +192,7 @@ export function useTheme(): UseThemeReturn {
     const setAutoTheme = (enabled: boolean) => {
         setAutoThemeState(enabled);
         localStorage.setItem('auto_theme', String(enabled));
+        options?.onAutoThemeChange?.(enabled);
         if (enabled && typeof window !== 'undefined') {
             const isDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches;
             const target = isDark ? 'dark' : preferredLightTheme;

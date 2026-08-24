@@ -126,35 +126,37 @@ describe('useSettings', () => {
     // Cloud sync loading
     // -----------------------------------------------------------------------
     describe('cloud sync loading', () => {
-        it('applies cloud metadata settings when provided', () => {
+        it('applies all cloud metadata settings when provided', () => {
             const metadataSettings = {
+                theme: 'sage',
+                autoTheme: true,
+                preferredLightTheme: 'sage',
+                fontFamily: 'roboto',
+                fontSize: 'large',
                 markdownEnabled: false,
                 accentColor: 'purple',
                 toolbarVisible: false,
                 spellcheckEnabled: false,
+                monochromeIcons: true,
+                showIconsWhenCollapsed: true,
                 showNoteCounts: true,
+                landscapeFullscreen: true,
             }
             const { result } = renderHook(() => useSettings(metadataSettings))
 
+            expect(result.current.theme).toBe('sage')
+            expect(result.current.autoTheme).toBe(true)
+            expect(result.current.preferredLightTheme).toBe('sage')
+            expect(result.current.fontFamily).toBe('roboto')
+            expect(result.current.fontSize).toBe('large')
             expect(result.current.markdownEnabled).toBe(false)
             expect(result.current.accentColor).toBe('purple')
             expect(result.current.toolbarVisible).toBe(false)
             expect(result.current.spellcheckEnabled).toBe(false)
+            expect(result.current.monochromeIcons).toBe(true)
+            expect(result.current.showIconsWhenCollapsed).toBe(true)
             expect(result.current.showNoteCounts).toBe(true)
-        })
-
-        it('does NOT override device-specific settings from cloud', () => {
-            localStorage.setItem('font-family', 'roboto')
-            localStorage.setItem('font-size', 'large')
-
-            const metadataSettings = {
-                markdownEnabled: true,
-            }
-            const { result } = renderHook(() => useSettings(metadataSettings))
-
-            // Device-specific settings stay at their localStorage values
-            expect(result.current.fontFamily).toBe('roboto')
-            expect(result.current.fontSize).toBe('large')
+            expect(result.current.landscapeFullscreen).toBe(true)
         })
 
         it('does not call onSaveSettings before metadata is loaded', () => {
@@ -181,25 +183,24 @@ describe('useSettings', () => {
             expect(lastCall.accentColor).toBe('red')
         })
 
-        it('only syncs syncable settings, not device-specific ones', () => {
+        it('syncs all setting categories to cloud', () => {
             const onSave = vi.fn()
             const metadataSettings = { markdownEnabled: true }
             const { result } = renderHook(() => useSettings(metadataSettings, onSave))
 
             act(() => {
-                result.current.setMarkdownEnabled(false)
+                result.current.setFontFamily('courier')
             })
 
             const lastCall = onSave.mock.calls[onSave.mock.calls.length - 1][0]
-            // Cloud payload should NOT contain fontFamily or fontSize
-            expect(lastCall).not.toHaveProperty('fontFamily')
-            expect(lastCall).not.toHaveProperty('fontSize')
-            expect(lastCall).not.toHaveProperty('landscapeFullscreen')
-            // But should contain syncable settings
+            expect(lastCall).toHaveProperty('fontFamily', 'courier')
+            expect(lastCall).toHaveProperty('fontSize')
+            expect(lastCall).toHaveProperty('theme')
             expect(lastCall).toHaveProperty('markdownEnabled')
             expect(lastCall).toHaveProperty('accentColor')
             expect(lastCall).toHaveProperty('toolbarVisible')
             expect(lastCall).toHaveProperty('spellcheckEnabled')
+            expect(lastCall).toHaveProperty('landscapeFullscreen')
         })
 
         it('does NOT revert local changes when re-rendered with stale metadataSettings before save completes', () => {

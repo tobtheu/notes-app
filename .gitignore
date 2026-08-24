@@ -36,6 +36,7 @@ docs/
 .env
 features-demo/
 marketing-assets/
+landing-mockups/
 
 # AI Agents & Assistants
 .agents/
