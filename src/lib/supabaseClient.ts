@@ -1,48 +1,52 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { FEATURES } from '../config/features';
 
-const envUrl = (import.meta.env.VITE_SUPABASE_URL as string) || '';
-const SUPABASE_URL = (envUrl && !envUrl.includes('46.225.11.148')) ? envUrl : 'https://api.lamanotes.de';
-const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc3MDYwNDMzLCJleHAiOjIwOTI0MjA0MzN9.MfNPRgANFJG_PqejvzL269R4J-u7AaRBoNdEdGqaQJQ';
-const LAMA_SECRET = (import.meta.env.VITE_LAMA_SECRET as string) || 'LamaNotes_Safe_30b9d5a4';
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || '';
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
+const LAMA_SECRET = (import.meta.env.VITE_LAMA_SECRET as string) || '';
 
 /**
- * Supabase JS client — used exclusively for writes to Postgres.
- * Reads go through PGlite (local SQLite synced by Electric).
- *
- * Auth tokens are injected via setSession() after sign-in
- * (tokens come from the Tauri Rust backend).
+ * Supabase JS client — initialized only when Cloud Sync is active and valid URL is configured.
+ * For offline builds, provides a safe dummy/fallback client to prevent initialization errors.
  */
-export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: false,   // Session managed by Tauri store, not the JS client
-    autoRefreshToken: false, // Token refresh handled by Tauri backend
-  },
-  global: {
-    headers: LAMA_SECRET 
-      ? { 'X-Lama-Secret': LAMA_SECRET }
-      : {},
-  },
-});
+export const supabase: SupabaseClient = (FEATURES.SYNC && SUPABASE_URL && SUPABASE_ANON_KEY)
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+        },
+        global: {
+            headers: LAMA_SECRET ? { 'X-Lama-Secret': LAMA_SECRET } : {},
+        },
+    })
+    : createClient('https://placeholder.supabase.co', 'placeholder-anon-key', {
+        auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+        },
+    });
 
 /**
  * Inject an active session into the Supabase JS client so it can
  * make authenticated writes. Call this after sign-in or app start.
  */
 export async function setSupabaseSession(accessToken: string, refreshToken: string): Promise<void> {
-  try {
-    await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-  } catch (e) {
-    console.warn('[supabaseClient] setSession failed:', e);
-  }
+    if (!FEATURES.SYNC || !SUPABASE_URL) return;
+    try {
+        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+    } catch (e) {
+        console.warn('[supabaseClient] setSession failed:', e);
+    }
 }
 
 /**
  * Clear the active session (on sign-out).
  */
 export async function clearSupabaseSession(): Promise<void> {
-  try {
-    await supabase.auth.signOut();
-  } catch (e) {
-    console.warn('[supabaseClient] signOut failed:', e);
-  }
+    if (!FEATURES.SYNC || !SUPABASE_URL) return;
+    try {
+        await supabase.auth.signOut();
+    } catch (e) {
+        console.warn('[supabaseClient] signOut failed:', e);
+    }
 }
