@@ -1,10 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLiveQuery } from '@electric-sql/pglite-react';
-import type { Note, AppMetadata, SyncStatus } from '../types';
-import { sanitizeAppMetadata } from '../types';
+import type { Note, SyncStatus } from '../types';
 import { normalizeStr, getPathId } from '../utils/path';
-import { enqueue, flushQueue } from '../lib/offlineQueue';
-import { log } from '../lib/logger';
 import type { PGliteWithLive } from '@electric-sql/pglite/live';
 
 import { useNotesAuth } from './useNotesAuth';
@@ -12,6 +9,8 @@ import { useNotesWorkspace } from './useNotesWorkspace';
 import { useNotesOperations } from './useNotesOperations';
 import { useNotesInit } from './useNotesInit';
 import { useNotesFilter } from './useNotesFilter';
+import { useNotesConfig } from './useNotesConfig';
+import { useNotesDbWriter } from './useNotesDbWriter';
 
 export type { SyncStatus };
 
@@ -43,8 +42,6 @@ export function useNotes() {
   const [currentFolder, setCurrentFolder] = useState<string | null>(() => localStorage.getItem('notes-folder'));
 
   const dbRef = useRef<PGliteWithLive | null>(null);
-  const lastConfigWriteAt = useRef<string | null>(null);
-  const metadataRef = useRef<AppMetadata>({ folders: {}, pinnedNotes: [] });
 
   // ── Initialise PGlite + restore session + network listeners ─────────────
   useNotesInit({
@@ -95,57 +92,8 @@ export function useNotes() {
     return trashQuery?.rows?.map(rowToNote) ?? [];
   }, [trashQuery?.rows]);
 
-  // ── App Config ───────────────────────────────────────────────────────────
-  const configQuery = useLiveQuery<{ metadata: string | AppMetadata; updated_at: string }>(
-    userId
-      ? `SELECT metadata, updated_at FROM app_config WHERE user_id = $1`
-      : `SELECT '' AS metadata, '' AS updated_at WHERE 1=0`,
-    userId ? [userId] : [],
-  );
-
-  const [metadata, setMetadataState] = useState<AppMetadata>(() => {
-    try {
-      const cached = localStorage.getItem('lama-metadata');
-      return cached ? sanitizeAppMetadata(JSON.parse(cached)) : { folders: {}, pinnedNotes: [] };
-    } catch {
-      return { folders: {}, pinnedNotes: [] };
-    }
-  });
-
-  // Reset metadata only when an active user changes to a DIFFERENT active user or signs out.
-  const prevUserIdRef = useRef<string | null | undefined>(undefined);
-  useEffect(() => {
-    if (
-      prevUserIdRef.current !== undefined &&
-      prevUserIdRef.current !== null &&
-      prevUserIdRef.current !== userId
-    ) {
-      setMetadataState({ folders: {}, pinnedNotes: [] });
-      metadataRef.current = { folders: {}, pinnedNotes: [] };
-      try { localStorage.removeItem('lama-metadata'); } catch {}
-    }
-    prevUserIdRef.current = userId;
-  }, [userId]);
-
-  const configRow = configQuery?.rows?.[0];
-  const configUpdatedAt = configRow?.updated_at;
-  const configMetadataRaw = configRow?.metadata;
-
-  useEffect(() => {
-    if (!configRow) return;
-    const incomingAt = configRow.updated_at;
-    // Skip if this is our own write echoing back (same or older timestamp)
-    if (lastConfigWriteAt.current && incomingAt <= lastConfigWriteAt.current) return;
-    // It's a remote change (or initial load) — apply it
-    try {
-      const m = configRow.metadata;
-      const parsed = typeof m === 'string' ? JSON.parse(m) : m;
-      const safeMetadata = sanitizeAppMetadata(parsed);
-      setMetadataState(safeMetadata);
-      metadataRef.current = safeMetadata;
-      try { localStorage.setItem('lama-metadata', JSON.stringify(safeMetadata)); } catch {}
-    } catch { /* ignore parse errors */ }
-  }, [configUpdatedAt, configMetadataRaw]);
+  // ── App Config & Metadata Sync ───────────────────────────────────────────
+  const { metadata, metadataRef, writeConfig } = useNotesConfig({ dbRef, userId });
 
   // Note ID helper
   const getNoteId = useCallback((note: Note) => {
@@ -173,210 +121,159 @@ export function useNotes() {
   }, [notesQuery?.rows]);
 
   // ── Core note write helper ────────────────────────────────────────────────
-  const NOTE_SIZE_LIMIT = 5 * 1024 * 1024;
+  const { writeNote } = useNotesDbWriter({ dbRef, userId });
 
-  const writeNote = useCallback(async (
-    id: string,
-    content: string,
-    updatedAt: string,
-    deleted = false,
-  ) => {
-    if (!userId || !dbRef.current) return;
-    const db = dbRef.current;
+  // ── Filter & Search hook ──────────────────────────────────────────────────
+  const {
+    filteredNotes,
+    selectedNote,
+    isNotePinned,
+  } = useNotesFilter({
+    notes,
+    searchTerm,
+    selectedCategory,
+    selectedNoteId,
+    setSelectedNoteId,
+    metadata,
+    getNoteId,
+  });
 
-    if (!deleted && (content.length > 2_500_000 && new Blob([content]).size > NOTE_SIZE_LIMIT)) {
-      log.warn(`[useNotes:writeNote] note ${id} exceeds 5MB size limit — write blocked`);
-      throw new Error('Note is too large (max. 5 MB). Please shorten the content.');
-    }
-
-    const existing = await db.query<{ updated_at: string }>(
-      `SELECT updated_at FROM notes WHERE id = $1 AND user_id = $2`,
-      [id, userId]
-    );
-    let finalUpdatedAt = updatedAt;
-    if (existing.rows.length > 0) {
-      const existingTime = new Date(existing.rows[0].updated_at).getTime();
-      const localTime = new Date(updatedAt).getTime();
-      if (existingTime >= localTime) {
-        finalUpdatedAt = new Date(existingTime + 1).toISOString();
-      }
-    }
-
-    await db.query(
-      /* sql */ `
-      INSERT INTO notes (id, user_id, content, updated_at, deleted)
-      VALUES ($1, $2, $3, $4, $5)
-      ON CONFLICT (id, user_id) DO UPDATE SET
-        content    = EXCLUDED.content,
-        updated_at = EXCLUDED.updated_at,
-        deleted    = EXCLUDED.deleted
-      `,
-      [id, userId, content, finalUpdatedAt, deleted],
-    );
-
-    await enqueue(db, 'notes', 'upsert', {
-      id,
-      user_id: userId,
-      content,
-      updated_at: finalUpdatedAt,
-      deleted,
-    });
-
-    if (navigator.onLine) {
-      flushQueue(db).catch((e: unknown) => log.error(String(e)));
-    }
-  }, [userId]);
-
-  // ── Core config write helper ──────────────────────────────────────────────
-  const writeConfig = useCallback(async (newMetadata: AppMetadata) => {
-    if (!userId || !dbRef.current) return;
-    const db = dbRef.current;
-    const updatedAt = new Date().toISOString();
-
-    // Instant UI state update & local persistence
-    setMetadataState(newMetadata);
-    metadataRef.current = newMetadata;
-    try { localStorage.setItem('lama-metadata', JSON.stringify(newMetadata)); } catch {}
-
-    const existing = await db.query<{ updated_at: string }>(
-      `SELECT updated_at FROM app_config WHERE user_id = $1`,
-      [userId]
-    );
-    let finalUpdatedAt = updatedAt;
-    if (existing.rows.length > 0) {
-      const existingTime = new Date(existing.rows[0].updated_at).getTime();
-      const localTime = new Date(updatedAt).getTime();
-      if (existingTime >= localTime) {
-        finalUpdatedAt = new Date(existingTime + 1).toISOString();
-      }
-    }
-
-    lastConfigWriteAt.current = finalUpdatedAt;
-
-    await db.query(
-      /* sql */ `
-      INSERT INTO app_config (user_id, metadata, updated_at)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (user_id) DO UPDATE SET
-        metadata   = EXCLUDED.metadata,
-        updated_at = EXCLUDED.updated_at
-      `,
-      [userId, JSON.stringify(newMetadata), finalUpdatedAt],
-    );
-
-    await enqueue(db, 'app_config', 'upsert', {
-      user_id: userId,
-      metadata: newMetadata,
-      updated_at: finalUpdatedAt,
-    });
-
-    if (navigator.onLine) flushQueue(db).catch((e: unknown) => log.error(String(e)));
-  }, [userId]);
-
-  // ── Derived state — folder lists ──────────────────────────────────────────
-  const sortedFolders = useMemo(() => {
-    const active = foldersQuery?.rows?.map(r => r.folder) ?? [];
-    const ordered = metadata.folderOrder ?? [];
-    const result = [...ordered];
-    const seenNormalized = new Set(ordered.map(normalizeStr));
-
-    for (let i = 0; i < active.length; i++) {
-      const f = active[i];
-      const norm = normalizeStr(f);
-      if (!seenNormalized.has(norm)) {
-        seenNormalized.add(norm);
-        result.push(f);
-      }
-    }
-    return result;
-  }, [foldersQuery?.rows, metadata.folderOrder]);
-
-  // ── sub-hooks ─────────────────────────────────────────────────────────────
-  const auth = useNotesAuth({
+  // ── Workspace Operations ──────────────────────────────────────────────────
+  const {
+    isLoading,
+    selectFolder,
+    setupDefaultWorkspace,
+    importFolder,
+    importFiles,
+    exportBackup,
+    resetDatabase,
+    goLocalOnly,
+  } = useNotesWorkspace({
     dbRef,
     userId,
+    setCurrentFolder,
+    writeConfig,
+    setSyncStatus,
+    setUserId,
+  });
+
+  // ── Note & Folder & Trash Operations ──────────────────────────────────────
+  const {
+    saveNote,
+    createNote,
+    deleteNote,
+    createFolder,
+    deleteFolder,
+    renameFolder,
+    reorderFolders,
+    updateFolderMetadata,
+    saveSettings,
+    moveNote,
+    togglePinNote,
+    updateNoteLocally,
+    restoreNote,
+    permanentlyDeleteNote,
+    emptyTrash,
+  } = useNotesOperations({
+    dbRef,
+    userId,
+    notes,
+    metadata,
+    metadataRef,
+    writeNote,
+    writeConfig,
+    selectedCategory,
+    setSelectedCategory,
+    setSelectedNoteId,
+    getNoteId,
+  });
+
+  // ── Auth Operations ───────────────────────────────────────────────────────
+  const {
+    signIn,
+    signUp,
+    signOut,
+    deleteAccount,
+    triggerSync,
+  } = useNotesAuth({
+    dbRef,
     setUserId,
     setUserEmail,
     setSyncStatus,
     setSyncError,
-  });
-
-  const workspace = useNotesWorkspace({
-    dbRef,
-    userId,
-    setUserId,
     setCurrentFolder,
-    setSyncStatus,
-    writeNote
+    setupDefaultWorkspace,
   });
 
-  const operations = useNotesOperations({
-    dbRef,
-    userId,
-    metadata,
-    metadataRef,
-    notes,
-    sortedFolders,
-    selectedNoteId,
-    setSelectedNoteId,
-    selectedCategory,
-    setSelectedCategory,
-    writeNote,
-    writeConfig,
-    getNoteId
-  });
+  // ── Combined folders from notes + metadata ─────────────────────────────────
+  const folders = useMemo(() => {
+    const fromNotes = foldersQuery?.rows?.map((r) => r.folder).filter(Boolean) ?? [];
+    const fromMeta = Object.keys(metadata.folders || {});
+    const combined = Array.from(new Set([...fromNotes, ...fromMeta]));
 
-  const filter = useNotesFilter({
-    notes,
-    searchTerm,
-    selectedCategory,
-    selectedNoteId,
-    metadata,
-    getNoteId,
-  });
-
-  // Auto-cleanup: remove soft-deleted notes older than 30 days
-  useEffect(() => {
-    if (userId && dbRef.current) {
-      operations.cleanExpiredTrashNotes().catch(e => log.error('[useNotes:autoCleanup] error:', e));
+    if (metadata.folderOrder && Array.isArray(metadata.folderOrder)) {
+      const order = metadata.folderOrder;
+      combined.sort((a, b) => {
+        const iA = order.indexOf(a);
+        const iB = order.indexOf(b);
+        if (iA !== -1 && iB !== -1) return iA - iB;
+        if (iA !== -1) return -1;
+        if (iB !== -1) return 1;
+        return a.localeCompare(b);
+      });
+    } else {
+      combined.sort();
     }
-  }, [userId, operations.cleanExpiredTrashNotes]);
+    return combined;
+  }, [foldersQuery?.rows, metadata.folders, metadata.folderOrder]);
 
-  // ── Return ────────────────────────────────────────────────────────────────
   return {
-    notes: filter.filteredNotes,
     allNotes: notes,
-    trashNotes,
-    folders: sortedFolders,
+    notes: filteredNotes,
+    folders,
     metadata,
-    selectedNoteId,
-    selectedNote: filter.selectedNote,
+    currentFolder,
     selectedCategory,
-    isLoading: syncStatus === 'initialising',
+    isLoading,
+    selectFolder,
+    createNote,
+    saveNote,
+    deleteNote,
+    createFolder,
+    deleteFolder,
+    renameFolder,
+    updateFolderMetadata,
+    reorderFolders,
+    saveSettings,
+    selectedNote,
     setSelectedNote: setSelectedNoteId,
     setSelectedCategory,
+    updateNoteLocally,
+    moveNote,
+    togglePinNote,
+    isNotePinned,
+    getNoteId,
     searchTerm,
     setSearchTerm,
+    triggerSync,
     syncStatus,
     syncError,
     hasPending,
+    setupDefaultWorkspace,
+    signIn,
+    signUp,
+    signOut,
+    deleteAccount,
     userId,
     userEmail,
-    currentFolder,
-    getNoteId,
-    isNotePinned: filter.isNotePinned,
-
-    // Auth
-    ...auth,
-
-    // Workspace
-    ...workspace,
-
-    // Operations
-    ...operations,
-
-    // Sync helpers
-    triggerSync: async () => { if (dbRef.current) await flushQueue(dbRef.current); },
-    resetSyncStatus: () => setSyncStatus(navigator.onLine ? 'synced' : 'offline'),
+    importFolder,
+    importFiles,
+    exportBackup,
+    resetDatabase,
+    goLocalOnly,
+    trashNotes,
+    restoreNote,
+    permanentlyDeleteNote,
+    emptyTrash,
   };
 }
