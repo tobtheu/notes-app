@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
 import { MobileSwipeContainer } from './components/MobileSwipeContainer';
 import { TitleBar } from './components/TitleBar';
-import { EmptyStateTutorial } from './components/EmptyStateTutorial';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { AppModals } from './components/AppModals';
+import { AppCanvas } from './components/AppCanvas';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { PGliteWrapper } from './components/PGliteWrapper';
 
@@ -19,9 +18,9 @@ import { useTauriUpdater } from './hooks/useTauriUpdater';
 import { useViewport } from './hooks/useViewport';
 import { usePlatformInfo } from './hooks/usePlatformInfo';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+import { useAppViewTransitions } from './hooks/useAppViewTransitions';
 
 import { getDb } from './lib/electric';
-import type { Note, FolderMetadata } from './types';
 import clsx from 'clsx';
 import { initGlobalHandlers } from './utils/initGlobalHandlers';
 
@@ -121,11 +120,32 @@ function App() {
   });
 
   const { isIOS, isWindows } = usePlatformInfo();
-  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [isFocusMode, setIsFocusMode] = useState(false);
-  const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('notelist');
+
+  // View transitions & navigation
+  const {
+    activeView,
+    setActiveView,
+    categoryToDelete,
+    setCategoryToDelete,
+    editingCategory,
+    setEditingCategory,
+    handleSelectCategory,
+    handleSelectNote,
+    handleCreateNote,
+    handleNavigate,
+    handleSaveCategory,
+    handleDeleteCategory,
+  } = useAppViewTransitions({
+    setSelectedCategory,
+    setSelectedNote,
+    getNoteId,
+    createNote,
+    renameFolder,
+    updateFolderMetadata,
+    deleteFolder,
+  });
 
   // Tauri updater hook
   const {
@@ -183,50 +203,12 @@ function App() {
     document.documentElement.setAttribute('data-accent', accentColor);
   }, [accentColor]);
 
-  const handleSelectCategory = (category: string | null) => {
-    setSelectedCategory(category);
-    setActiveView('notelist');
-  };
-
-  const handleSelectNote = (note: Note) => {
-    window.__noteOpenStartTime = performance.now();
-    setSelectedNote(getNoteId(note));
-    setActiveView('editor');
-  };
-
-  const handleCreateNote = async () => {
-    await createNote();
-    setActiveView('editor');
-  };
-
   // Global Keyboard Shortcuts
   useGlobalShortcuts({
     onCreateNote: handleCreateNote,
     onOpenSettings: () => setIsSettingsOpen(true),
     onToggleSidebar: () => setIsSidebarCollapsed(prev => !prev),
   });
-
-  const handleNavigate = (id: string) => {
-    setSelectedNote(id);
-    setActiveView('editor');
-  };
-
-  const handleSaveCategory = (newName: string, folderMeta: FolderMetadata) => {
-    if (editingCategory) {
-      if (newName !== editingCategory) {
-        renameFolder(editingCategory, newName);
-      }
-      updateFolderMetadata(newName, folderMeta);
-      setEditingCategory(null);
-    }
-  };
-
-  const handleDeleteCategory = async (mode: 'recursive' | 'move') => {
-    if (categoryToDelete) {
-      await deleteFolder(categoryToDelete, mode);
-      setCategoryToDelete(null);
-    }
-  };
 
   if (!currentFolder || syncStatus === 'unauthenticated') {
     return (
@@ -282,30 +264,6 @@ function App() {
   };
 
   const isAnyModalOpen = isSettingsOpen || editingCategory !== null || categoryToDelete !== null || isUpdateModalOpen;
-
-  const renderEditor = (extraClassName: string) => {
-    if (!selectedNote) return null;
-    return (
-      <Editor
-        className={extraClassName}
-        note={selectedNote}
-        allNotes={allNotes}
-        workspacePath={currentFolder || ''}
-        onSave={(id, filename, content, folder) => saveNote(id, filename, content, folder)}
-        onUpdateLocally={updateNoteLocally}
-        markdownEnabled={markdownEnabled}
-        toolbarVisible={toolbarVisible}
-        setToolbarVisible={setToolbarVisible}
-        spellcheckEnabled={spellcheckEnabled}
-        isFocusMode={isFocusMode}
-        onToggleFocus={() => setIsFocusMode(!isFocusMode)}
-        onSync={triggerSync}
-        onNavigate={(id, _anchor) => handleNavigate(id)}
-        isIOS={isIOS}
-        iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
-      />
-    );
-  };
 
   return (
     <div
@@ -379,49 +337,38 @@ function App() {
             )}
 
             {/* UNIFIED FLOATING CANVAS (NoteList + Editor in Unified Background) */}
-            <section
-              id="floating-canvas"
-              className={clsx(
-                "flex-1 bg-[var(--canvas-bg)] flex overflow-hidden relative transition-colors duration-500",
-                !_isMobile && "rounded-[18px] shadow-sm border border-[var(--border-subtle)]"
-              )}
-            >
-              {/* NOTELIST */}
-              <NoteList
-                className={clsx(
-                  "flex-1 min-w-0 md:flex-none md:w-80 md:shrink-0 transition-all duration-300 ease-in-out border-r border-[var(--border-subtle)]",
-                  activeView === 'editor' ? (isIOS && isLandscape && !landscapeFullscreen ? "flex" : "flex") :
-                    activeView === 'sidebar' ? "hidden md:flex" : "flex"
-                )}
-                notes={notes}
-                selectedNote={activeView === 'editor' ? selectedNote : null}
-                onSelectNote={handleSelectNote}
-                onDeleteNote={deleteNote}
-                onMoveNote={moveNote}
-                onTogglePin={togglePinNote}
-                isNotePinned={isNotePinned}
-                getNoteId={getNoteId}
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                folders={folders}
-                selectedCategory={selectedCategory}
-                isIOS={isIOS}
-                onCreateNote={handleCreateNote}
-              />
-
-              {/* EDITOR — desktop inline */}
-              {selectedNote && !_isMobile && renderEditor(clsx(
-                "flex-1",
-                activeView === 'editor' ? "flex" : "hidden md:flex"
-              ))}
-
-              {!selectedNote && (
-                <EmptyStateTutorial
-                  onCreateNote={handleCreateNote}
-                  className={activeView === 'editor' ? "flex" : "hidden md:flex"}
-                />
-              )}
-            </section>
+            <AppCanvas
+              notes={notes}
+              allNotes={allNotes}
+              selectedNote={selectedNote}
+              selectedCategory={selectedCategory}
+              folders={folders}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              onSelectNote={handleSelectNote}
+              onDeleteNote={deleteNote}
+              onMoveNote={moveNote}
+              onTogglePin={togglePinNote}
+              isNotePinned={isNotePinned}
+              getNoteId={getNoteId}
+              onCreateNote={handleCreateNote}
+              activeView={activeView}
+              isIOS={isIOS}
+              isLandscape={isLandscape}
+              landscapeFullscreen={landscapeFullscreen}
+              isMobile={_isMobile}
+              workspacePath={currentFolder || ''}
+              onSaveNote={saveNote}
+              onUpdateLocally={updateNoteLocally}
+              markdownEnabled={markdownEnabled}
+              toolbarVisible={toolbarVisible}
+              setToolbarVisible={setToolbarVisible}
+              spellcheckEnabled={spellcheckEnabled}
+              isFocusMode={isFocusMode}
+              onToggleFocus={() => setIsFocusMode(!isFocusMode)}
+              onSync={triggerSync}
+              onNavigate={handleNavigate}
+            />
           </div>
         </div>
       </div>
@@ -438,7 +385,24 @@ function App() {
           isIOS={isIOS}
           isMobile={_isMobile}
         >
-          {renderEditor("flex-1 flex")}
+          <Editor
+            className="flex-1 flex"
+            note={selectedNote}
+            allNotes={allNotes}
+            workspacePath={currentFolder || ''}
+            onSave={saveNote}
+            onUpdateLocally={updateNoteLocally}
+            markdownEnabled={markdownEnabled}
+            toolbarVisible={toolbarVisible}
+            setToolbarVisible={setToolbarVisible}
+            spellcheckEnabled={spellcheckEnabled}
+            isFocusMode={isFocusMode}
+            onToggleFocus={() => setIsFocusMode(!isFocusMode)}
+            onSync={triggerSync}
+            onNavigate={handleNavigate}
+            isIOS={isIOS}
+            iosLandscapeFullscreen={isIOS && isLandscape && landscapeFullscreen}
+          />
         </MobileSwipeContainer>
       )}
 
