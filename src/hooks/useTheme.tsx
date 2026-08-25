@@ -28,6 +28,9 @@ export interface UseThemeOptions {
  * Default on first launch is 'clay'.
  */
 export function useTheme(options?: UseThemeOptions): UseThemeReturn {
+    const optionsRef = useRef(options);
+    optionsRef.current = options;
+
     const [autoTheme, setAutoThemeState] = useState<boolean>(() => {
         if (options?.autoTheme !== undefined) return options.autoTheme;
         return localStorage.getItem('auto_theme') === 'true';
@@ -93,6 +96,7 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
             setThemeState(nextTheme);
             applyThemeToDOM(nextTheme);
             localStorage.setItem('theme', nextTheme);
+            optionsRef.current?.onThemeChange?.(nextTheme);
             return;
         }
 
@@ -108,6 +112,7 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
                 setThemeState(nextTheme);
                 applyThemeToDOM(nextTheme);
                 localStorage.setItem('theme', nextTheme);
+                optionsRef.current?.onThemeChange?.(nextTheme);
             });
         });
 
@@ -120,8 +125,8 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
                     ]
                 },
                 {
-                    duration: 500,
-                    easing: 'cubic-bezier(0.2, 0, 0, 1)',
+                    duration: 600,
+                    easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
                     pseudoElement: '::view-transition-new(root)'
                 }
             );
@@ -173,10 +178,8 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
         if (nextTheme === 'clay' || nextTheme === 'sage') {
             setPreferredLightTheme(nextTheme);
             localStorage.setItem('preferred_light_theme', nextTheme);
-            options?.onPreferredLightThemeChange?.(nextTheme);
+            optionsRef.current?.onPreferredLightThemeChange?.(nextTheme);
         }
-
-        options?.onThemeChange?.(nextTheme);
 
         if (autoTheme) {
             const isSystemDark = typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)')?.matches;
@@ -197,7 +200,7 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
     const setAutoTheme = (enabled: boolean) => {
         setAutoThemeState(enabled);
         localStorage.setItem('auto_theme', String(enabled));
-        options?.onAutoThemeChange?.(enabled);
+        optionsRef.current?.onAutoThemeChange?.(enabled);
         if (enabled && typeof window !== 'undefined') {
             const isDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches;
             const target = isDark ? 'dark' : preferredLightTheme;
