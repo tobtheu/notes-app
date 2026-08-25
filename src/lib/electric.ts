@@ -3,9 +3,9 @@ import { live, type PGliteWithLive } from '@electric-sql/pglite/live';
 import { electricSync } from '@electric-sql/pglite-sync';
 import { initSchema } from './db';
 import { log } from './logger';
+import { FEATURES } from '../config/features';
 
-const envElectricUrl = (import.meta.env.VITE_ELECTRIC_URL as string) || '';
-const ELECTRIC_URL = (envElectricUrl && !envElectricUrl.includes('46.225.11.148')) ? envElectricUrl : 'https://sync.lamanotes.de';
+const ELECTRIC_URL = FEATURES.SYNC ? ((import.meta.env.VITE_ELECTRIC_URL as string) || '') : '';
 
 /**
  * Singleton PGlite instance — shared across the entire app.
@@ -55,6 +55,10 @@ export async function startElectricSync(
   accessToken: string,
   onError?: (err: unknown) => void,
 ): Promise<void> {
+  if (!FEATURES.SYNC || !ELECTRIC_URL) {
+    log.info('[electric] sync skipped — sync disabled or ELECTRIC_URL missing');
+    return;
+  }
   if (_shapesStarted) {
     log.info('[electric] syncShapes already started — skipping');
     return;

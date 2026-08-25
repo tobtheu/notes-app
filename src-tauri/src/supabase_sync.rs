@@ -12,15 +12,15 @@ use std::time::Duration;
 // and locally via the .env file (loaded by build.rs).
 pub const SUPABASE_URL: &str = match option_env!("VITE_SUPABASE_URL") {
     Some(v) if !v.is_empty() => v,
-    _ => "https://api.lamanotes.de",
+    _ => "",
 };
 pub const SUPABASE_ANON_KEY: &str = match option_env!("VITE_SUPABASE_ANON_KEY") {
     Some(v) if !v.is_empty() => v,
-    _ => "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc3MDYwNDMzLCJleHAiOjIwOTI0MjA0MzN9.MfNPRgANFJG_PqejvzL269R4J-u7AaRBoNdEdGqaQJQ",
+    _ => "",
 };
 pub const LAMA_SECRET: &str = match option_env!("VITE_LAMA_SECRET") {
     Some(v) if !v.is_empty() => v,
-    _ => "LamaNotes_Safe_30b9d5a4",
+    _ => "",
 };
 
 // Hard ceiling so a hung Supabase endpoint can't freeze sign-in/refresh.
@@ -68,6 +68,10 @@ struct AuthResponse {
 
 /// Sign in with email + password. Returns credentials on success.
 pub async fn sign_in(email: &str, password: &str) -> Result<SupabaseCredentials, String> {
+    if SUPABASE_URL.is_empty() || SUPABASE_ANON_KEY.is_empty() {
+        return Err("Cloud sync backend is not configured in this build".to_string());
+    }
+
     let client = http_client()?;
     let url = format!("{}/auth/v1/token?grant_type=password", SUPABASE_URL);
 
@@ -106,6 +110,10 @@ pub async fn sign_in(email: &str, password: &str) -> Result<SupabaseCredentials,
 
 /// Sign up with email + password. Returns credentials on success.
 pub async fn sign_up(email: &str, password: &str) -> Result<SupabaseCredentials, String> {
+    if SUPABASE_URL.is_empty() || SUPABASE_ANON_KEY.is_empty() {
+        return Err("Cloud sync backend is not configured in this build".to_string());
+    }
+
     let client = http_client()?;
     let url = format!("{}/auth/v1/signup", SUPABASE_URL);
 
@@ -144,6 +152,10 @@ pub async fn sign_up(email: &str, password: &str) -> Result<SupabaseCredentials,
 
 /// Refreshes a Supabase session using the stored refresh token.
 pub async fn refresh_session(refresh_token: &str) -> Result<SupabaseCredentials, String> {
+    if SUPABASE_URL.is_empty() || SUPABASE_ANON_KEY.is_empty() {
+        return Err("Cloud sync backend is not configured in this build".to_string());
+    }
+
     let client = http_client()?;
     let url = format!("{}/auth/v1/token?grant_type=refresh_token", SUPABASE_URL);
 

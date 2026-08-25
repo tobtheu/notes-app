@@ -1,3 +1,5 @@
+import { FEATURES } from '../config/features';
+
 /**
  * Connectivity & Health checks for the application services.
  */
@@ -21,7 +23,7 @@ async function ping(url: string, options: { useSecret?: boolean; noCors?: boolea
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     const headers: Record<string, string> = {};
-    if (options.useSecret) {
+    if (options.useSecret && FEATURES.SYNC) {
       const secret = import.meta.env.VITE_LAMA_SECRET;
       if (secret) {
         headers['X-Lama-Secret'] = secret as string;
@@ -52,8 +54,8 @@ async function ping(url: string, options: { useSecret?: boolean; noCors?: boolea
  * Runs a full diagnostic of required services.
  */
 export async function runDiagnostics(): Promise<HealthStatus[]> {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const electricUrl = import.meta.env.VITE_ELECTRIC_URL;
+  const supabaseUrl = FEATURES.SYNC ? (import.meta.env.VITE_SUPABASE_URL as string) : undefined;
+  const electricUrl = FEATURES.SYNC ? (import.meta.env.VITE_ELECTRIC_URL as string) : undefined;
 
   const results: HealthStatus[] = [];
 

@@ -1,9 +1,9 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { FEATURES } from '../config/features';
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || '';
-const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
-const LAMA_SECRET = (import.meta.env.VITE_LAMA_SECRET as string) || '';
+const SUPABASE_URL = FEATURES.SYNC ? ((import.meta.env.VITE_SUPABASE_URL as string) || '') : '';
+const SUPABASE_ANON_KEY = FEATURES.SYNC ? ((import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '') : '';
+const LAMA_SECRET = FEATURES.SYNC ? ((import.meta.env.VITE_LAMA_SECRET as string) || '') : '';
 
 /**
  * Supabase JS client — initialized only when Cloud Sync is active and valid URL is configured.
