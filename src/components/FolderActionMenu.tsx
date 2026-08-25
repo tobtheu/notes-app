@@ -4,8 +4,8 @@ import { Pencil, Trash2 } from 'lucide-react';
 interface FolderActionMenuProps {
     isOpen: boolean;
     onClose: () => void;
-    onEdit: () => void;
-    onDelete: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
 }
 
 export function FolderActionMenu({
@@ -24,13 +24,11 @@ export function FolderActionMenu({
         };
 
         if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-            document.addEventListener('touchstart', handleClickOutside);
+            document.addEventListener('click', handleClickOutside);
         }
 
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-            document.removeEventListener('touchstart', handleClickOutside);
+            document.removeEventListener('click', handleClickOutside);
         };
     }, [isOpen, onClose]);
 
@@ -39,31 +37,38 @@ export function FolderActionMenu({
     return (
         <div
             ref={menuRef}
-            className="absolute right-0 top-full mt-1 w-32 bg-[var(--canvas-bg)] border border-[var(--border-subtle)] rounded-xl shadow-lg z-50 py-1 text-xs animate-in fade-in zoom-in-95 duration-100"
+            className="absolute right-0 top-7 z-50 bg-[var(--canvas-bg)] border border-[var(--border-subtle)] shadow-xl rounded-2xl py-1.5 w-36 text-xs font-medium animate-popover-expand backdrop-blur-xl select-none"
             onClick={(e) => e.stopPropagation()}
         >
-            <button
-                type="button"
-                onClick={() => {
-                    onClose();
-                    onEdit();
-                }}
-                className="w-full px-3 py-1.5 flex items-center gap-2 text-[var(--text-main)] hover:bg-[var(--card-hover)] transition-colors text-left font-medium"
-            >
-                <Pencil size={12} className="text-[var(--text-muted)]" />
-                <span>Bearbeiten</span>
-            </button>
-            <button
-                type="button"
-                onClick={() => {
-                    onClose();
-                    onDelete();
-                }}
-                className="w-full px-3 py-1.5 flex items-center gap-2 text-red-500 hover:bg-red-500/10 transition-colors text-left font-medium"
-            >
-                <Trash2 size={12} />
-                <span>Löschen</span>
-            </button>
+            {onEdit && (
+                <button
+                    type="button"
+                    onClick={() => {
+                        onClose();
+                        onEdit();
+                    }}
+                    className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-[var(--card-hover)] flex items-center gap-2 text-[var(--text-main)] active:scale-95"
+                >
+                    <Pencil size={13} className="text-[var(--text-muted)]" />
+                    <span>Edit Folder</span>
+                </button>
+            )}
+            {onDelete && (
+                <>
+                    <div className="h-px bg-[var(--border-subtle)] my-1 mx-2" />
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onClose();
+                            onDelete();
+                        }}
+                        className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-red-500/10 flex items-center gap-2 text-red-500 active:scale-95"
+                    >
+                        <Trash2 size={13} />
+                        <span>Delete Folder</span>
+                    </button>
+                </>
+            )}
         </div>
     );
 }

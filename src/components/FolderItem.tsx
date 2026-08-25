@@ -91,8 +91,8 @@ export const FolderItem = ({
         setIsLongPressing(false);
     };
 
-    const folderKey = Object.keys(metadata.folders).find(k => normalizeStr(k) === normalizeStr(folder)) || folder;
-    const folderMeta = metadata.folders[folderKey] || {};
+    const folderKey = Object.keys(metadata.folders || {}).find(k => normalizeStr(k) === normalizeStr(folder)) || folder;
+    const folderMeta = (metadata.folders || {})[folderKey] || {};
     const IconComponent = ICON_MAP[folderMeta.icon || 'Folder'] || Folder;
     const colorStyles = COLOR_MAP[folderMeta.color || 'gray'];
     const isSelected = !!selectedCategory && normalizeStr(selectedCategory) === normalizeStr(folder);
@@ -166,28 +166,29 @@ export const FolderItem = ({
 
             {/* 3-Dots Button (fades in at same position on hover) */}
             {!isCollapsed && !isReorderMode && (onEditCategory || onDeleteCategory) && (
-                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/folder:opacity-100 transition-opacity duration-200">
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setIsMenuOpen(!isMenuOpen);
-                        }}
-                        className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-[var(--canvas-bg)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
-                        title="Ordneroptionen"
-                        aria-label="Ordneroptionen"
-                    >
-                        <MoreVertical size={13} />
-                    </button>
-
-                    <FolderActionMenu
-                        isOpen={isMenuOpen}
-                        onClose={() => setIsMenuOpen(false)}
-                        onEdit={() => onEditCategory?.(folder)}
-                        onDelete={() => onDeleteCategory?.(folder)}
-                    />
-                </div>
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsMenuOpen(prev => !prev);
+                    }}
+                    className={clsx(
+                        "smooth-transition absolute right-1.5 p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 z-20",
+                        isMenuOpen ? "opacity-100 bg-black/5 dark:bg-white/10 text-[var(--text-main)]" : "opacity-0 group-hover/folder:opacity-100 pointer-events-none group-hover/folder:pointer-events-auto"
+                    )}
+                    title="Folder Options"
+                >
+                    <MoreVertical size={13} />
+                </button>
             )}
+
+            {/* 3-Dots Popover Menu */}
+            <FolderActionMenu
+                isOpen={isMenuOpen}
+                onClose={() => setIsMenuOpen(false)}
+                onEdit={() => onEditCategory?.(folder)}
+                onDelete={() => onDeleteCategory?.(folder)}
+            />
         </div>
     );
 };
