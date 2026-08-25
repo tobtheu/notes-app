@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLiveQuery } from '@electric-sql/pglite-react';
 import type { Note, SyncStatus } from '../types';
-import { normalizeStr, getPathId } from '../utils/path';
+import { getPathId, normalizeStr } from '../utils/path';
+import { flushQueue } from '../lib/offlineQueue';
 import type { PGliteWithLive } from '@electric-sql/pglite/live';
 
 import { useNotesAuth } from './useNotesAuth';
@@ -123,6 +124,29 @@ export function useNotes() {
   // ── Core note write helper ────────────────────────────────────────────────
   const { writeNote } = useNotesDbWriter({ dbRef, userId });
 
+  // ── Combined folders from metadata.folderOrder + notes + metadata.folders ─
+  const folders = useMemo(() => {
+    const ordered = metadata.folderOrder ?? [];
+    const fromNotes = foldersQuery?.rows?.map((r) => r.folder).filter(Boolean) ?? [];
+    const fromMeta = Object.keys(metadata.folders || {}).filter(Boolean);
+
+    const allSources = [...ordered, ...fromNotes, ...fromMeta];
+    const result: string[] = [];
+    const seenNormalized = new Set<string>();
+
+    for (const f of allSources) {
+      const trimmed = f.trim();
+      if (!trimmed) continue;
+      const norm = normalizeStr(trimmed);
+      if (!seenNormalized.has(norm)) {
+        seenNormalized.add(norm);
+        result.push(trimmed);
+      }
+    }
+
+    return result;
+  }, [foldersQuery?.rows, metadata.folders, metadata.folderOrder]);
+
   // ── Filter & Search hook ──────────────────────────────────────────────────
   const {
     filteredNotes,
@@ -133,14 +157,12 @@ export function useNotes() {
     searchTerm,
     selectedCategory,
     selectedNoteId,
-    setSelectedNoteId,
     metadata,
     getNoteId,
   });
 
   // ── Workspace Operations ──────────────────────────────────────────────────
   const {
-    isLoading,
     selectFolder,
     setupDefaultWorkspace,
     importFolder,
@@ -151,10 +173,10 @@ export function useNotes() {
   } = useNotesWorkspace({
     dbRef,
     userId,
-    setCurrentFolder,
-    writeConfig,
-    setSyncStatus,
     setUserId,
+    setCurrentFolder,
+    setSyncStatus,
+    writeNote,
   });
 
   // ── Note & Folder & Trash Operations ──────────────────────────────────────
@@ -178,12 +200,14 @@ export function useNotes() {
     dbRef,
     userId,
     notes,
+    sortedFolders: folders,
     metadata,
     metadataRef,
     writeNote,
     writeConfig,
     selectedCategory,
     setSelectedCategory,
+    selectedNoteId,
     setSelectedNoteId,
     getNoteId,
   });
@@ -194,38 +218,21 @@ export function useNotes() {
     signUp,
     signOut,
     deleteAccount,
-    triggerSync,
   } = useNotesAuth({
     dbRef,
+    userId,
     setUserId,
     setUserEmail,
     setSyncStatus,
     setSyncError,
-    setCurrentFolder,
-    setupDefaultWorkspace,
   });
 
-  // ── Combined folders from notes + metadata ─────────────────────────────────
-  const folders = useMemo(() => {
-    const fromNotes = foldersQuery?.rows?.map((r) => r.folder).filter(Boolean) ?? [];
-    const fromMeta = Object.keys(metadata.folders || {});
-    const combined = Array.from(new Set([...fromNotes, ...fromMeta]));
+  const triggerSync = useCallback(async () => {
+    if (!dbRef.current || !userId) return;
+    await flushQueue(dbRef.current);
+  }, [userId]);
 
-    if (metadata.folderOrder && Array.isArray(metadata.folderOrder)) {
-      const order = metadata.folderOrder;
-      combined.sort((a, b) => {
-        const iA = order.indexOf(a);
-        const iB = order.indexOf(b);
-        if (iA !== -1 && iB !== -1) return iA - iB;
-        if (iA !== -1) return -1;
-        if (iB !== -1) return 1;
-        return a.localeCompare(b);
-      });
-    } else {
-      combined.sort();
-    }
-    return combined;
-  }, [foldersQuery?.rows, metadata.folders, metadata.folderOrder]);
+  const isLoading = syncStatus === 'initialising';
 
   return {
     allNotes: notes,

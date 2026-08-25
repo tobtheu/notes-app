@@ -52,4 +52,25 @@ describe('Sidebar Status Indicator', () => {
 
         expect(screen.getByText('Synchronisiere...')).toBeDefined();
     });
+
+    it('renders folder items uniquely without duplicate entries', () => {
+        render(
+            <Sidebar
+                {...defaultProps}
+                folders={['Arbeit', 'Privat', 'Projekte']}
+                metadata={{
+                    folders: {
+                        Arbeit: { color: 'blue' },
+                    },
+                    pinnedNotes: [],
+                    folderOrder: ['Arbeit', 'Privat', 'Projekte'],
+                }}
+            />
+        );
+
+        expect(screen.getByText('Arbeit')).toBeDefined();
+        expect(screen.getByText('Privat')).toBeDefined();
+        expect(screen.getByText('Projekte')).toBeDefined();
+        expect(screen.getAllByText('Arbeit')).toHaveLength(1);
+    });
 });
