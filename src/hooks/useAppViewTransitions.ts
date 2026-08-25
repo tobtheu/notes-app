@@ -37,8 +37,8 @@ export function useAppViewTransitions({
         setActiveView('editor');
     };
 
-    const handleCreateNote = async () => {
-        await createNote();
+    const handleCreateNote = () => {
+        createNote();
         setActiveView('editor');
     };
 

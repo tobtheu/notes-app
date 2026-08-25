@@ -54,6 +54,21 @@ export function useNotesFilter({
             matching.push(note);
         }
 
+        // If selectedNoteId is newly created and not yet in notes rows, inject it at the top
+        if (selectedNoteId && !notes.some(n => getNoteId(n) === selectedNoteId)) {
+            const lastSlash = selectedNoteId.lastIndexOf('/');
+            const filename = lastSlash >= 0 ? selectedNoteId.slice(lastSlash + 1) : selectedNoteId;
+            const folder = lastSlash >= 0 ? selectedNoteId.slice(0, lastSlash) : '';
+            if (!normalizedCategory || normalizeStr(folder) === normalizedCategory) {
+                matching.unshift({
+                    filename,
+                    folder,
+                    content: '# ',
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+        }
+
         return matching.sort((a, b) => {
             const aPinned = isNotePinned(a);
             const bPinned = isNotePinned(b);
@@ -63,12 +78,25 @@ export function useNotesFilter({
             if (dateCompare !== 0) return dateCompare;
             return a.filename.localeCompare(b.filename);
         });
-    }, [notes, debouncedSearch, selectedCategory, isNotePinned]);
+    }, [notes, debouncedSearch, selectedCategory, isNotePinned, selectedNoteId, getNoteId]);
 
     const lastValidSelectedNote = useRef<Note | null>(null);
-    const selectedNote = selectedNoteId
-        ? (notes.find(n => getNoteId(n) === selectedNoteId) ?? lastValidSelectedNote.current)
-        : null;
+    const selectedNote = useMemo(() => {
+        if (!selectedNoteId) return null;
+        const found = notes.find(n => getNoteId(n) === selectedNoteId);
+        if (found) return found;
+
+        // If not found in DB rows yet (freshly created note), return optimistic draft instantly
+        const lastSlash = selectedNoteId.lastIndexOf('/');
+        const filename = lastSlash >= 0 ? selectedNoteId.slice(lastSlash + 1) : selectedNoteId;
+        const folder = lastSlash >= 0 ? selectedNoteId.slice(0, lastSlash) : '';
+        return {
+            filename,
+            folder,
+            content: '# ',
+            updatedAt: new Date().toISOString(),
+        };
+    }, [selectedNoteId, notes, getNoteId]);
 
     // Commit the resolved selection to the ref only after render (not during)
     useEffect(() => {
