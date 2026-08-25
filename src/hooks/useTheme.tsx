@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 
 export type Theme = 'dark' | 'sage' | 'clay';
@@ -24,7 +24,7 @@ export interface UseThemeOptions {
 
 /**
  * useTheme Hook
- * Manages application appearance theme ('clay', 'sage', 'dark') and automatic system switching.
+ * Manages application appearance theme ('clay', 'sage', 'dark') with smooth circular ripple view transition.
  * Default on first launch is 'clay'.
  */
 export function useTheme(options?: UseThemeOptions): UseThemeReturn {
@@ -57,6 +57,9 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
         return 'clay';
     });
 
+    const currentThemeRef = useRef<Theme>(theme);
+    currentThemeRef.current = theme;
+
     const applyThemeToDOM = useCallback((t: Theme) => {
         if (typeof window === 'undefined') return;
         const root = window.document.documentElement;
@@ -74,12 +77,14 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
     const performThemeTransition = useCallback((nextTheme: Theme, origin?: ThemeOrigin) => {
         let coords: { x: number; y: number } | undefined;
         if (origin) {
-            if ('clientX' in origin && 'clientY' in origin) {
+            if ('clientX' in origin && typeof origin.clientX === 'number') {
                 coords = { x: origin.clientX, y: origin.clientY };
-            } else if ('x' in origin && 'y' in origin) {
+            } else if ('x' in origin && typeof origin.x === 'number') {
                 coords = { x: origin.x, y: origin.y };
             }
         }
+
+        currentThemeRef.current = nextTheme;
 
         const isReducedMotion = typeof window !== 'undefined' &&
             window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
@@ -91,8 +96,8 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
             return;
         }
 
-        const x = coords?.x ?? window.innerWidth / 2;
-        const y = coords?.y ?? window.innerHeight / 2;
+        const x = coords?.x ?? (window.innerWidth / 2);
+        const y = coords?.y ?? (window.innerHeight / 2);
         const endRadius = Math.hypot(
             Math.max(x, window.innerWidth - x),
             Math.max(y, window.innerHeight - y)
@@ -115,8 +120,8 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
                     ]
                 },
                 {
-                    duration: 600,
-                    easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                    duration: 500,
+                    easing: 'cubic-bezier(0.2, 0, 0, 1)',
                     pseudoElement: '::view-transition-new(root)'
                 }
             );
@@ -137,7 +142,7 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
         return () => mediaQuery.removeEventListener('change', handleSystemChange);
     }, [autoTheme, preferredLightTheme, performThemeTransition]);
 
-    // Sync incoming external options (e.g. cloud sync)
+    // Sync incoming external options (e.g. cloud sync) without double-triggering local transitions
     useEffect(() => {
         if (options?.autoTheme !== undefined && options.autoTheme !== autoTheme) {
             setAutoThemeState(options.autoTheme);
@@ -151,10 +156,10 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
     }, [options?.preferredLightTheme, preferredLightTheme]);
 
     useEffect(() => {
-        if (options?.theme !== undefined && options.theme !== theme) {
+        if (options?.theme !== undefined && options.theme !== currentThemeRef.current) {
             performThemeTransition(options.theme);
         }
-    }, [options?.theme, theme, performThemeTransition]);
+    }, [options?.theme, performThemeTransition]);
 
     // Apply on initial load and sync localStorage
     useEffect(() => {
@@ -185,7 +190,7 @@ export function useTheme(options?: UseThemeOptions): UseThemeReturn {
             return;
         }
 
-        if (nextTheme === theme) return;
+        if (nextTheme === currentThemeRef.current) return;
         performThemeTransition(nextTheme, origin);
     };
 

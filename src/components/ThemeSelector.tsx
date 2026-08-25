@@ -24,7 +24,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
                 {/* 1. Clay & Oatmeal (Default) */}
                 <button
                     type="button"
-                    onClick={(e) => setTheme('clay', e)}
+                    onClick={(e) => setTheme('clay', { x: e.clientX, y: e.clientY })}
                     className={clsx(
                         "smooth-transition flex flex-col p-2.5 sm:p-3 rounded-2xl border text-left active:scale-98 min-w-0 overflow-hidden relative",
                         theme === 'clay'
@@ -44,7 +44,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
                 {/* 2. Sage Green */}
                 <button
                     type="button"
-                    onClick={(e) => setTheme('sage', e)}
+                    onClick={(e) => setTheme('sage', { x: e.clientX, y: e.clientY })}
                     className={clsx(
                         "smooth-transition flex flex-col p-2.5 sm:p-3 rounded-2xl border text-left active:scale-98 min-w-0 overflow-hidden relative",
                         theme === 'sage'
@@ -64,7 +64,7 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({
                 {/* 3. Dark Mode */}
                 <button
                     type="button"
-                    onClick={(e) => setTheme('dark', e)}
+                    onClick={(e) => setTheme('dark', { x: e.clientX, y: e.clientY })}
                     className={clsx(
                         "smooth-transition flex flex-col p-2.5 sm:p-3 rounded-2xl border text-left active:scale-98 min-w-0 overflow-hidden",
                         theme === 'dark'
