@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { runDiagnostics } from '../utils/health';
-import type { HealthStatus } from '../utils/health';
+import { useState } from 'react';
 import type { ImportProgress } from './useNotesWorkspace';
+import { useSettingsImportExport } from './useSettingsImportExport';
+import { useSettingsDiagnostics } from './useSettingsDiagnostics';
 
 interface UseSettingsModalProps {
     isOpen: boolean;
@@ -28,97 +28,45 @@ export function useSettingsModal({
     onResetDatabase,
     onInstallUpdate,
 }: UseSettingsModalProps) {
-    const [version, setVersion] = useState<string>('0.0.0');
-    const [updateStatus, setUpdateStatus] = useState<{
-        type: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
-        progress?: number;
-        error?: string;
-        version?: string;
-    }>({ type: 'idle' });
-    const [diagResults, setDiagResults] = useState<HealthStatus[] | null>(null);
-    const [isDiagnosing, setIsDiagnosing] = useState(false);
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-    
-    const [importState, setImportState] = useState<'idle' | 'loading' | 'done'>('idle');
-    const [importCount, setImportCount] = useState(0);
-    const [importFolderProgress, setImportFolderProgress] = useState<ImportProgress | null>(null);
+    // Import, Export & Reset Database subsystem
+    const {
+        importState,
+        importCount,
+        importFolderProgress,
+        handleImportFolder,
+        importFilesState,
+        importFilesCount,
+        importFilesProgress,
+        handleImportFiles,
+        exportState,
+        exportCount,
+        handleExportBackup,
+        resetDbState,
+        resetDbStep,
+        setResetDbStep,
+        handleResetDatabase,
+    } = useSettingsImportExport({
+        onImportFolder,
+        onImportFiles,
+        onExportBackup,
+        onResetDatabase,
+    });
 
-    const [importFilesState, setImportFilesState] = useState<'idle' | 'loading' | 'done'>('idle');
-    const [importFilesCount, setImportFilesCount] = useState(0);
-    const [importFilesProgress, setImportFilesProgress] = useState<ImportProgress | null>(null);
-
-    const [exportState, setExportState] = useState<'idle' | 'loading' | 'done'>('idle');
-    const [exportCount, setExportCount] = useState(0);
-
-    const [resetDbState, setResetDbState] = useState<'idle' | 'loading' | 'done'>('idle');
-    const [resetDbStep, setResetDbStep] = useState<'idle' | 'confirm'>('idle');
-
-    const handleImportFolder = async () => {
-        if (!onImportFolder) return;
-        setImportState('loading');
-        setImportFolderProgress({ stage: 'selecting', current: 0, total: 0 });
-        try {
-            const count = await onImportFolder((prog) => {
-                setImportFolderProgress(prog);
-            });
-            setImportCount(count);
-            setImportState('done');
-            setTimeout(() => {
-                setImportState('idle');
-                setImportFolderProgress(null);
-            }, 3500);
-        } catch {
-            setImportState('idle');
-            setImportFolderProgress(null);
-        }
-    };
-
-    const handleImportFiles = async () => {
-        if (!onImportFiles) return;
-        setImportFilesState('loading');
-        setImportFilesProgress({ stage: 'selecting', current: 0, total: 0 });
-        try {
-            const count = await onImportFiles((prog) => {
-                setImportFilesProgress(prog);
-            });
-            setImportFilesCount(count);
-            setImportFilesState('done');
-            setTimeout(() => {
-                setImportFilesState('idle');
-                setImportFilesProgress(null);
-            }, 3500);
-        } catch {
-            setImportFilesState('idle');
-            setImportFilesProgress(null);
-        }
-    };
-
-    const handleExportBackup = async () => {
-        if (!onExportBackup) return;
-        setExportState('loading');
-        try {
-            const count = await onExportBackup();
-            setExportCount(count);
-            setExportState('done');
-            setTimeout(() => setExportState('idle'), 3500);
-        } catch {
-            setExportState('idle');
-        }
-    };
-
-    const handleResetDatabase = async () => {
-        if (!onResetDatabase) return;
-        setResetDbState('loading');
-        try {
-            await onResetDatabase();
-            setResetDbState('done');
-            setResetDbStep('idle');
-            setTimeout(() => setResetDbState('idle'), 3500);
-        } catch {
-            setResetDbState('idle');
-            setResetDbStep('idle');
-        }
-    };
+    // Diagnostics, Versions & Updates subsystem
+    const {
+        version,
+        updateStatus,
+        diagResults,
+        isDiagnosing,
+        scrollContainerRef,
+        handleCheckForUpdates,
+        handleDownloadUpdate,
+        handleInstallUpdate,
+        handleRunDiagnostics,
+    } = useSettingsDiagnostics({
+        isOpen,
+        onInstallUpdate,
+    });
 
     // Auth form state
     const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -134,30 +82,6 @@ export function useSettingsModal({
     // Delete account confirmation
     const [deleteAccountStep, setDeleteAccountStep] = useState<'idle' | 'confirm'>('idle');
     const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
-
-    // Auto-scroll to update status box when it appears
-    useEffect(() => {
-        if (updateStatus.type !== 'idle' && scrollContainerRef.current) {
-            setTimeout(() => {
-                scrollContainerRef.current?.scrollTo({
-                    top: scrollContainerRef.current.scrollHeight,
-                    behavior: 'smooth'
-                });
-            }, 50);
-        }
-    }, [updateStatus.type]);
-
-    /**
-     * --- INITIALIZATION & TAURI INTEROP ---
-     */
-    useEffect(() => {
-        if (!isOpen) return;
-        window.tauriAPI.getAppVersion().then(setVersion);
-        const unsubscribe = window.tauriAPI.onUpdateStatus((status) => {
-            setUpdateStatus(status);
-        });
-        return () => unsubscribe();
-    }, [isOpen]);
 
     const handleAuth = async () => {
         if (!authEmail || !authPassword || !onSignIn || !onSignUp) return;
@@ -204,32 +128,6 @@ export function useSettingsModal({
             setDeleteAccountStep('idle');
         } finally {
             setDeleteAccountLoading(false);
-        }
-    };
-
-    const handleCheckForUpdates = () => {
-        setUpdateStatus({ type: 'checking' });
-        window.tauriAPI.checkForUpdates();
-    };
-
-    const handleDownloadUpdate = () => {
-        window.tauriAPI.downloadUpdate();
-    };
-
-    const handleInstallUpdate = async () => {
-        if (onInstallUpdate) await onInstallUpdate();
-        else window.tauriAPI.quitAndInstall();
-    };
-
-    const handleRunDiagnostics = async () => {
-        setIsDiagnosing(true);
-        try {
-            const results = await runDiagnostics();
-            setDiagResults(results);
-        } catch (err) {
-            console.error('Diagnostics failed:', err);
-        } finally {
-            setIsDiagnosing(false);
         }
     };
 
