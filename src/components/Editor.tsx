@@ -1,8 +1,11 @@
+import React from 'react';
 import type { Note } from '../types';
 import { MarkdownEditor } from './MarkdownEditor';
 import clsx from 'clsx';
-import { Eye, EyeOff, Loader2, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { EditorMenu } from './EditorMenu';
+import { EditorFocusControls } from './EditorFocusControls';
+import { EditorTitleInput } from './EditorTitleInput';
 import { useNoteEditor } from '../hooks/useNoteEditor';
 
 interface EditorProps {
@@ -23,8 +26,6 @@ interface EditorProps {
     iosLandscapeFullscreen?: boolean;
     className?: string;
 }
-
-import React from 'react';
 
 /**
  * Editor Component
@@ -118,30 +119,12 @@ export const Editor = React.memo(function Editor(props: EditorProps) {
 
             {/* Focus Mode Controls (Floating Top Right) */}
             {showFocusOverlay && (
-                <div className={clsx(
-                    "fixed top-6 right-8 flex items-center gap-3 z-[10001] no-drag transition-opacity duration-300",
-                    isExitingFocus ? "opacity-0" : "opacity-100"
-                )}>
-                    <button
-                        onClick={() => setToolbarVisible(!toolbarVisible)}
-                        className={clsx(
-                            "p-2 rounded-full transition-all active:scale-90",
-                            toolbarVisible
-                                ? "text-primary-600 bg-primary-50 dark:bg-primary-900/40"
-                                : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        )}
-                        title={toolbarVisible ? "Hide Toolbar" : "Show Toolbar"}
-                    >
-                        {toolbarVisible ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
-                    <button
-                        onClick={handleExitFocus}
-                        className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all active:scale-90"
-                        title="Exit Focus Mode (Esc)"
-                    >
-                        <X size={24} />
-                    </button>
-                </div>
+                <EditorFocusControls
+                    toolbarVisible={toolbarVisible}
+                    setToolbarVisible={setToolbarVisible}
+                    onExitFocus={handleExitFocus}
+                    isExitingFocus={isExitingFocus}
+                />
             )}
 
             {/* 3-Dots Menu - Always sticky/fixed at top right of editor viewport */}
@@ -186,22 +169,15 @@ export const Editor = React.memo(function Editor(props: EditorProps) {
                     toolbarVisible={toolbarVisible}
                     spellcheckEnabled={spellcheckEnabled}
                     header={
-                        <div className={clsx("w-full", isFocusMode ? "pt-8 mb-6" : "pt-4 pb-2")}>
-                            <textarea
-                                ref={titleRef}
-                                className={clsx(
-                                    "w-full p-0 font-extrabold bg-transparent border-none outline-none resize-none overflow-hidden text-[var(--text-main)] leading-tight placeholder-[var(--text-muted)]",
-                                    isFocusMode ? "text-5xl font-black text-center" : "text-3xl pr-12"
-                                )}
-                                placeholder="Note Title"
-                                value={title}
-                                onChange={(e) => handleTitleChange(e.target.value)}
-                                onKeyDown={handleTitleKeyDown}
-                                onBlur={() => throttledSync()}
-                                spellCheck={spellcheckEnabled}
-                                rows={1}
-                            />
-                        </div>
+                        <EditorTitleInput
+                            title={title}
+                            titleRef={titleRef}
+                            isFocusMode={isFocusMode}
+                            spellcheckEnabled={spellcheckEnabled}
+                            onChange={handleTitleChange}
+                            onKeyDown={handleTitleKeyDown}
+                            onBlur={() => throttledSync()}
+                        />
                     }
                     isFocusMode={isFocusMode}
                     iosLandscapeFullscreen={iosLandscapeFullscreen}
@@ -212,21 +188,17 @@ export const Editor = React.memo(function Editor(props: EditorProps) {
             ) : (
                 /* PLAIN TEXT MODE - Standard Fallback */
                 <div ref={plainTextContainerRef} className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-8 pb-8 overflow-y-auto custom-scrollbar">
-                    <div className="pt-4 pb-2">
-                        <textarea
-                            ref={titleRef}
-                            className="w-full p-0 text-3xl font-extrabold bg-transparent border-none outline-none resize-none overflow-hidden text-[var(--text-main)] leading-tight placeholder-[var(--text-muted)] pr-12"
-                            placeholder="Note Title"
-                            value={title}
-                            onChange={(e) => handleTitleChange(e.target.value)}
-                            onKeyDown={handleTitleKeyDown}
-                            onBlur={() => throttledSync()}
-                            spellCheck={spellcheckEnabled}
-                            rows={1}
-                        />
-                    </div>
+                    <EditorTitleInput
+                        title={title}
+                        titleRef={titleRef}
+                        isFocusMode={false}
+                        spellcheckEnabled={spellcheckEnabled}
+                        onChange={handleTitleChange}
+                        onKeyDown={handleTitleKeyDown}
+                        onBlur={() => throttledSync()}
+                    />
                     <textarea
-                        ref={textareaRef}
+                        ref={textareaRef as React.RefObject<HTMLTextAreaElement>}
                         className="w-full p-0 text-sm bg-transparent border-none outline-none resize-none text-[var(--text-main)] placeholder-[var(--text-muted)] leading-relaxed flex-1"
                         placeholder="Start typing your note here..."
                         value={body}
