@@ -21,6 +21,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:dev:sync": "cross-env VITE_ENABLE_SYNC=true tauri dev",
     "tauri:build": "tauri build",
     "tauri:build:beta": "cross-env VITE_ENABLE_SYNC=true tauri build --config src-tauri/tauri.beta.conf.json"
   },
