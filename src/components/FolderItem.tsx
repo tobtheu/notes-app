@@ -1,11 +1,12 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Folder, Pencil, Trash2, GripVertical, MoreVertical } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Folder, GripVertical, MoreVertical } from 'lucide-react';
 import clsx from 'clsx';
 import type { AppMetadata } from '../types';
 import { normalizeStr } from '../utils/path';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ICON_MAP, COLOR_MAP } from '../utils/sidebar';
+import { FolderActionMenu } from './FolderActionMenu';
 
 export interface FolderItemProps {
     folder: string;
@@ -90,19 +91,6 @@ export const FolderItem = ({
         setIsLongPressing(false);
     };
 
-    // Close menu when clicking outside
-    useEffect(() => {
-        const handleClickOutside = () => {
-            setIsMenuOpen(false);
-        };
-        if (isMenuOpen) {
-            document.addEventListener('click', handleClickOutside);
-        }
-        return () => {
-            document.removeEventListener('click', handleClickOutside);
-        };
-    }, [isMenuOpen]);
-
     const folderKey = Object.keys(metadata.folders).find(k => normalizeStr(k) === normalizeStr(folder)) || folder;
     const folderMeta = metadata.folders[folderKey] || {};
     const IconComponent = ICON_MAP[folderMeta.icon || 'Folder'] || Folder;
@@ -178,64 +166,37 @@ export const FolderItem = ({
 
             {/* 3-Dots Button (fades in at same position on hover) */}
             {!isCollapsed && !isReorderMode && (onEditCategory || onDeleteCategory) && (
-                <button
-                    type="button"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setIsMenuOpen(prev => !prev);
-                    }}
-                    className={clsx(
-                        "smooth-transition absolute right-1.5 p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 z-20",
-                        isMenuOpen ? "opacity-100 bg-black/5 dark:bg-white/10 text-[var(--text-main)]" : "opacity-0 group-hover/folder:opacity-100 pointer-events-none group-hover/folder:pointer-events-auto"
-                    )}
-                    title="Folder Options"
-                >
-                    <MoreVertical size={13} />
-                </button>
-            )}
+                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/folder:opacity-100 transition-opacity duration-200">
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsMenuOpen(!isMenuOpen);
+                        }}
+                        className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-[var(--canvas-bg)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
+                        title="Ordneroptionen"
+                        aria-label="Ordneroptionen"
+                    >
+                        <MoreVertical size={13} />
+                    </button>
 
-            {/* 3-Dots Popover Menu */}
-            {isMenuOpen && (
-                <div
-                    className="absolute right-0 top-7 z-50 bg-[var(--canvas-bg)] border border-[var(--border-subtle)] shadow-xl rounded-2xl py-1.5 w-36 text-xs font-medium animate-popover-expand backdrop-blur-xl"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    {onEditCategory && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsMenuOpen(false);
-                                onEditCategory(folder);
-                            }}
-                            className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-[var(--card-hover)] flex items-center gap-2 text-[var(--text-main)] active:scale-95"
-                        >
-                            <Pencil size={13} className="text-[var(--text-muted)]" />
-                            <span>Edit Folder</span>
-                        </button>
-                    )}
-                    {onDeleteCategory && (
-                        <>
-                            <div className="h-px bg-[var(--border-subtle)] my-1 mx-2" />
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsMenuOpen(false);
-                                    onDeleteCategory(folder);
-                                }}
-                                className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 flex items-center gap-2 active:scale-95"
-                            >
-                                <Trash2 size={13} />
-                                <span>Delete</span>
-                            </button>
-                        </>
-                    )}
+                    <FolderActionMenu
+                        isOpen={isMenuOpen}
+                        onClose={() => setIsMenuOpen(false)}
+                        onEdit={() => onEditCategory?.(folder)}
+                        onDelete={() => onDeleteCategory?.(folder)}
+                    />
                 </div>
             )}
         </div>
     );
 };
 
-export const SortableFolderItem = (props: SortableFolderItemProps) => {
+export const SortableFolderItem = ({
+    id, folder, metadata, selectedCategory, isCollapsed, isReorderMode = false, isIOS = false, monochromeIcons = false,
+    showNoteCounts = false, noteCount = 0,
+    onSelectCategory, onEditCategory, onDeleteCategory
+}: SortableFolderItemProps) => {
     const {
         attributes,
         listeners,
@@ -243,26 +204,32 @@ export const SortableFolderItem = (props: SortableFolderItemProps) => {
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: props.id });
+    } = useSortable({ id });
 
-    const style = {
-        transform: CSS.Transform.toString(transform),
+    const style: React.CSSProperties = {
+        transform: CSS.Translate.toString(transform),
         transition,
     };
 
     return (
         <FolderItem
-            {...props}
+            folder={folder}
+            metadata={metadata}
+            selectedCategory={selectedCategory}
+            isCollapsed={isCollapsed}
+            isReorderMode={isReorderMode}
+            isIOS={isIOS}
+            monochromeIcons={monochromeIcons}
+            showNoteCounts={showNoteCounts}
+            noteCount={noteCount}
+            onSelectCategory={onSelectCategory}
+            onEditCategory={onEditCategory}
+            onDeleteCategory={onDeleteCategory}
+            isDragging={isDragging}
             setNodeRef={setNodeRef}
-            style={style}
             attributes={attributes}
             listeners={listeners}
-            isDragging={isDragging}
-            isReorderMode={props.isReorderMode}
-            isIOS={props.isIOS}
-            monochromeIcons={props.monochromeIcons}
-            showNoteCounts={props.showNoteCounts}
-            noteCount={props.noteCount}
+            style={style}
         />
     );
 };
