@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Trash2, Search, AlertTriangle } from 'lucide-react';
-import clsx from 'clsx';
 import type { Note } from '../types';
 import { extractNoteTitle } from '../utils/markdown';
 import { getPathId } from '../utils/path';

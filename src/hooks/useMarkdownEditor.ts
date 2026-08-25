@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Selection } from 'prosemirror-state';
-import { useEditor } from '@tiptap/react';
+import { useEditor, type Editor } from '@tiptap/react';
 import { platform } from '@tauri-apps/plugin-os';
 
 import { EDITOR_EXTENSIONS } from '../extensions/editorExtensions';
@@ -69,6 +69,7 @@ export function useMarkdownEditor({
     onChangeRef.current = onChange;
     const onBlurRef = useRef(onBlur);
     onBlurRef.current = onBlur;
+    const editorRef = useRef<Editor | null>(null);
 
     const editor = useEditor({
         extensions: EDITOR_EXTENSIONS,
@@ -147,8 +148,8 @@ export function useMarkdownEditor({
                     return false;
                 }
             },
-            handlePaste: (view, event) => {
-                return handleEditorPaste(view, event, editor);
+            handlePaste: (view, event): boolean => {
+                return handleEditorPaste(view, event, editorRef.current);
             },
             handleKeyDown: (view, event) => {
                 if (event.key === 'ArrowUp' && onArrowUpAtStart) {
@@ -181,6 +182,8 @@ export function useMarkdownEditor({
             onBlurRef.current?.();
         },
     }, []);
+
+    editorRef.current = editor;
 
     /**
      * --- SIDE EFFECTS ---

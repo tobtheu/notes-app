@@ -36,8 +36,8 @@ interface AppModalsProps {
     syncStatus: SyncStatus;
     hasPending: boolean;
     userEmail?: string | null;
-    onSignIn: (email: string, pass: string) => Promise<void>;
-    onSignUp: (email: string, pass: string) => Promise<void>;
+    onSignIn: (email: string, pass: string) => Promise<any>;
+    onSignUp: (email: string, pass: string) => Promise<any>;
     onSignOut: () => Promise<void>;
     onDeleteAccount: () => Promise<void>;
     onImportFolder?: (prog?: (p: any) => void) => Promise<number>;
@@ -56,7 +56,7 @@ interface AppModalsProps {
     onCloseCategoryToDelete: () => void;
     onDeleteCategory: (mode: 'recursive' | 'move') => Promise<void>;
     isUpdateModalOpen: boolean;
-    updateVersion?: string;
+    updateVersion?: string | null;
     updateStatus: any;
     onUpdate: () => Promise<void>;
     onSkipUpdate: () => void;
@@ -161,9 +161,9 @@ export const AppModals: React.FC<AppModalsProps> = ({
                     onExportBackup={onExportBackup}
                     onResetDatabase={onResetDatabase}
                     trashNotes={trashNotes}
-                    onRestoreNote={restoreNote}
-                    onPermanentlyDeleteNote={permanentlyDeleteNote}
-                    onEmptyTrash={emptyTrash}
+                    onRestoreNote={onRestoreNote}
+                    onPermanentlyDeleteNote={onPermanentlyDeleteNote}
+                    onEmptyTrash={onEmptyTrash}
                 />
             )}
 

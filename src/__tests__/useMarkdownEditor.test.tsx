@@ -46,7 +46,7 @@ describe('useMarkdownEditor paste behavior', () => {
 
         // The editor content should contain a heading and a paragraph, NOT a codeBlock node
         const json = editor.getJSON();
-        const topNodeTypes = json.content?.map((n) => n.type);
+        const topNodeTypes = json.content?.map((n: any) => n.type);
         
         expect(topNodeTypes).not.toContain('codeBlock');
     });
@@ -81,7 +81,7 @@ describe('useMarkdownEditor paste behavior', () => {
         });
 
         const json = editor.getJSON();
-        const topNodeTypes = json.content?.map((n) => n.type);
+        const topNodeTypes = json.content?.map((n: any) => n.type);
 
         expect(topNodeTypes).toContain('heading');
         expect(topNodeTypes).toContain('bulletList');
@@ -119,7 +119,7 @@ describe('useMarkdownEditor paste behavior', () => {
         });
 
         const json = editor.getJSON();
-        const topNodeTypes = json.content?.map((n) => n.type);
+        const topNodeTypes = json.content?.map((n: any) => n.type);
 
         expect(topNodeTypes).toContain('codeBlock');
     });
