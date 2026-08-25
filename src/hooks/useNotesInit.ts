@@ -5,6 +5,7 @@ import { setSupabaseSession, supabase } from '../lib/supabaseClient';
 import { flushQueue } from '../lib/offlineQueue';
 import { pullFromSupabase } from '../lib/syncSupabase';
 import { log } from '../lib/logger';
+import { FEATURES } from '../config/features';
 import type { PGliteWithLive } from '@electric-sql/pglite/live';
 
 interface UseNotesInitProps {
@@ -30,26 +31,23 @@ export function useNotesInit({
 
         (async () => {
             try {
-                log.info('[useNotes:init] start — localStorage:', {
-                    'lama-mode': localStorage.getItem('lama-mode'),
-                    'lama-user-id': localStorage.getItem('lama-user-id'),
-                    'notes-folder': localStorage.getItem('notes-folder'),
-                });
+                log.info('[useNotes:init] start — FEATURES.SYNC:', FEATURES.SYNC);
 
                 const db = await getDb();
                 log.info('[useNotes:init] PGlite ready');
                 if (cancelled) return;
                 dbRef.current = db;
 
-                if (localStorage.getItem('lama-mode') === 'local') {
-                    log.info('[useNotes:init] restoring local-only mode');
+                // If Sync is disabled via feature flag or explicitly in local mode, operate pure offline
+                if (!FEATURES.SYNC || localStorage.getItem('lama-mode') === 'local') {
+                    log.info('[useNotes:init] operating in local-only offline mode');
                     setUserId('local');
                     setSyncStatus('offline');
                     return;
                 }
 
                 log.info('[useNotes:init] reading Tauri secure store...');
-                const stored = await window.tauriAPI.getSupabaseCredentials().catch((e: unknown) => {
+                const stored = await window.tauriAPI?.getSupabaseCredentials().catch((e: unknown) => {
                     log.warn('[useNotes:init] getSupabaseCredentials failed:', e);
                     return null;
                 });
@@ -78,7 +76,7 @@ export function useNotesInit({
 
                     if (secondsLeft < 300) {
                         log.info('[useNotes:init] Token expired or expiring soon, refreshing...');
-                        const refreshed = await window.tauriAPI.refreshSupabaseToken().catch(() => null);
+                        const refreshed = await window.tauriAPI?.refreshSupabaseToken().catch(() => null);
                         if (refreshed) {
                             freshAccessToken = refreshed.accessToken;
                             freshRefreshToken = refreshed.refreshToken;
@@ -145,8 +143,10 @@ export function useNotesInit({
 
     // ── Network reconnect → flush queue ──────────────────────────────────────
     useEffect(() => {
+        if (!FEATURES.SYNC) return;
+
         const handleOnline = async () => {
-            if (!dbRef.current || !userId) return;
+            if (!dbRef.current || !userId || userId === 'local') return;
             setSyncStatus('synced');
             await pullFromSupabase(dbRef.current, userId);
             await flushQueue(dbRef.current);

@@ -2,6 +2,10 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { useNotes } from '../hooks/useNotes';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('../config/features', () => ({
+  FEATURES: { SYNC: true },
+}));
+
 vi.mock('@electric-sql/pglite-react', () => ({
   useLiveQuery: vi.fn().mockReturnValue({ rows: [] }),
 }));
