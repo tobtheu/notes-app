@@ -51,9 +51,9 @@ export function useAppViewTransitions({
         if (editingCategory) {
             if (newName !== editingCategory) {
                 renameFolder(editingCategory, newName);
+                setEditingCategory(newName);
             }
             updateFolderMetadata(newName, folderMeta);
-            setEditingCategory(null);
         }
     };
 
