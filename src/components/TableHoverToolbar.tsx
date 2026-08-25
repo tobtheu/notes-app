@@ -17,7 +17,7 @@ interface TableHoverToolbarProps {
 export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, node, getPos }) => {
     /**
      * --- SELECTION HELPERS ---
-     * Tiptap/ProseMirror table commands (like addRowAfter) depend on the current selection.
+     * Tiptap/ProseMirror table commands depend on the current selection.
      * Since clicking a toolbar button can shift focus, we use onMouseDown + e.preventDefault()
      * and manually ensure the selection is correct before executing the command.
      */
@@ -25,14 +25,16 @@ export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, no
         e.preventDefault()
         e.stopPropagation()
 
-        if (typeof getPos !== 'function') return
+        if (typeof getPos !== 'function') {
+            command(0)
+            return
+        }
         const pos = getPos()
         if (pos === undefined) return
         command(pos)
     }
 
     /**
-     * Stellschraube: Selection Logic
      * Forces selection into the last cell to ensure commands like 'addRowAfter' 
      * target the expected location (the end of the table).
      */
@@ -42,78 +44,102 @@ export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, no
         editor.chain().setTextSelection(endPos).run()
     }
 
+    /**
+     * Deletes the entire table safely and reliably, even if focus/selection is elsewhere.
+     */
+    const handleDeleteTable = (pos: number) => {
+        if (node && typeof pos === 'number') {
+            const from = pos
+            const to = pos + node.nodeSize
+            const ran = editor.chain().setTextSelection(pos + 2).deleteTable().focus().run()
+            if (!ran) {
+                editor.chain().deleteRange({ from, to }).focus().run()
+            }
+        } else {
+            editor.chain().focus().deleteTable().run()
+        }
+    }
+
     return (
         <div className={clsx(
-            "flex items-center gap-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-md p-0.5 animate-in fade-in zoom-in duration-200 pointer-events-auto"
+            "flex items-center gap-1 bg-[var(--canvas-bg)] shadow-lg border border-[var(--border-subtle)] rounded-xl p-1 animate-in fade-in zoom-in duration-200 pointer-events-auto backdrop-blur-md"
         )}>
             {/* --- HEADER CONTROLS --- */}
-            <div className="flex items-center gap-0.5 border-r border-gray-100 dark:border-gray-700 pr-1 mr-1">
+            <div className="flex items-center gap-0.5 border-r border-[var(--border-subtle)] pr-1 mr-0.5">
                 <button
-                    onMouseDown={exec(() => editor.chain().focus().toggleHeaderRow().run())}
-                    className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/40 text-gray-500 hover:text-primary-600 rounded-md transition-colors"
+                    type="button"
+                    onMouseDown={exec((pos) => {
+                        editor.chain().setTextSelection(pos + 2).toggleHeaderRow().focus().run()
+                    })}
+                    className="p-1.5 hover:bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-lg transition-colors"
                     title="Toggle Header Row"
                 >
-                    <Heading size={14} />
+                    <Heading size={13} />
                 </button>
             </div>
 
             {/* --- ROW CONTROLS --- */}
-            <div className="flex items-center gap-0.5 border-r border-gray-100 dark:border-gray-700 pr-1 mr-1">
-                <span className="text-[10px] text-gray-400 font-bold uppercase px-1 mr-1">Row</span>
+            <div className="flex items-center gap-0.5 border-r border-[var(--border-subtle)] pr-1 mr-0.5">
+                <span className="text-[10px] text-[var(--text-muted)] font-bold uppercase px-1 mr-0.5">Row</span>
                 <button
+                    type="button"
                     onMouseDown={exec((pos) => {
                         setSelectionToLastCell(pos)
-                        editor.chain().addRowAfter().run()
+                        editor.chain().addRowAfter().focus().run()
                     })}
-                    className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/40 text-gray-500 hover:text-primary-600 rounded-md transition-colors"
+                    className="p-1.5 hover:bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-lg transition-colors"
                     title="Add Row to Bottom"
                 >
-                    <Plus size={14} />
+                    <Plus size={13} />
                 </button>
                 <button
+                    type="button"
                     onMouseDown={exec((pos) => {
                         setSelectionToLastCell(pos)
-                        editor.chain().deleteRow().run()
+                        editor.chain().deleteRow().focus().run()
                     })}
-                    className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-500 hover:text-red-600 rounded-md transition-colors"
+                    className="p-1.5 hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-500 rounded-lg transition-colors"
                     title="Delete Last Row"
                 >
-                    <Minus size={14} />
+                    <Minus size={13} />
                 </button>
             </div>
 
             {/* --- COLUMN CONTROLS --- */}
-            <div className="flex items-center gap-0.5 border-r border-gray-100 dark:border-gray-700 pr-1 mr-1">
-                <span className="text-[10px] text-gray-400 font-bold uppercase px-1 mr-1">Col</span>
+            <div className="flex items-center gap-0.5 border-r border-[var(--border-subtle)] pr-1 mr-0.5">
+                <span className="text-[10px] text-[var(--text-muted)] font-bold uppercase px-1 mr-0.5">Col</span>
                 <button
+                    type="button"
                     onMouseDown={exec((pos) => {
                         setSelectionToLastCell(pos)
-                        editor.chain().addColumnAfter().run()
+                        editor.chain().addColumnAfter().focus().run()
                     })}
-                    className="p-1.5 hover:bg-primary-50 dark:hover:bg-primary-900/40 text-gray-500 hover:text-primary-600 rounded-md transition-colors"
+                    className="p-1.5 hover:bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-lg transition-colors"
                     title="Add Column to Right"
                 >
-                    <Plus size={14} />
+                    <Plus size={13} />
                 </button>
                 <button
+                    type="button"
                     onMouseDown={exec((pos) => {
                         setSelectionToLastCell(pos)
-                        editor.chain().deleteColumn().run()
+                        editor.chain().deleteColumn().focus().run()
                     })}
-                    className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-500 hover:text-red-600 rounded-md transition-colors"
+                    className="p-1.5 hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-500 rounded-lg transition-colors"
                     title="Delete Last Column"
                 >
-                    <Minus size={14} />
+                    <Minus size={13} />
                 </button>
             </div>
 
-            {/* --- DANGER ZONE --- */}
+            {/* --- DANGER ZONE (DELETE TABLE) --- */}
             <button
-                onMouseDown={exec(() => editor.chain().focus().deleteTable().run())}
-                className="flex items-center gap-1.5 px-2 py-1.5 hover:bg-red-50 dark:hover:bg-red-900/40 text-red-500 hover:text-red-600 rounded-md transition-colors text-xs font-medium"
+                type="button"
+                onMouseDown={exec(handleDeleteTable)}
+                className="flex items-center gap-1 p-1.5 hover:bg-red-500/10 text-red-500 hover:text-red-600 rounded-lg transition-colors text-xs font-medium"
                 title="Delete Entire Table"
             >
-                <Trash2 size={14} />
+                <Trash2 size={13} />
             </button>
         </div>
     )
