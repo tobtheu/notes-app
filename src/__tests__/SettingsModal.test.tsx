@@ -2,6 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SettingsModal } from '../components/SettingsModal';
 
+vi.mock('../config/features', () => ({
+    FEATURES: { SYNC: true }
+}));
+
 describe('SettingsModal', () => {
     it('renders and allows navigating between all 6 tabs without errors', () => {
         const mockClose = vi.fn();

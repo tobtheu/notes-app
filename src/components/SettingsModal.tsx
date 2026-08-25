@@ -5,6 +5,7 @@ import type { Theme, ThemeOrigin } from '../hooks/useTheme';
 import type { Note } from '../types';
 import { useSettingsModal } from '../hooks/useSettingsModal';
 import { SettingsNav, type TabKey } from './SettingsNav';
+import { FEATURES } from '../config/features';
 
 import { CloudSyncSection } from './CloudSyncSection';
 import { AppearanceSection } from './AppearanceSection';
