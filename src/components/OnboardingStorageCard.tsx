@@ -1,4 +1,4 @@
-import { Mail, FolderOpen, ChevronRight } from 'lucide-react';
+import { Cloud, FolderOpen, ChevronRight } from 'lucide-react';
 
 interface OnboardingStorageCardProps {
     onOpenEmailAuth: (mode: 'signin' | 'signup') => void;
@@ -29,7 +29,7 @@ export function OnboardingStorageCard({
                 >
                     <div className="flex items-center gap-3.5">
                         <div className="w-10 h-10 rounded-xl bg-[var(--canvas-bg)] flex items-center justify-center text-[var(--accent-color)] border border-[var(--border-subtle)]/60 shadow-sm shrink-0">
-                            <Mail size={18} />
+                            <Cloud size={18} />
                         </div>
                         <div>
                             <div className="font-semibold text-xs sm:text-sm text-[var(--text-main)]">Sign In / Register</div>
