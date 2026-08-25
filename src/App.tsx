@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { MobileSwipeContainer } from './components/MobileSwipeContainer';
@@ -10,15 +10,12 @@ import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { PGliteWrapper } from './components/PGliteWrapper';
 
 import { useNotes } from './hooks/useNotes';
-import { useSettings } from './hooks/useSettings';
-import { useTheme } from './hooks/useTheme';
 import { useSessionExpiryHandler } from './hooks/useSessionExpiryHandler';
-import { useSidebarGestures } from './hooks/useSidebarGestures';
 import { useTauriUpdater } from './hooks/useTauriUpdater';
-import { useViewport } from './hooks/useViewport';
 import { usePlatformInfo } from './hooks/usePlatformInfo';
-import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { useAppViewTransitions } from './hooks/useAppViewTransitions';
+import { useAppThemeAndFont } from './hooks/useAppThemeAndFont';
+import { useAppWindowControls } from './hooks/useAppWindowControls';
 
 import { getDb } from './lib/electric';
 import clsx from 'clsx';
@@ -82,15 +79,13 @@ function App() {
   } = useNotes();
 
   const {
-    theme: syncTheme,
-    setTheme: setSyncTheme,
-    autoTheme: syncAutoTheme,
-    setAutoTheme: setSyncAutoTheme,
-    preferredLightTheme: syncPrefLight,
-    setPreferredLightTheme: setSyncPrefLight,
+    theme,
+    setTheme,
+    autoTheme,
+    setAutoTheme,
+    preferredLightTheme,
     markdownEnabled,
     setMarkdownEnabled,
-    accentColor,
     fontFamily,
     setFontFamily,
     fontSize,
@@ -107,21 +102,12 @@ function App() {
     setShowIconsWhenCollapsed,
     showNoteCounts,
     setShowNoteCounts,
-  } = useSettings(metadata.settings, saveSettings);
-
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  useEffect(() => { if (syncStatus === 'unauthenticated') setIsSettingsOpen(false); }, [syncStatus]);
-
-  useSessionExpiryHandler({
-    syncStatus,
-    syncError,
-    signOut,
-    setIsSettingsOpen,
+  } = useAppThemeAndFont({
+    settings: metadata.settings,
+    saveSettings,
   });
 
   const { isIOS, isWindows } = usePlatformInfo();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => window.innerWidth < 768);
-  const [isFocusMode, setIsFocusMode] = useState(false);
 
   // View transitions & navigation
   const {
@@ -147,6 +133,32 @@ function App() {
     deleteFolder,
   });
 
+  // Window, layout, viewport & shortcuts
+  const {
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    isFocusMode,
+    setIsFocusMode,
+    isSettingsOpen,
+    setIsSettingsOpen,
+    isMobile: _isMobile,
+    isLandscape,
+    isMaximized,
+    containerRef,
+    sidebarRef,
+  } = useAppWindowControls({
+    syncStatus,
+    activeView,
+    onCreateNote: handleCreateNote,
+  });
+
+  useSessionExpiryHandler({
+    syncStatus,
+    syncError,
+    signOut,
+    setIsSettingsOpen,
+  });
+
   // Tauri updater hook
   const {
     isUpdateModalOpen,
@@ -158,57 +170,12 @@ function App() {
     handleSkipUpdate,
   } = useTauriUpdater();
 
-  // Viewport hook
-  const {
-    isMobile: _isMobile,
-    isLandscape,
-    isMaximized,
-  } = useViewport(isSidebarCollapsed, setIsSidebarCollapsed);
-
-  // Sidebar gestures
-  const {
-    containerRef,
-    sidebarRef,
-  } = useSidebarGestures({
-    isSidebarCollapsed,
-    setIsSidebarCollapsed,
-    activeView,
-    isFocusMode,
-  });
-
   // Hide native iOS toolbar accessory bar whenever the user leaves the editor view
   useEffect(() => {
     if (isIOS && activeView !== 'editor') {
       window.webkit?.messageHandlers?.toolbarVisible?.postMessage(false);
     }
   }, [isIOS, activeView]);
-
-  const { theme, setTheme, autoTheme, setAutoTheme, preferredLightTheme } = useTheme({
-    theme: syncTheme,
-    onThemeChange: setSyncTheme,
-    autoTheme: syncAutoTheme,
-    onAutoThemeChange: setSyncAutoTheme,
-    preferredLightTheme: syncPrefLight,
-    onPreferredLightThemeChange: setSyncPrefLight,
-  });
-
-  // Apply font size to <html> so all rem-based Tailwind classes scale with it
-  useEffect(() => {
-    const px = fontSize === 'small' ? '14px' : fontSize === 'large' ? '18px' : '16px';
-    document.documentElement.style.fontSize = px;
-  }, [fontSize]);
-
-  // Apply accent color to document root for CSS variable overrides
-  useEffect(() => {
-    document.documentElement.setAttribute('data-accent', accentColor);
-  }, [accentColor]);
-
-  // Global Keyboard Shortcuts
-  useGlobalShortcuts({
-    onCreateNote: handleCreateNote,
-    onOpenSettings: () => setIsSettingsOpen(true),
-    onToggleSidebar: () => setIsSidebarCollapsed(prev => !prev),
-  });
 
   if (!currentFolder || syncStatus === 'unauthenticated') {
     return (
