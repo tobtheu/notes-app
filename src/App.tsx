@@ -4,27 +4,26 @@ import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
 import { MobileSwipeContainer } from './components/MobileSwipeContainer';
 import { TitleBar } from './components/TitleBar';
-import { SettingsModal } from './components/SettingsModal';
-import { DeleteFolderModal } from './components/DeleteFolderModal';
-import { UpdateModal } from './components/UpdateModal';
-import { FolderEditModal } from './components/FolderEditModal';
 import { EmptyStateTutorial } from './components/EmptyStateTutorial';
 import { OnboardingScreen } from './components/OnboardingScreen';
+import { AppModals } from './components/AppModals';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
+import { PGliteWrapper } from './components/PGliteWrapper';
+
 import { useNotes } from './hooks/useNotes';
 import { useSettings } from './hooks/useSettings';
 import { useTheme } from './hooks/useTheme';
 import { useSessionExpiryHandler } from './hooks/useSessionExpiryHandler';
-import { getDb } from './lib/electric';
-import type { Note, FolderMetadata } from './types';
-import { Loader2 } from 'lucide-react';
-import clsx from 'clsx';
-import { platform } from '@tauri-apps/plugin-os';
-import { initGlobalHandlers } from './utils/initGlobalHandlers';
-import { AppErrorBoundary } from './components/AppErrorBoundary';
-import { PGliteWrapper } from './components/PGliteWrapper';
 import { useSidebarGestures } from './hooks/useSidebarGestures';
 import { useTauriUpdater } from './hooks/useTauriUpdater';
 import { useViewport } from './hooks/useViewport';
+import { usePlatformInfo } from './hooks/usePlatformInfo';
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+
+import { getDb } from './lib/electric';
+import type { Note, FolderMetadata } from './types';
+import clsx from 'clsx';
+import { initGlobalHandlers } from './utils/initGlobalHandlers';
 
 // Kick off PGlite init immediately at module load time so it's ready
 void getDb();
@@ -120,31 +119,15 @@ function App() {
     signOut,
     setIsSettingsOpen,
   });
-  const [isIOS, setIsIOS] = useState(false);
-  const [isWindows, setIsWindows] = useState(false);
-  useEffect(() => {
-    try {
-      const p = platform();
-      setIsIOS(p === 'ios');
-      setIsWindows(p === 'windows');
-      document.documentElement.setAttribute('data-os', p);
-    } catch {
-      const isWin = typeof navigator !== 'undefined' && /Win/.test(navigator.userAgent || navigator.platform);
-      if (isWin) {
-        setIsWindows(true);
-        document.documentElement.setAttribute('data-os', 'windows');
-      }
-      const isLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.userAgent || navigator.platform);
-      if (isLinux) {
-        document.documentElement.setAttribute('data-os', 'linux');
-      }
-    }
-  }, []);
+
+  const { isIOS, isWindows } = usePlatformInfo();
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => window.innerWidth < 768);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('notelist');
 
-  // Tauri updater hook logic
+  // Tauri updater hook
   const {
     isUpdateModalOpen,
     setIsUpdateModalOpen,
@@ -155,15 +138,14 @@ function App() {
     handleSkipUpdate,
   } = useTauriUpdater();
 
-  // Viewport custom hook logic
+  // Viewport hook
   const {
     isMobile: _isMobile,
     isLandscape,
     isMaximized,
   } = useViewport(isSidebarCollapsed, setIsSidebarCollapsed);
 
-  // Sidebar gestures logic
-  const [activeView, setActiveView] = useState<'sidebar' | 'notelist' | 'editor'>('notelist');
+  // Sidebar gestures
   const {
     containerRef,
     sidebarRef,
@@ -173,8 +155,6 @@ function App() {
     activeView,
     isFocusMode,
   });
-
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
 
   // Hide native iOS toolbar accessory bar whenever the user leaves the editor view
   useEffect(() => {
@@ -219,40 +199,12 @@ function App() {
     setActiveView('editor');
   };
 
-  // Global Keyboard Shortcuts (Cmd+M/Cmd+N on Mac, Ctrl+N on Win/Linux)
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
-
-      const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-      const isNewNoteMac = isMac && e.metaKey && e.key.toLowerCase() === 'n';
-      const isNewNoteWin = !isMac && e.ctrlKey && e.key.toLowerCase() === 'n';
-
-      if (isNewNoteMac || isNewNoteWin) {
-        e.preventDefault();
-        handleCreateNote();
-        return;
-      }
-
-      // Settings shortcut (Cmd/Ctrl + ,)
-      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
-        e.preventDefault();
-        setIsSettingsOpen(true);
-        return;
-      }
-
-      // Sidebar Toggle shortcut (Cmd/Ctrl + B)
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b' && !isInput) {
-        e.preventDefault();
-        setIsSidebarCollapsed(prev => !prev);
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [createNote]);
+  // Global Keyboard Shortcuts
+  useGlobalShortcuts({
+    onCreateNote: handleCreateNote,
+    onOpenSettings: () => setIsSettingsOpen(true),
+    onToggleSidebar: () => setIsSidebarCollapsed(prev => !prev),
+  });
 
   const handleNavigate = (id: string) => {
     setSelectedNote(id);
@@ -398,7 +350,6 @@ function App() {
 
         {/* Right column (iOS) or full layout (desktop): TitleBar + content */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
           {!isFocusMode && (
             <TitleBar
               isSidebarCollapsed={isSidebarCollapsed}
@@ -435,7 +386,7 @@ function App() {
                 !_isMobile && "rounded-[18px] shadow-sm border border-[var(--border-subtle)]"
               )}
             >
-              {/* NOTELIST — visible when not in sidebar-only or editor view */}
+              {/* NOTELIST */}
               <NoteList
                 className={clsx(
                   "flex-1 min-w-0 md:flex-none md:w-80 md:shrink-0 transition-all duration-300 ease-in-out border-r border-[var(--border-subtle)]",
@@ -458,7 +409,7 @@ function App() {
                 onCreateNote={handleCreateNote}
               />
 
-              {/* EDITOR — on desktop, it is rendered inline */}
+              {/* EDITOR — desktop inline */}
               {selectedNote && !_isMobile && renderEditor(clsx(
                 "flex-1",
                 activeView === 'editor' ? "flex" : "hidden md:flex"
@@ -491,84 +442,63 @@ function App() {
         </MobileSwipeContainer>
       )}
 
-      {isSettingsOpen && (
-        <SettingsModal
-          isOpen={true}
-          onClose={() => setIsSettingsOpen(false)}
-          isIOS={isIOS}
-          theme={theme}
-          setTheme={setTheme}
-          autoTheme={autoTheme}
-          onToggleAutoTheme={setAutoTheme}
-          preferredLightTheme={preferredLightTheme}
-          markdownEnabled={markdownEnabled}
-          onToggleMarkdown={setMarkdownEnabled}
-          monochromeIcons={monochromeIcons}
-          onToggleMonochromeIcons={setMonochromeIcons}
-          showIconsWhenCollapsed={showIconsWhenCollapsed}
-          onToggleShowIconsWhenCollapsed={setShowIconsWhenCollapsed}
-          showNoteCounts={showNoteCounts}
-          onToggleShowNoteCounts={setShowNoteCounts}
-          fontFamily={fontFamily}
-          setFontFamily={setFontFamily}
-          fontSize={fontSize}
-          setFontSize={setFontSize}
-          spellcheckEnabled={spellcheckEnabled}
-          onToggleSpellcheck={setSpellcheckEnabled}
-          landscapeFullscreen={landscapeFullscreen}
-          onToggleLandscapeFullscreen={setLandscapeFullscreen}
-          syncStatus={syncStatus}
-          hasPending={hasPending}
-          userEmail={userEmail}
-          onSignIn={signIn}
-          onSignUp={signUp}
-          onSignOut={signOut}
-          onDeleteAccount={deleteAccount}
-          onImportFolder={isIOS ? undefined : importFolder}
-          onImportFiles={isIOS ? undefined : importFiles}
-          onExportBackup={isIOS ? undefined : () => exportBackup(allNotes)}
-          onResetDatabase={resetDatabase}
-          trashNotes={trashNotes}
-          onRestoreNote={restoreNote}
-          onPermanentlyDeleteNote={permanentlyDeleteNote}
-          onEmptyTrash={emptyTrash}
-        />
-      )}
-
-      {editingCategory && (
-        <FolderEditModal
-          isOpen={true}
-          onClose={() => setEditingCategory(null)}
-          folderName={editingCategory}
-          metadata={metadata.folders[editingCategory] || {}}
-          onSave={handleSaveCategory}
-        />
-      )}
-
-      {categoryToDelete && (
-        <DeleteFolderModal
-          folderName={categoryToDelete}
-          onClose={() => setCategoryToDelete(null)}
-          onConfirm={handleDeleteCategory}
-        />
-      )}
-
-      {isUpdateModalOpen && updateVersion && (
-        <UpdateModal
-          version={updateVersion}
-          onUpdate={handleUpdate}
-          onSkip={handleSkipUpdate}
-          onCancel={() => setIsUpdateModalOpen(false)}
-          onInstall={handleInstallUpdate}
-          status={updateStatus}
-        />
-      )}
-
-      {isLoading && (
-        <div className="fixed bottom-6 right-6 z-50 bg-white dark:bg-gray-900 rounded-full shadow-lg p-3 border border-gray-100 dark:border-gray-700">
-          <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
-        </div>
-      )}
+      {/* Modals & Dialogs */}
+      <AppModals
+        isSettingsOpen={isSettingsOpen}
+        onCloseSettings={() => setIsSettingsOpen(false)}
+        isIOS={isIOS}
+        theme={theme}
+        setTheme={setTheme}
+        autoTheme={autoTheme}
+        setAutoTheme={setAutoTheme}
+        preferredLightTheme={preferredLightTheme}
+        markdownEnabled={markdownEnabled}
+        setMarkdownEnabled={setMarkdownEnabled}
+        monochromeIcons={monochromeIcons}
+        setMonochromeIcons={setMonochromeIcons}
+        showIconsWhenCollapsed={showIconsWhenCollapsed}
+        setShowIconsWhenCollapsed={setShowIconsWhenCollapsed}
+        showNoteCounts={showNoteCounts}
+        setShowNoteCounts={setShowNoteCounts}
+        fontFamily={fontFamily}
+        setFontFamily={setFontFamily}
+        fontSize={fontSize}
+        setFontSize={setFontSize}
+        spellcheckEnabled={spellcheckEnabled}
+        setSpellcheckEnabled={setSpellcheckEnabled}
+        landscapeFullscreen={landscapeFullscreen}
+        setLandscapeFullscreen={setLandscapeFullscreen}
+        syncStatus={syncStatus}
+        hasPending={hasPending}
+        userEmail={userEmail}
+        onSignIn={signIn}
+        onSignUp={signUp}
+        onSignOut={signOut}
+        onDeleteAccount={deleteAccount}
+        onImportFolder={isIOS ? undefined : importFolder}
+        onImportFiles={isIOS ? undefined : importFiles}
+        onExportBackup={isIOS ? undefined : () => exportBackup(allNotes)}
+        onResetDatabase={resetDatabase}
+        trashNotes={trashNotes}
+        onRestoreNote={restoreNote}
+        onPermanentlyDeleteNote={permanentlyDeleteNote}
+        onEmptyTrash={emptyTrash}
+        editingCategory={editingCategory}
+        onCloseEditingCategory={() => setEditingCategory(null)}
+        metadata={metadata}
+        onSaveCategory={handleSaveCategory}
+        categoryToDelete={categoryToDelete}
+        onCloseCategoryToDelete={() => setCategoryToDelete(null)}
+        onDeleteCategory={handleDeleteCategory}
+        isUpdateModalOpen={isUpdateModalOpen}
+        updateVersion={updateVersion}
+        updateStatus={updateStatus}
+        onUpdate={handleUpdate}
+        onSkipUpdate={handleSkipUpdate}
+        onCancelUpdate={() => setIsUpdateModalOpen(false)}
+        onInstallUpdate={handleInstallUpdate}
+        isLoading={isLoading}
+      />
     </div>
   );
 }
