@@ -58,7 +58,7 @@ export function useAppThemeAndFont({
 
     // Apply font size to <html> so all rem-based Tailwind classes scale with it
     useEffect(() => {
-        const px = fontSize === 'small' ? '14px' : fontSize === 'large' ? '18px' : '16px';
+        const px = fontSize === 'small' ? '13px' : fontSize === 'large' ? '17px' : '15px';
         document.documentElement.style.fontSize = px;
     }, [fontSize]);
 
