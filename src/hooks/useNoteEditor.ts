@@ -71,14 +71,6 @@ export function useNoteEditor({
                     plainTextContainerRef.current.scrollTop = 0;
                 }
             });
-
-            // Focus title automatically for empty / newly created notes
-            const isNewNote = !note.content || note.content.trim() === '' || note.content.trim() === '#';
-            if (isNewNote) {
-                requestAnimationFrame(() => {
-                    titleRef.current?.focus();
-                });
-            }
         } else {
             // Parent updated the same note (e.g. from remote sync). Only update if user is not actively typing.
             if (!isDirty.current && note.content !== lastSavedContent.current) {
@@ -87,6 +79,27 @@ export function useNoteEditor({
             }
         }
     }, [note.folder, note.filename, note.content]);
+
+    // Auto-focus title input immediately when creating/opening an empty or new note
+    useEffect(() => {
+        const isNewNote = !note.content || note.content.trim() === '' || note.content.trim() === '#';
+        if (isNewNote) {
+            const focusInput = () => {
+                if (titleRef.current) {
+                    titleRef.current.focus();
+                    const len = titleRef.current.value.length;
+                    titleRef.current.setSelectionRange(len, len);
+                }
+            };
+            focusInput();
+            const raf = requestAnimationFrame(focusInput);
+            const timer = setTimeout(focusInput, 40);
+            return () => {
+                cancelAnimationFrame(raf);
+                clearTimeout(timer);
+            };
+        }
+    }, [note.filename, note.folder]);
 
     /**
      * --- FAST CONTENT SPLITTING (O(Title) instead of O(N) array allocation) ---
