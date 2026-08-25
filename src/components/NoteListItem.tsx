@@ -1,10 +1,11 @@
 import { memo, useMemo, useState, useRef, useEffect } from 'react';
-import { Trash2, Pin, FolderTree, MoreVertical } from 'lucide-react';
+import { Pin, MoreVertical } from 'lucide-react';
 import clsx from 'clsx';
 import type { Note } from '../types';
 import { extractNoteTitle, extractNotePreview } from '../utils/markdown';
 import { useNoteSwipe } from '../hooks/useNoteSwipe';
 import { FolderMoveMenu } from './FolderMoveMenu';
+import { NoteSwipeActions, NoteMenuPopover } from './NoteItemActions';
 
 interface NoteListItemProps {
     note: Note;
@@ -99,39 +100,18 @@ export const NoteListItem = memo(({
                 (isMenuOpen || dropdownOpenId === noteId) && "z-30"
             )}
         >
-            {/* Swipe Actions (Behind - only visible during active swipe gesture) */}
-            <div
-                style={{
-                    opacity: swipeOffset !== 0 ? 1 : 0,
-                    pointerEvents: swipeOffset !== 0 ? 'auto' : 'none'
-                }}
-                className="absolute inset-y-[2px] right-[2px] left-[2px] ml-auto flex items-center justify-end max-w-[192px] z-0 h-[calc(100%-4px)] rounded-r-xl overflow-hidden transition-opacity duration-150"
-            >
-                <button
-                    onClick={(e) => { e.stopPropagation(); onTogglePin(note); closeSwipe(); }}
-                    className={clsx(
-                        "flex items-center justify-center w-14 h-full text-white transition-colors shrink-0",
-                        isPinned ? "bg-[var(--accent-color)]" : "bg-gray-400 dark:bg-gray-600"
-                    )}
-                    title={isPinned ? "Unpin Note" : "Pin Note"}
-                >
-                    <Pin size={16} fill={isPinned ? "currentColor" : "none"} />
-                </button>
-                <button
-                    onClick={(e) => { e.stopPropagation(); setDropdownOpenId(dropdownOpenId === noteId ? null : noteId); closeSwipe(); }}
-                    className="flex items-center justify-center w-14 h-full bg-blue-500 hover:bg-blue-600 text-white transition-colors shrink-0 folder-dropdown-trigger"
-                    title="Move to Folder"
-                >
-                    <FolderTree size={16} />
-                </button>
-                <button
-                    onClick={(e) => { e.stopPropagation(); onDeleteNote(noteId); closeSwipe(); }}
-                    className="flex items-center justify-center w-14 h-full bg-red-500 hover:bg-red-600 text-white transition-colors shrink-0 rounded-r-xl"
-                    title="Delete Note"
-                >
-                    <Trash2 size={16} />
-                </button>
-            </div>
+            {/* Swipe Actions (Behind) */}
+            <NoteSwipeActions
+                note={note}
+                noteId={noteId}
+                isPinned={isPinned}
+                swipeOffset={swipeOffset}
+                dropdownOpenId={dropdownOpenId}
+                setDropdownOpenId={setDropdownOpenId}
+                onTogglePin={onTogglePin}
+                onDeleteNote={onDeleteNote}
+                closeSwipe={closeSwipe}
+            />
 
             {/* Foreground Card */}
             <div
@@ -202,47 +182,17 @@ export const NoteListItem = memo(({
             </div>
 
             {/* 3-Dots Popover Menu */}
-            {isMenuOpen && (
-                <div
-                    className="absolute right-2 top-8 z-50 bg-[var(--canvas-bg)] border border-[var(--border-subtle)] shadow-xl rounded-2xl py-1.5 w-40 text-xs font-medium animate-popover-expand backdrop-blur-xl"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <button
-                        type="button"
-                        onClick={() => {
-                            onTogglePin(note);
-                            setIsMenuOpen(false);
-                        }}
-                        className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-[var(--card-hover)] flex items-center gap-2 text-[var(--text-main)] active:scale-95"
-                    >
-                        <Pin size={13} className={clsx("text-[var(--text-muted)]", isPinned && "fill-current text-[var(--accent-color)]")} />
-                        <span>{isPinned ? 'Unpin Note' : 'Pin Note'}</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setIsMenuOpen(false);
-                            setDropdownOpenId(dropdownOpenId === noteId ? null : noteId);
-                        }}
-                        className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-[var(--card-hover)] flex items-center gap-2 text-[var(--text-main)] active:scale-95 folder-dropdown-trigger"
-                    >
-                        <FolderTree size={13} className="text-[var(--text-muted)]" />
-                        <span>Move to...</span>
-                    </button>
-                    <div className="h-px bg-[var(--border-subtle)] my-1 mx-2" />
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setIsMenuOpen(false);
-                            onDeleteNote(noteId);
-                        }}
-                        className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 flex items-center gap-2 active:scale-95"
-                    >
-                        <Trash2 size={13} />
-                        <span>Delete</span>
-                    </button>
-                </div>
-            )}
+            <NoteMenuPopover
+                isOpen={isMenuOpen}
+                onClose={() => setIsMenuOpen(false)}
+                note={note}
+                noteId={noteId}
+                isPinned={isPinned}
+                dropdownOpenId={dropdownOpenId}
+                setDropdownOpenId={setDropdownOpenId}
+                onTogglePin={onTogglePin}
+                onDeleteNote={onDeleteNote}
+            />
 
             {/* Folder Move Menu */}
             {dropdownOpenId === noteId && (

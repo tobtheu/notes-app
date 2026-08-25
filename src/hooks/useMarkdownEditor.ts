@@ -7,6 +7,8 @@ import { EDITOR_EXTENSIONS } from '../extensions/editorExtensions';
 import { handleEditorPaste } from '../utils/editorPasteHandler';
 import { useEditorKeyboardScroll } from './useEditorKeyboardScroll';
 import { useIOSEditorToolbar } from './useIOSEditorToolbar';
+import { useEditorLinkPopup } from './useEditorLinkPopup';
+import { useEditorDragDrop } from './useEditorDragDrop';
 
 interface UseMarkdownEditorProps {
     content: string;
@@ -28,17 +30,7 @@ export function useMarkdownEditor({
     onArrowUpAtStart,
     onBlur
 }: UseMarkdownEditorProps) {
-    /**
-     * --- LOCAL STATE ---
-     */
-    const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
-    const [linkModalData, setLinkModalData] = useState<{ url: string; text: string }>({ url: '', text: '' });
-
-    // Tracks current hover state for "quick action" popups on links
-    const [hoveredLink, setHoveredLink] = useState<{ href: string, text: string, pos: number, rect: DOMRect } | null>(null);
-
     const [isScrolling, setIsScrolling] = useState(false);
-    const [isDragging, setIsDragging] = useState(false); // Visual feedback for file drop
 
     const [isIOS, setIsIOS] = useState(false);
     useEffect(() => {
@@ -58,8 +50,16 @@ export function useMarkdownEditor({
         scrollCursorAboveKeyboard,
     } = useEditorKeyboardScroll(isIOS);
 
+    // File Drag & Drop feedback
+    const {
+        isDragging,
+        setIsDragging,
+        handleDragEnter,
+        handleDragOver,
+        handleDragLeave,
+    } = useEditorDragDrop();
+
     const toolbarRef = useRef<HTMLDivElement>(null);
-    const hideTimeoutRef = useRef<any>(null);
     const scrollTimeoutRef = useRef<any>(null);
 
     const editorMarkdownRef = useRef('');
@@ -81,17 +81,13 @@ export function useMarkdownEditor({
                 spellcheck: spellcheckEnabled ? 'true' : 'false',
             },
             handleScrollToSelection: (view) => {
-                // Prevent ProseMirror from scrolling the container if the editor does not have focus
-                if (!view.hasFocus()) {
-                    return true;
-                }
+                if (!view.hasFocus()) return true;
                 return false;
             },
             handleDOMEvents: {
                 click: (_view, event) => {
                     const target = event.target as HTMLElement;
 
-                    // If a taskItem checkbox is clicked, ensure selection matches clicked item position to prevent viewport jump
                     const taskItem = target.closest('li[data-type="taskItem"], li.task-item');
                     if (taskItem && (target.tagName === 'INPUT' || target.tagName === 'LABEL' || target.closest('label'))) {
                         try {
@@ -132,21 +128,9 @@ export function useMarkdownEditor({
                     }
                     return false;
                 },
-                dragenter: () => {
-                    setIsDragging(true);
-                    return false;
-                },
-                dragover: (_view, event) => {
-                    setIsDragging(true);
-                    event.preventDefault();
-                    return false;
-                },
-                dragleave: (_view, event) => {
-                    if (!(_view.dom as HTMLElement).contains(event.relatedTarget as Node)) {
-                        setIsDragging(false);
-                    }
-                    return false;
-                }
+                dragenter: handleDragEnter,
+                dragover: handleDragOver,
+                dragleave: handleDragLeave,
             },
             handlePaste: (view, event): boolean => {
                 return handleEditorPaste(view, event, editorRef.current);
@@ -185,10 +169,20 @@ export function useMarkdownEditor({
 
     editorRef.current = editor;
 
-    /**
-     * --- SIDE EFFECTS ---
-     */
+    // Link popovers & link modal management
+    const {
+        isLinkModalOpen,
+        setIsLinkModalOpen,
+        linkModalData,
+        hoveredLink,
+        setHoveredLink,
+        clearHideTimeout,
+        startHideTimeout,
+        openLinkModal,
+        saveLink,
+    } = useEditorLinkPopup({ editor });
 
+    // Sync content changes
     useEffect(() => {
         if (!editor || content == null) return;
         const normalizedContent = content.trim();
@@ -220,25 +214,6 @@ export function useMarkdownEditor({
         return () => clearTimeout(timer);
     }, [editor, spellcheckEnabled]);
 
-    /**
-     * --- HELPER METHODS ---
-     */
-
-    const clearHideTimeout = () => {
-        if (hideTimeoutRef.current) {
-            clearTimeout(hideTimeoutRef.current);
-            hideTimeoutRef.current = null;
-        }
-    };
-
-    const startHideTimeout = () => {
-        clearHideTimeout();
-        hideTimeoutRef.current = setTimeout(() => {
-            setHoveredLink(null);
-            hideTimeoutRef.current = null;
-        }, 300);
-    };
-
     const handleScroll = useCallback(() => {
         setIsScrolling(true);
         if (scrollTimeoutRef.current) {
@@ -255,21 +230,6 @@ export function useMarkdownEditor({
         };
     }, []);
 
-    const openLinkModal = useCallback((initialUrl?: string, initialText?: string) => {
-        if (!editor) return;
-        setLinkModalData({
-            url: initialUrl || editor.getAttributes('link').href || '',
-            text: initialText || editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to) || ''
-        });
-        setIsLinkModalOpen(true);
-    }, [editor]);
-
-    useEffect(() => {
-        const handler = () => openLinkModal();
-        window.addEventListener('tiptap:openLinkModal', handler);
-        return () => window.removeEventListener('tiptap:openLinkModal', handler);
-    }, [openLinkModal]);
-
     // iOS native toolbar accessory bar bridge
     useIOSEditorToolbar({
         isIOS,
@@ -278,29 +238,6 @@ export function useMarkdownEditor({
         scrollCursorAboveKeyboard,
         openLinkModal,
     });
-
-    const saveLink = (url: string, text?: string) => {
-        if (!editor) return;
-
-        if (url === '') {
-            editor.chain().focus().extendMarkRange('link').unsetLink().run();
-        } else {
-            if (text) {
-                editor.chain()
-                    .focus()
-                    .extendMarkRange('link')
-                    .insertContent({
-                        type: 'text',
-                        text: text,
-                        marks: [{ type: 'link', attrs: { href: url } }]
-                    })
-                    .run();
-            } else {
-                editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-            }
-        }
-        setIsLinkModalOpen(false);
-    };
 
     return {
         editor,
