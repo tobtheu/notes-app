@@ -1,8 +1,8 @@
-name: "Release"
+name: "Release Offline (Public)"
 on:
   push:
     tags:
-      - 'v*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   publish:
@@ -50,14 +50,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          VITE_SUPABASE_URL: "https://api.lamanotes.de"
-          VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc3MDYwNDMzLCJleHAiOjIwOTI0MjA0MzN9.MfNPRgANFJG_PqejvzL269R4J-u7AaRBoNdEdGqaQJQ"
-          VITE_ELECTRIC_URL: "https://sync.lamanotes.de"
-          VITE_LAMA_SECRET: "LamaNotes_Safe_30b9d5a4"
         with:
           tagName: v__VERSION__ # the action replaces this with the version from tauri.conf.json
-          releaseName: "NotizApp v__VERSION__"
-          releaseBody: "See the assets below to download and install this version."
+          releaseName: "Lama Notes v__VERSION__"
+          releaseBody: "Offline-first release of Lama Notes."
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
