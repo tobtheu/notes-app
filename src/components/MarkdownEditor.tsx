@@ -1,12 +1,10 @@
 import { forwardRef, useImperativeHandle, memo, useState } from 'react';
 import type { Note } from '../types';
 import { EditorContent } from '@tiptap/react';
-import { BubbleMenu } from '@tiptap/react/menus';
 import clsx from 'clsx';
 
 import { EditorToolbar } from './EditorToolbar';
-import { UrlInputModal } from './UrlInputModal';
-import { BubbleToolbarContent } from './BubbleToolbarContent';
+import { EditorHoverMenus } from './EditorHoverMenus';
 import { DropIndicator } from './DropIndicator';
 import { useMarkdownEditor } from '../hooks/useMarkdownEditor';
 
@@ -52,8 +50,6 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
         setPrevVisible(toolbarVisible);
         setAnimState(toolbarVisible ? 'entering' : 'exiting');
     }
-
-
 
     const {
         editor,
@@ -107,57 +103,21 @@ export const MarkdownEditor = memo(forwardRef<MarkdownEditorRef, MarkdownEditorP
             onMouseLeave={() => setHoveredLink(null)}
             style={{ backgroundColor: 'transparent' }}
         >
-            {/* Link Modal */}
-            <UrlInputModal
-                isOpen={isLinkModalOpen}
-                type="link"
-                initialUrl={linkModalData.url}
-                initialText={linkModalData.text}
-                onClose={() => setIsLinkModalOpen(false)}
-                onSave={saveLink}
+            {/* Popover Hover Menus & Modals */}
+            <EditorHoverMenus
+                editor={editor}
+                isLinkModalOpen={isLinkModalOpen}
+                setIsLinkModalOpen={setIsLinkModalOpen}
+                linkModalData={linkModalData}
+                saveLink={saveLink}
                 isIOS={isIOS}
+                hoveredLink={hoveredLink}
+                setHoveredLink={setHoveredLink}
+                clearHideTimeout={clearHideTimeout}
+                startHideTimeout={startHideTimeout}
+                openLinkModal={openLinkModal}
+                onNavigate={onNavigate}
             />
-
-            {/* Merged Formatting & Link Menu */}
-            {editor && (
-                <BubbleMenu
-                    pluginKey="formattingMenu"
-                    editor={editor}
-                    updateDelay={0}
-                    shouldShow={({ from, to }) => {
-                        if (isIOS) return false;
-                        return from !== to;
-                    }}
-                >
-                    <BubbleToolbarContent
-                        editor={editor}
-                        onLinkClick={openLinkModal}
-                        onRemoveLink={() => setHoveredLink(null)}
-                        onNavigate={onNavigate}
-                    />
-                </BubbleMenu>
-            )}
-
-            {/* Hover-based Link Toolbar */}
-            {hoveredLink && editor.state.selection.empty && (
-                <div
-                    className="fixed z-[100] animate-fade-in-up"
-                    style={{
-                        top: hoveredLink.rect.top - 45,
-                        left: Math.max(10, Math.min(window.innerWidth - 250, hoveredLink.rect.left + (hoveredLink.rect.width / 2) - 100))
-                    }}
-                    onMouseEnter={clearHideTimeout}
-                    onMouseLeave={startHideTimeout}
-                >
-                    <BubbleToolbarContent
-                        editor={editor}
-                        onLinkClick={openLinkModal}
-                        onRemoveLink={() => setHoveredLink(null)}
-                        hoveredLink={hoveredLink}
-                        onNavigate={onNavigate}
-                    />
-                </div>
-            )}
 
             {/* Drop Indicator */}
             {isDragging && <DropIndicator />}
