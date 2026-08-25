@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Palette, Edit3, Cloud, HardDrive, Info, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { SyncStatus } from '../hooks/useNotes';
 import type { Theme, ThemeOrigin } from '../hooks/useTheme';
 import type { Note } from '../types';
 import { useSettingsModal } from '../hooks/useSettingsModal';
+import { SettingsNav, type TabKey } from './SettingsNav';
 
 import { CloudSyncSection } from './CloudSyncSection';
 import { AppearanceSection } from './AppearanceSection';
@@ -59,8 +59,6 @@ interface SettingsModalProps {
     onResetDatabase?: () => Promise<void>;
     onInstallUpdate?: () => Promise<void>;
 }
-
-type TabKey = 'appearance' | 'editor' | 'sync' | 'storage' | 'trash' | 'about';
 
 /**
  * SettingsModal Component
@@ -187,98 +185,7 @@ export function SettingsModal(props: SettingsModalProps) {
                 onClick={e => e.stopPropagation()}
             >
                 {/* Left Navigation Sidebar */}
-                <aside className="w-40 sm:w-44 bg-[var(--shell-bg)] border-r border-[var(--border-subtle)] p-3 flex flex-col justify-between select-none shrink-0 overflow-x-hidden">
-                    <div className="space-y-4">
-                        <div className="px-2 pt-1">
-                            <h3 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider">Settings</h3>
-                        </div>
-                        <nav className="space-y-1 text-xs font-medium">
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab('appearance')}
-                                className={clsx(
-                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
-                                    activeTab === 'appearance'
-                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
-                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
-                                )}
-                            >
-                                <Palette size={16} />
-                                <span>Appearance</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab('editor')}
-                                className={clsx(
-                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
-                                    activeTab === 'editor'
-                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
-                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
-                                )}
-                            >
-                                <Edit3 size={16} />
-                                <span>Editor</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab('sync')}
-                                className={clsx(
-                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
-                                    activeTab === 'sync'
-                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
-                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
-                                )}
-                            >
-                                <Cloud size={16} />
-                                <span>Cloud Sync</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab('storage')}
-                                className={clsx(
-                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
-                                    activeTab === 'storage'
-                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
-                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
-                                )}
-                            >
-                                <HardDrive size={16} />
-                                <span>Backup & Data</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab('trash')}
-                                className={clsx(
-                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
-                                    activeTab === 'trash'
-                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
-                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
-                                )}
-                            >
-                                <Trash2 size={16} />
-                                <span>Papierkorb</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab('about')}
-                                className={clsx(
-                                    "smooth-transition w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left",
-                                    activeTab === 'about'
-                                        ? "bg-[var(--canvas-bg)] text-[var(--accent-color)] font-semibold shadow-sm border border-[var(--border-subtle)]"
-                                        : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)]"
-                                )}
-                            >
-                                <Info size={16} />
-                                <span>About</span>
-                            </button>
-                        </nav>
-                    </div>
-                </aside>
+                <SettingsNav activeTab={activeTab} onSelectTab={setActiveTab} />
 
                 {/* Right Content Panel */}
                 <section className="flex-1 flex flex-col justify-between p-4 sm:p-5 overflow-hidden">

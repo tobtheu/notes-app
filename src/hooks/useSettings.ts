@@ -4,13 +4,6 @@ import type { Theme, LightTheme } from './useTheme';
 export type FontFamily = 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system';
 export type FontSize = 'small' | 'medium' | 'large';
 
-/**
- * useSettings Hook
- * Manages application settings with local storage persistence and full cloud metadata synchronization.
- * Synchronized across all devices:
- * - Appearance: theme, autoTheme, preferredLightTheme, accentColor, monochromeIcons, showIconsWhenCollapsed, showNoteCounts, fontFamily, fontSize
- * - Editor & View: markdownEnabled, toolbarVisible, spellcheckEnabled, landscapeFullscreen
- */
 export interface AllSettings {
     theme: Theme;
     autoTheme: boolean;
@@ -27,63 +20,58 @@ export interface AllSettings {
     landscapeFullscreen: boolean;
 }
 
+function loadInitialSettings(): AllSettings {
+    const savedTheme = localStorage.getItem('theme');
+    const theme: Theme = (savedTheme === 'dark' || savedTheme === 'sage' || savedTheme === 'clay') ? savedTheme : 'clay';
+    const autoTheme = localStorage.getItem('auto_theme') === 'true';
+    const savedPrefLight = localStorage.getItem('preferred_light_theme');
+    const preferredLightTheme: LightTheme = (savedPrefLight === 'sage' || savedPrefLight === 'clay')
+        ? savedPrefLight
+        : (theme === 'sage' ? 'sage' : 'clay');
+
+    const savedFont = localStorage.getItem('font-family');
+    const fontFamily: FontFamily = (savedFont === 'inter' || savedFont === 'roboto' || savedFont === 'courier' || savedFont === 'sfmono' || savedFont === 'serif' || savedFont === 'system')
+        ? (savedFont as FontFamily)
+        : 'inter';
+
+    const savedSize = localStorage.getItem('font-size');
+    const fontSize: FontSize = (savedSize === 'small' || savedSize === 'medium' || savedSize === 'large')
+        ? savedSize
+        : 'medium';
+
+    const savedMd = localStorage.getItem('markdown-enabled');
+    const markdownEnabled = savedMd === null ? true : savedMd === 'true';
+    const accentColor = localStorage.getItem('accent-color') || 'blue';
+    const savedTb = localStorage.getItem('toolbar-visible');
+    const toolbarVisible = savedTb === null ? true : savedTb === 'true';
+    const savedSc = localStorage.getItem('spellcheck-enabled');
+    const spellcheckEnabled = savedSc === null ? true : savedSc === 'true';
+
+    const monochromeIcons = localStorage.getItem('monochrome-icons') === 'true';
+    const showIconsWhenCollapsed = localStorage.getItem('show-icons-when-collapsed') === 'true';
+    const showNoteCounts = localStorage.getItem('show-note-counts') === 'true';
+    const landscapeFullscreen = localStorage.getItem('landscape-fullscreen') === 'true';
+
+    return {
+        theme,
+        autoTheme,
+        preferredLightTheme,
+        fontFamily,
+        fontSize,
+        markdownEnabled,
+        accentColor,
+        toolbarVisible,
+        spellcheckEnabled,
+        monochromeIcons,
+        showIconsWhenCollapsed,
+        showNoteCounts,
+        landscapeFullscreen,
+    };
+}
+
 export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: any) => void) {
-    /** --- 1. SETTINGS STATE (Initialized from LocalStorage) --- **/
-    const [settings, setSettings] = useState<AllSettings>(() => {
-        const savedTheme = localStorage.getItem('theme');
-        const theme: Theme = (savedTheme === 'dark' || savedTheme === 'sage' || savedTheme === 'clay') ? savedTheme : 'clay';
+    const [settings, setSettings] = useState<AllSettings>(loadInitialSettings);
 
-        const autoTheme = localStorage.getItem('auto_theme') === 'true';
-
-        const savedPrefLight = localStorage.getItem('preferred_light_theme');
-        const preferredLightTheme: LightTheme = (savedPrefLight === 'sage' || savedPrefLight === 'clay') 
-            ? savedPrefLight 
-            : (theme === 'sage' ? 'sage' : 'clay');
-
-        const savedFont = localStorage.getItem('font-family');
-        const fontFamily: FontFamily = (savedFont === 'inter' || savedFont === 'roboto' || savedFont === 'courier' || savedFont === 'sfmono' || savedFont === 'serif' || savedFont === 'system') 
-            ? (savedFont as FontFamily) 
-            : 'inter';
-
-        const savedSize = localStorage.getItem('font-size');
-        const fontSize: FontSize = (savedSize === 'small' || savedSize === 'medium' || savedSize === 'large') 
-            ? savedSize 
-            : 'medium';
-
-        const savedMd = localStorage.getItem('markdown-enabled');
-        const markdownEnabled = savedMd === null ? true : savedMd === 'true';
-
-        const accentColor = localStorage.getItem('accent-color') || 'blue';
-
-        const savedTb = localStorage.getItem('toolbar-visible');
-        const toolbarVisible = savedTb === null ? true : savedTb === 'true';
-
-        const savedSc = localStorage.getItem('spellcheck-enabled');
-        const spellcheckEnabled = savedSc === null ? true : savedSc === 'true';
-
-        const monochromeIcons = localStorage.getItem('monochrome-icons') === 'true';
-        const showIconsWhenCollapsed = localStorage.getItem('show-icons-when-collapsed') === 'true';
-        const showNoteCounts = localStorage.getItem('show-note-counts') === 'true';
-        const landscapeFullscreen = localStorage.getItem('landscape-fullscreen') === 'true';
-
-        return {
-            theme,
-            autoTheme,
-            preferredLightTheme,
-            fontFamily,
-            fontSize,
-            markdownEnabled,
-            accentColor,
-            toolbarVisible,
-            spellcheckEnabled,
-            monochromeIcons,
-            showIconsWhenCollapsed,
-            showNoteCounts,
-            landscapeFullscreen,
-        };
-    });
-
-    // Guard to prevent saving to cloud before metadata has been initially loaded
     const hasLoadedMetadata = useRef(false);
     const prevMetadataRef = useRef<any>(undefined);
 
@@ -198,104 +186,46 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         }
     }, [settings, onSaveSettings]);
 
-    const setThemeWrapped = useCallback((val: Theme) => {
-        setSettings(prev => {
-            const next = { ...prev, theme: val };
-            if (val === 'clay' || val === 'sage') {
-                next.preferredLightTheme = val;
-            }
-            return next;
-        });
-        saveCloudSettings(val === 'clay' || val === 'sage' ? { theme: val, preferredLightTheme: val } : { theme: val });
+    const updateSetting = useCallback(<K extends keyof AllSettings>(
+        key: K,
+        val: AllSettings[K],
+        extraCloud?: Partial<AllSettings>
+    ) => {
+        setSettings(prev => ({ ...prev, [key]: val, ...(extraCloud ?? {}) }));
+        saveCloudSettings({ [key]: val, ...(extraCloud ?? {}) });
     }, [saveCloudSettings]);
 
-    const setAutoThemeWrapped = useCallback((val: boolean) => {
-        setSettings(prev => ({ ...prev, autoTheme: val }));
-        saveCloudSettings({ autoTheme: val });
-    }, [saveCloudSettings]);
-
-    const setPreferredLightThemeWrapped = useCallback((val: LightTheme) => {
-        setSettings(prev => ({ ...prev, preferredLightTheme: val }));
-        saveCloudSettings({ preferredLightTheme: val });
-    }, [saveCloudSettings]);
-
-    const setFontFamilyWrapped = useCallback((val: FontFamily) => {
-        setSettings(prev => ({ ...prev, fontFamily: val }));
-        saveCloudSettings({ fontFamily: val });
-    }, [saveCloudSettings]);
-
-    const setFontSizeWrapped = useCallback((val: FontSize) => {
-        setSettings(prev => ({ ...prev, fontSize: val }));
-        saveCloudSettings({ fontSize: val });
-    }, [saveCloudSettings]);
-
-    const setMarkdownEnabledWrapped = useCallback((val: boolean) => {
-        setSettings(prev => ({ ...prev, markdownEnabled: val }));
-        saveCloudSettings({ markdownEnabled: val });
-    }, [saveCloudSettings]);
-
-    const setAccentColorWrapped = useCallback((val: string) => {
-        setSettings(prev => ({ ...prev, accentColor: val }));
-        saveCloudSettings({ accentColor: val });
-    }, [saveCloudSettings]);
-
-    const setToolbarVisibleWrapped = useCallback((val: boolean) => {
-        setSettings(prev => ({ ...prev, toolbarVisible: val }));
-        saveCloudSettings({ toolbarVisible: val });
-    }, [saveCloudSettings]);
-
-    const setSpellcheckEnabledWrapped = useCallback((val: boolean) => {
-        setSettings(prev => ({ ...prev, spellcheckEnabled: val }));
-        saveCloudSettings({ spellcheckEnabled: val });
-    }, [saveCloudSettings]);
-
-    const setMonochromeIconsWrapped = useCallback((val: boolean) => {
-        setSettings(prev => ({ ...prev, monochromeIcons: val }));
-        saveCloudSettings({ monochromeIcons: val });
-    }, [saveCloudSettings]);
-
-    const setShowIconsWhenCollapsedWrapped = useCallback((val: boolean) => {
-        setSettings(prev => ({ ...prev, showIconsWhenCollapsed: val }));
-        saveCloudSettings({ showIconsWhenCollapsed: val });
-    }, [saveCloudSettings]);
-
-    const setShowNoteCountsWrapped = useCallback((val: boolean) => {
-        setSettings(prev => ({ ...prev, showNoteCounts: val }));
-        saveCloudSettings({ showNoteCounts: val });
-    }, [saveCloudSettings]);
-
-    const setLandscapeFullscreenWrapped = useCallback((val: boolean) => {
-        setSettings(prev => ({ ...prev, landscapeFullscreen: val }));
-        saveCloudSettings({ landscapeFullscreen: val });
-    }, [saveCloudSettings]);
+    const setTheme = useCallback((val: Theme) => {
+        const extra = (val === 'clay' || val === 'sage') ? { preferredLightTheme: val } : undefined;
+        updateSetting('theme', val, extra);
+    }, [updateSetting]);
 
     return {
         theme: settings.theme,
-        setTheme: setThemeWrapped,
+        setTheme,
         autoTheme: settings.autoTheme,
-        setAutoTheme: setAutoThemeWrapped,
+        setAutoTheme: useCallback((v: boolean) => updateSetting('autoTheme', v), [updateSetting]),
         preferredLightTheme: settings.preferredLightTheme,
-        setPreferredLightTheme: setPreferredLightThemeWrapped,
+        setPreferredLightTheme: useCallback((v: LightTheme) => updateSetting('preferredLightTheme', v), [updateSetting]),
         fontFamily: settings.fontFamily,
-        setFontFamily: setFontFamilyWrapped,
+        setFontFamily: useCallback((v: FontFamily) => updateSetting('fontFamily', v), [updateSetting]),
         fontSize: settings.fontSize,
-        setFontSize: setFontSizeWrapped,
+        setFontSize: useCallback((v: FontSize) => updateSetting('fontSize', v), [updateSetting]),
         markdownEnabled: settings.markdownEnabled,
-        setMarkdownEnabled: setMarkdownEnabledWrapped,
+        setMarkdownEnabled: useCallback((v: boolean) => updateSetting('markdownEnabled', v), [updateSetting]),
         accentColor: settings.accentColor,
-        setAccentColor: setAccentColorWrapped,
+        setAccentColor: useCallback((v: string) => updateSetting('accentColor', v), [updateSetting]),
         toolbarVisible: settings.toolbarVisible,
-        setToolbarVisible: setToolbarVisibleWrapped,
+        setToolbarVisible: useCallback((v: boolean) => updateSetting('toolbarVisible', v), [updateSetting]),
         spellcheckEnabled: settings.spellcheckEnabled,
-        setSpellcheckEnabled: setSpellcheckEnabledWrapped,
+        setSpellcheckEnabled: useCallback((v: boolean) => updateSetting('spellcheckEnabled', v), [updateSetting]),
         landscapeFullscreen: settings.landscapeFullscreen,
-        setLandscapeFullscreen: setLandscapeFullscreenWrapped,
+        setLandscapeFullscreen: useCallback((v: boolean) => updateSetting('landscapeFullscreen', v), [updateSetting]),
         monochromeIcons: settings.monochromeIcons,
-        setMonochromeIcons: setMonochromeIconsWrapped,
+        setMonochromeIcons: useCallback((v: boolean) => updateSetting('monochromeIcons', v), [updateSetting]),
         showIconsWhenCollapsed: settings.showIconsWhenCollapsed,
-        setShowIconsWhenCollapsed: setShowIconsWhenCollapsedWrapped,
+        setShowIconsWhenCollapsed: useCallback((v: boolean) => updateSetting('showIconsWhenCollapsed', v), [updateSetting]),
         showNoteCounts: settings.showNoteCounts,
-        setShowNoteCounts: setShowNoteCountsWrapped,
+        setShowNoteCounts: useCallback((v: boolean) => updateSetting('showNoteCounts', v), [updateSetting]),
     };
 }
-
