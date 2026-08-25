@@ -101,6 +101,7 @@ export function SettingsModal(props: SettingsModalProps) {
     } = props;
 
     const [activeTab, setActiveTab] = useState<TabKey>('appearance');
+    const effectiveTab = (!FEATURES.SYNC && activeTab === 'sync') ? 'appearance' : activeTab;
     const [isClosing, setIsClosing] = useState(false);
 
     const handleClose = useCallback(() => {
@@ -186,25 +187,25 @@ export function SettingsModal(props: SettingsModalProps) {
                 onClick={e => e.stopPropagation()}
             >
                 {/* Left Navigation Sidebar */}
-                <SettingsNav activeTab={activeTab} onSelectTab={setActiveTab} />
+                <SettingsNav activeTab={effectiveTab} onSelectTab={setActiveTab} />
 
                 {/* Right Content Panel */}
                 <section className="flex-1 flex flex-col justify-between p-4 sm:p-5 overflow-hidden">
                     <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)] shrink-0">
                         <h2 className="text-sm font-bold text-[var(--text-main)]">
-                            {activeTab === 'appearance' && 'Appearance'}
-                            {activeTab === 'editor' && 'Editor'}
-                            {activeTab === 'sync' && 'Cloud Sync'}
-                            {activeTab === 'storage' && 'Backup & Data'}
-                            {activeTab === 'trash' && 'Papierkorb'}
-                            {activeTab === 'about' && 'About'}
+                            {effectiveTab === 'appearance' && 'Appearance'}
+                            {effectiveTab === 'editor' && 'Editor'}
+                            {effectiveTab === 'sync' && 'Cloud Sync'}
+                            {effectiveTab === 'storage' && 'Backup & Data'}
+                            {effectiveTab === 'trash' && 'Papierkorb'}
+                            {effectiveTab === 'about' && 'About'}
                         </h2>
                     </div>
 
                     {/* Scrollable Tab Content Container */}
                     <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 pt-3 pr-1.5 sm:pr-2.5 custom-scrollbar">
                             {/* TAB 1: APPEARANCE */}
-                            {activeTab === 'appearance' && (
+                            {effectiveTab === 'appearance' && (
                                 <AppearanceSection
                                     theme={theme}
                                     setTheme={setTheme}
@@ -225,7 +226,7 @@ export function SettingsModal(props: SettingsModalProps) {
                             )}
 
                             {/* TAB 2: EDITOR */}
-                            {activeTab === 'editor' && (
+                            {effectiveTab === 'editor' && (
                                 <EditorSection
                                     markdownEnabled={markdownEnabled}
                                     onToggleMarkdown={onToggleMarkdown}
@@ -238,7 +239,7 @@ export function SettingsModal(props: SettingsModalProps) {
                             )}
 
                             {/* TAB 3: CLOUD SYNC */}
-                            {activeTab === 'sync' && (
+                            {effectiveTab === 'sync' && (
                                 <CloudSyncSection
                                     userEmail={userEmail}
                                     syncStatus={syncStatus}
@@ -264,7 +265,7 @@ export function SettingsModal(props: SettingsModalProps) {
                             )}
 
                             {/* TAB 4: STORAGE & BACKUP */}
-                            {activeTab === 'storage' && (
+                            {effectiveTab === 'storage' && (
                                 <StorageSection
                                     hasImportFolderOption={!!props.onImportFolder}
                                     importState={importState}
@@ -286,7 +287,7 @@ export function SettingsModal(props: SettingsModalProps) {
                             )}
 
                             {/* TAB 5: TRASH */}
-                            {activeTab === 'trash' && (
+                            {effectiveTab === 'trash' && (
                                 <TrashSection
                                     trashNotes={trashNotes}
                                     onRestoreNote={onRestoreNote ?? (() => {})}
@@ -296,7 +297,7 @@ export function SettingsModal(props: SettingsModalProps) {
                             )}
 
                             {/* TAB 6: ABOUT */}
-                            {activeTab === 'about' && (
+                            {effectiveTab === 'about' && (
                                 <AboutSection
                                     isIOS={isIOS}
                                     version={version}

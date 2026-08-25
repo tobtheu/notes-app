@@ -1,0 +1,15 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Lama Notes Beta",
+  "identifier": "com.tobtheu.notizapp.beta",
+  "build": {
+    "beforeBuildCommand": "npm run build:sync"
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://api.lamanotes.de/updates/beta.json"
+      ]
+    }
+  }
+}

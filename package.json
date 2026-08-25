@@ -12,13 +12,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
+    "dev:sync": "cross-env VITE_ENABLE_SYNC=true vite --host",
     "build": "tsc -b && vite build",
+    "build:sync": "tsc -b && cross-env VITE_ENABLE_SYNC=true vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:build": "tauri build",
+    "tauri:build:beta": "cross-env VITE_ENABLE_SYNC=true tauri build --config src-tauri/tauri.beta.conf.json"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
