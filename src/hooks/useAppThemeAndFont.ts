@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
-import type { AppMetadata, Settings } from '../types';
+import type { AllSettings } from './useSettings';
 import { useSettings } from './useSettings';
 import { useTheme } from './useTheme';
 
 interface UseAppThemeAndFontProps {
-    settings?: Settings;
-    saveSettings: (settings: Partial<Settings>) => Promise<void>;
+    settings?: Partial<AllSettings>;
+    saveSettings: (settings: Partial<AllSettings>) => Promise<void>;
 }
 
 export function useAppThemeAndFont({

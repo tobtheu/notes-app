@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Type, Folder } from 'lucide-react';
+import { Type } from 'lucide-react';
 import type { FolderMetadata } from '../types';
 import { FolderColorGrid, FOLDER_COLORS } from './FolderColorGrid';
 import { FolderIconGrid, FOLDER_ICONS } from './FolderIconGrid';

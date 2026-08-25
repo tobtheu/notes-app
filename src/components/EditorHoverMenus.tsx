@@ -8,13 +8,13 @@ interface EditorHoverMenusProps {
     isLinkModalOpen: boolean;
     setIsLinkModalOpen: (open: boolean) => void;
     linkModalData: { url: string; text: string };
-    saveLink: (url: string, text: string) => void;
+    saveLink: (url: string, text?: string) => void;
     isIOS: boolean;
-    hoveredLink: { url: string; rect: DOMRect } | null;
-    setHoveredLink: (link: { url: string; rect: DOMRect } | null) => void;
+    hoveredLink: { href: string; text: string; pos: number; rect: DOMRect } | null;
+    setHoveredLink: React.Dispatch<React.SetStateAction<{ href: string; text: string; pos: number; rect: DOMRect } | null>>;
     clearHideTimeout: () => void;
     startHideTimeout: () => void;
-    openLinkModal: () => void;
+    openLinkModal: (url?: string, text?: string) => void;
     onNavigate?: (id: string, anchor?: string) => void;
 }
 
