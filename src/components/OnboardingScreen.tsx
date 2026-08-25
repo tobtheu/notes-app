@@ -4,7 +4,7 @@ import { OnboardingAuthCard } from './OnboardingAuthCard';
 import { OnboardingStorageCard } from './OnboardingStorageCard';
 
 interface Props {
-    onSelectFolder: () => void;
+    onSelectFolder?: () => void;
     onSetupWorkspace: () => Promise<void>;
     onSignIn?: (email: string, password: string) => Promise<{ userId: string; email: string }>;
     onSignUp?: (email: string, password: string) => Promise<{ userId: string; email: string }>;
@@ -30,7 +30,7 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
         try {
             if (onLocalOnly) {
                 await onLocalOnly();
-            } else {
+            } else if (onSelectFolder) {
                 onSelectFolder();
             }
         } finally {
@@ -79,7 +79,7 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
 
     return (
         <div className="flex flex-col items-center justify-center absolute inset-0 w-full h-full bg-[var(--shell-bg)] text-[var(--text-main)] p-4 sm:p-6 text-center select-none transition-colors duration-500">
-            <div className="w-full max-w-[440px] bg-[var(--canvas-bg)] border border-[var(--border-subtle)] rounded-[28px] p-6 sm:p-8 shadow-2xl animate-modal-spring flex flex-col items-center">
+            <div className="w-full max-w-[440px] bg-[var(--canvas-bg)]/95 backdrop-blur-xl border border-[var(--border-subtle)]/70 rounded-[28px] p-6 sm:p-8 shadow-2xl animate-modal-spring flex flex-col items-center">
                 {/* App Logo */}
                 <img
                     src={logo}
@@ -93,7 +93,6 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
                             setScreen('email');
                             setAuthMode(mode);
                         }}
-                        onSelectFolder={onSelectFolder}
                         onLocalOnly={handleLocalOnly}
                         isLoading={isLoading}
                     />
@@ -115,6 +114,12 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
                         }}
                     />
                 )}
+
+                {/* Footer Credits */}
+                <div className="w-full flex items-center justify-between mt-6 pt-3.5 border-t border-[var(--border-subtle)]/40 text-[10px] text-[var(--text-muted)] select-none">
+                    <span>Copyright Tobias Theunissen</span>
+                    <span>Made in Germany</span>
+                </div>
             </div>
         </div>
     );

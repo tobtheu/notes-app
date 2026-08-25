@@ -56,7 +56,7 @@ export function OnboardingAuthCard({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading || success}
-                    className="w-full px-3.5 py-2.5 bg-[var(--card-hover)] border border-[var(--border-subtle)] rounded-xl text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-color)] transition-colors"
+                    className="smooth-transition w-full px-3.5 py-2.5 bg-[var(--card-hover)]/70 border border-[var(--border-subtle)]/60 rounded-xl text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-color)] focus:bg-[var(--card-hover)]"
                 />
                 <input
                     type="password"
@@ -65,7 +65,7 @@ export function OnboardingAuthCard({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading || success}
-                    className="w-full px-3.5 py-2.5 bg-[var(--card-hover)] border border-[var(--border-subtle)] rounded-xl text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-color)] transition-colors"
+                    className="smooth-transition w-full px-3.5 py-2.5 bg-[var(--card-hover)]/70 border border-[var(--border-subtle)]/60 rounded-xl text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-color)] focus:bg-[var(--card-hover)]"
                 />
 
                 {error && (
@@ -78,7 +78,7 @@ export function OnboardingAuthCard({
                     type="submit"
                     disabled={isLoading || success}
                     className={clsx(
-                        "smooth-transition w-full py-2.5 px-4 rounded-xl font-semibold text-xs text-white shadow-sm active:scale-95 flex items-center justify-center gap-2",
+                        "smooth-transition w-full py-2.5 px-4 rounded-xl font-semibold text-xs text-white shadow-sm active:scale-[0.98] flex items-center justify-center gap-2",
                         success ? "bg-emerald-500" : "bg-[var(--accent-color)] hover:opacity-90 disabled:opacity-50"
                     )}
                 >
@@ -98,7 +98,7 @@ export function OnboardingAuthCard({
                     <button
                         type="button"
                         onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
-                        className="text-xs text-[var(--text-muted)] hover:text-[var(--accent-color)] transition-colors"
+                        className="smooth-transition text-xs text-[var(--text-muted)] hover:text-[var(--accent-color)] py-1 px-2 rounded-lg hover:bg-[var(--card-hover)]"
                     >
                         {authMode === 'signin'
                             ? 'Noch kein Konto? Jetzt registrieren'
