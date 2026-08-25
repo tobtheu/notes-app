@@ -13,7 +13,7 @@
         "decorations": false,
         "transparent": false,
         "dragDropEnabled": false,
-        "devtools": false
+        "devtools": true
       }
     ]
   }
