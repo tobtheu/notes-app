@@ -104,13 +104,15 @@ export function useNotesConfig({ dbRef, userId }: UseNotesConfigProps) {
             [userId, JSON.stringify(newMetadata), finalUpdatedAt],
         );
 
-        await enqueue(db, 'app_config', 'upsert', {
-            user_id: userId,
-            metadata: newMetadata,
-            updated_at: finalUpdatedAt,
-        });
+        if (userId !== 'local') {
+            await enqueue(db, 'app_config', 'upsert', {
+                user_id: userId,
+                metadata: newMetadata,
+                updated_at: finalUpdatedAt,
+            });
 
-        if (navigator.onLine) flushQueue(db).catch((e: unknown) => log.error(String(e)));
+            if (navigator.onLine) flushQueue(db).catch((e: unknown) => log.error(String(e)));
+        }
     }, [userId, dbRef]);
 
     return {

@@ -50,16 +50,18 @@ export function useNotesDbWriter({ dbRef, userId }: UseNotesDbWriterProps) {
             [id, userId, content, finalUpdatedAt, deleted],
         );
 
-        await enqueue(db, 'notes', 'upsert', {
-            id,
-            user_id: userId,
-            content,
-            updated_at: finalUpdatedAt,
-            deleted,
-        });
+        if (userId !== 'local') {
+            await enqueue(db, 'notes', 'upsert', {
+                id,
+                user_id: userId,
+                content,
+                updated_at: finalUpdatedAt,
+                deleted,
+            });
 
-        if (navigator.onLine) {
-            flushQueue(db).catch((e: unknown) => log.error(String(e)));
+            if (navigator.onLine) {
+                flushQueue(db).catch((e: unknown) => log.error(String(e)));
+            }
         }
     }, [userId, dbRef]);
 

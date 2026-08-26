@@ -51,13 +51,15 @@ export function useNotesTrashOps({
             [`notes:${normalizedId}`]
         );
 
-        await enqueue(db, 'notes', 'delete', {
-            id: normalizedId,
-            user_id: userId,
-        });
+        if (userId !== 'local') {
+            await enqueue(db, 'notes', 'delete', {
+                id: normalizedId,
+                user_id: userId,
+            });
 
-        if (navigator.onLine) {
-            flushQueue(db).catch((e: unknown) => log.error(String(e)));
+            if (navigator.onLine) {
+                flushQueue(db).catch((e: unknown) => log.error(String(e)));
+            }
         }
 
         const mirrorFolder = typeof localStorage !== 'undefined' && typeof localStorage?.getItem === 'function'

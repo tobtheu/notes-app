@@ -147,6 +147,12 @@ export async function enqueue(
   operation: WriteOperation,
   payload: NoteWritePayload | ConfigWritePayload | NoteDeletePayload,
 ): Promise<void> {
+  const userId = 'user_id' in payload ? payload.user_id : null;
+  // Local offline writes must never be enqueued to the remote sync queue
+  if (!userId || userId === 'local') {
+    return;
+  }
+
   const rowId = 'id' in payload ? payload.id : (payload as ConfigWritePayload).user_id;
   const writeId = `${table}:${rowId}`;
 
@@ -193,6 +199,9 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
   log.info(`[offlineQueue] flush starting — user: ${session.user.id}`);
   await ensureFreshToken();
 
+  // Purge any stale 'local' or invalid writes that were enqueued previously
+  await db.query(`DELETE FROM pending_writes WHERE payload->>'user_id' = 'local' OR payload->>'user_id' IS NULL`);
+
   const { rows } = await db.query<{
     id: string;
     table_name: string;
@@ -203,10 +212,12 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
   }>(
     /* sql */ `
     SELECT * FROM pending_writes
-    WHERE CAST(next_retry_at AS timestamptz) <= NOW()
+    WHERE payload->>'user_id' = $1
+      AND CAST(next_retry_at AS timestamptz) <= NOW()
     ORDER BY created_at ASC
     LIMIT 50
     `,
+    [session.user.id],
   );
 
   if (rows.length === 0) {
