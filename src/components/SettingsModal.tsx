@@ -44,6 +44,7 @@ interface SettingsModalProps {
     onToggleLandscapeFullscreen?: (enabled: boolean) => void;
     language?: LanguageOption;
     setLanguage?: (lang: LanguageOption) => void;
+    onLanguageChange?: (lang: LanguageOption) => void;
     // Trash props
     trashNotes?: Note[];
     onRestoreNote?: (id: string) => Promise<void> | void;
@@ -227,7 +228,7 @@ export function SettingsModal(props: SettingsModalProps) {
                                     fontSize={fontSize}
                                     setFontSize={setFontSize}
                                     language={props.language}
-                                    setLanguage={props.setLanguage}
+                                    setLanguage={props.onLanguageChange || props.setLanguage}
                                 />
                             )}
 

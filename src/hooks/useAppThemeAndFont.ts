@@ -39,6 +39,8 @@ export function useAppThemeAndFont({
         setShowIconsWhenCollapsed,
         showNoteCounts,
         setShowNoteCounts,
+        language,
+        setLanguage,
     } = useSettings(settings, saveSettings);
 
     const {
@@ -93,5 +95,7 @@ export function useAppThemeAndFont({
         setShowIconsWhenCollapsed,
         showNoteCounts,
         setShowNoteCounts,
+        language,
+        setLanguage,
     };
 }

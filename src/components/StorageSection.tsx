@@ -33,7 +33,6 @@ export function StorageSection({
     importFilesProgress,
     onImportFilesClick,
     exportState = 'idle',
-    exportCount = 0,
     onExportBackup,
     resetDbState = 'idle',
     resetDbStep = 'idle',

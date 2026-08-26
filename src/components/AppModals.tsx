@@ -8,6 +8,8 @@ import type { Note, AppMetadata, FolderMetadata, SyncStatus } from '../types';
 import type { Theme, ThemeOrigin } from '../hooks/useTheme';
 import type { FontFamily, FontSize } from '../hooks/useSettings';
 
+import type { LanguageOption } from '../i18n';
+
 interface AppModalsProps {
     isSettingsOpen: boolean;
     onCloseSettings: () => void;
@@ -33,6 +35,8 @@ interface AppModalsProps {
     setSpellcheckEnabled: (enabled: boolean) => void;
     landscapeFullscreen: boolean;
     setLandscapeFullscreen: (enabled: boolean) => void;
+    language?: LanguageOption;
+    onLanguageChange?: (language: LanguageOption) => void;
     syncStatus: SyncStatus;
     hasPending: boolean;
     userEmail?: string | null;
@@ -90,6 +94,8 @@ export const AppModals: React.FC<AppModalsProps> = ({
     setSpellcheckEnabled,
     landscapeFullscreen,
     setLandscapeFullscreen,
+    language,
+    onLanguageChange,
     syncStatus,
     hasPending,
     userEmail,
@@ -149,6 +155,8 @@ export const AppModals: React.FC<AppModalsProps> = ({
                     onToggleSpellcheck={setSpellcheckEnabled}
                     landscapeFullscreen={landscapeFullscreen}
                     onToggleLandscapeFullscreen={setLandscapeFullscreen}
+                    language={language}
+                    onLanguageChange={onLanguageChange}
                     syncStatus={syncStatus}
                     hasPending={hasPending}
                     userEmail={userEmail}

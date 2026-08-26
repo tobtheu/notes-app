@@ -1,4 +1,4 @@
-import type { SupportedLocale, LanguageOption, TranslationSchema, TranslationKey } from './types';
+import type { SupportedLocale, LanguageOption, TranslationKey } from './types';
 import { locales } from './locales';
 
 /**
@@ -51,12 +51,27 @@ export function getEffectiveLocale(option: LanguageOption, navLang?: string): Su
 /**
  * Translates a key with parameters and language fallback hierarchy:
  * active locale -> English base -> raw key string.
+ * Supports both `translate(locale, key, params)` and `translate(key, params)`.
  */
 export function translate(
-    locale: SupportedLocale,
-    key: TranslationKey | string,
+    localeOrKey: SupportedLocale | TranslationKey | string,
+    keyOrParams?: TranslationKey | string | Record<string, string | number>,
     params?: Record<string, string | number>
 ): string {
+    let locale: SupportedLocale;
+    let key: string;
+    let actualParams: Record<string, string | number> | undefined;
+
+    if (localeOrKey === 'en' || localeOrKey === 'de') {
+        locale = localeOrKey;
+        key = typeof keyOrParams === 'string' ? keyOrParams : '';
+        actualParams = params;
+    } else {
+        locale = detectSystemLanguage();
+        key = String(localeOrKey);
+        actualParams = typeof keyOrParams === 'object' && keyOrParams !== null ? keyOrParams : undefined;
+    }
+
     const activeDict = locales[locale] || locales.en;
     let template = resolveTranslation(activeDict, key);
 
@@ -68,7 +83,7 @@ export function translate(
         return key;
     }
 
-    return interpolate(template, params);
+    return interpolate(template, actualParams);
 }
 
 /**
