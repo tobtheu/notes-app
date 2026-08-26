@@ -1,4 +1,3 @@
-import React from 'react';
 import { Pin, FolderTree, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { Note } from '../types';
