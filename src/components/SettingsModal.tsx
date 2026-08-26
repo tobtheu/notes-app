@@ -6,6 +6,7 @@ import type { Note } from '../types';
 import { useSettingsModal } from '../hooks/useSettingsModal';
 import { SettingsNav, type TabKey } from './SettingsNav';
 import { FEATURES } from '../config/features';
+import { useTranslation, type LanguageOption } from '../i18n';
 
 import { CloudSyncSection } from './CloudSyncSection';
 import { AppearanceSection } from './AppearanceSection';
@@ -41,6 +42,8 @@ interface SettingsModalProps {
     onToggleSpellcheck: (enabled: boolean) => void;
     landscapeFullscreen?: boolean;
     onToggleLandscapeFullscreen?: (enabled: boolean) => void;
+    language?: LanguageOption;
+    setLanguage?: (lang: LanguageOption) => void;
     // Trash props
     trashNotes?: Note[];
     onRestoreNote?: (id: string) => Promise<void> | void;
@@ -166,6 +169,7 @@ export function SettingsModal(props: SettingsModalProps) {
         handleInstallUpdate,
         handleRunDiagnostics,
     } = useSettingsModal(props);
+    const { t } = useTranslation();
 
     if (!isOpen) return null;
 
@@ -193,12 +197,12 @@ export function SettingsModal(props: SettingsModalProps) {
                 <section className="flex-1 flex flex-col justify-between p-4 sm:p-5 overflow-hidden">
                     <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)] shrink-0">
                         <h2 className="text-sm font-bold text-[var(--text-main)]">
-                            {effectiveTab === 'appearance' && 'Appearance'}
-                            {effectiveTab === 'editor' && 'Editor'}
-                            {effectiveTab === 'sync' && 'Cloud Sync'}
-                            {effectiveTab === 'storage' && 'Backup & Data'}
-                            {effectiveTab === 'trash' && 'Papierkorb'}
-                            {effectiveTab === 'about' && 'About'}
+                            {effectiveTab === 'appearance' && t('settings.tabs.appearance')}
+                            {effectiveTab === 'editor' && t('settings.tabs.editor')}
+                            {effectiveTab === 'sync' && t('settings.tabs.sync')}
+                            {effectiveTab === 'storage' && t('settings.tabs.storage')}
+                            {effectiveTab === 'trash' && t('settings.tabs.trash')}
+                            {effectiveTab === 'about' && t('settings.tabs.about')}
                         </h2>
                     </div>
 
@@ -222,6 +226,8 @@ export function SettingsModal(props: SettingsModalProps) {
                                     setFontFamily={setFontFamily}
                                     fontSize={fontSize}
                                     setFontSize={setFontSize}
+                                    language={props.language}
+                                    setLanguage={props.setLanguage}
                                 />
                             )}
 
@@ -319,7 +325,7 @@ export function SettingsModal(props: SettingsModalProps) {
                             onClick={handleClose}
                             className="smooth-transition px-4 py-1.5 text-xs font-semibold text-white bg-[var(--accent-color)] hover:opacity-90 rounded-xl shadow-sm active:scale-95"
                         >
-                            Done
+                            {t('common.done')}
                         </button>
                     </div>
                 </section>

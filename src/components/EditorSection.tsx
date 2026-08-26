@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { useTranslation } from '../i18n';
 
 interface EditorSectionProps {
     markdownEnabled: boolean;
@@ -19,17 +20,19 @@ export function EditorSection({
     landscapeFullscreen = false,
     onToggleLandscapeFullscreen
 }: EditorSectionProps) {
+    const { t } = useTranslation();
+
     return (
         <div className="space-y-6 text-xs select-none pb-6">
             {/* Formatting Tools Section */}
             <div>
-                <label className="block font-semibold text-[var(--text-main)] mb-2.5">Editor Formatting & Tools</label>
+                <label className="block font-semibold text-[var(--text-main)] mb-2.5">{t('settings.tabs.editor')}</label>
                 <div className="space-y-3">
                     {/* Markdown Formatting Toggle */}
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-[var(--text-main)] truncate">Markdown Formatting</div>
-                            <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">Live preview and rich markdown auto-formatting</div>
+                            <div className="font-semibold text-[var(--text-main)] truncate">{t('settings.editorSection.markdownShortcuts')}</div>
+                            <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">{t('settings.editorSection.markdownShortcutsDesc')}</div>
                         </div>
                         <button
                             type="button"
@@ -49,8 +52,8 @@ export function EditorSection({
                     {/* Spellcheck Toggle */}
                     <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--border-subtle)]">
                         <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-[var(--text-main)] truncate">Spellcheck</div>
-                            <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">Highlight misspelled words while typing</div>
+                            <div className="font-semibold text-[var(--text-main)] truncate">{t('settings.editorSection.spellcheck')}</div>
+                            <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">{t('settings.editorSection.spellcheckDesc')}</div>
                         </div>
                         <button
                             type="button"
@@ -72,11 +75,11 @@ export function EditorSection({
             {/* Display & Layout (iOS only) */}
             {isIOS && (
                 <div className="pt-3 border-t border-[var(--border-subtle)] space-y-3">
-                    <label className="block font-semibold text-[var(--text-main)] mb-1">Display Mode</label>
+                    <label className="block font-semibold text-[var(--text-main)] mb-1">{t('settings.editorSection.landscapeFullscreen')}</label>
                     <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-[var(--text-main)] truncate">Landscape Fullscreen</div>
-                            <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">Expand editor across the full screen in landscape mode</div>
+                            <div className="font-semibold text-[var(--text-main)] truncate">{t('settings.editorSection.landscapeFullscreen')}</div>
+                            <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">{t('settings.editorSection.landscapeFullscreenDesc')}</div>
                         </div>
                         <button
                             type="button"
@@ -97,3 +100,4 @@ export function EditorSection({
         </div>
     );
 }
+

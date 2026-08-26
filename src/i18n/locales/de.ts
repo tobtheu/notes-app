@@ -215,6 +215,9 @@ export const de: TranslationSchema = {
             permanentlyDelete: 'Endgültig löschen',
             noteCount_one: '{count} gelöschte Notiz',
             noteCount_other: '{count} gelöschte Notizen',
+            daysLeft_one: 'Noch 1 Tag verbleibend',
+            daysLeft_other: 'Noch {count} Tage verbleibend',
+            deletingSoon: 'Wird in Kürze gelöscht',
         },
         aboutSection: {
             title: 'Über Lama Notes',

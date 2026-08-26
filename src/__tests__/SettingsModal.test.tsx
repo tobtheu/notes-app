@@ -42,32 +42,30 @@ describe('SettingsModal', () => {
         );
 
         // 1. Appearance tab
-        expect(screen.getByText('Theme Selection')).toBeDefined();
-        expect(screen.getByText('Editor Typography')).toBeDefined();
+        expect(screen.getByText('Theme')).toBeDefined();
+        expect(screen.getByText('Typography')).toBeDefined();
 
         // 2. Switch to Editor tab
         fireEvent.click(screen.getByRole('button', { name: /Editor/i }));
-        expect(screen.getByText('Editor Formatting & Tools')).toBeDefined();
-        expect(screen.getByText('Markdown Formatting')).toBeDefined();
+        expect(screen.getByText('Markdown Shortcuts')).toBeDefined();
 
         // 3. Switch to Cloud Sync tab
         fireEvent.click(screen.getByRole('button', { name: /Cloud Sync/i }));
-        expect(screen.getByText('Lokaler Modus (Offline)')).toBeDefined();
+        expect(screen.getByText('Local Offline Storage')).toBeDefined();
 
         // 4. Switch to Storage / Backup & Data tab
         fireEvent.click(screen.getByRole('button', { name: /Backup & Data/i }));
-        expect(screen.getByText('Notizen exportieren')).toBeDefined();
-        expect(screen.getByText('Ordner importieren')).toBeDefined();
-        expect(screen.getByText('Dateien importieren')).toBeDefined();
+        expect(screen.getByText('Export Backup (.zip)')).toBeDefined();
+        expect(screen.getAllByText('Import Folder').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Import Files').length).toBeGreaterThan(0);
 
-        // 5. Switch to Trash / Papierkorb tab (vorletzter Reiter)
-        fireEvent.click(screen.getByRole('button', { name: /Papierkorb/i }));
+        // 5. Switch to Trash tab
+        fireEvent.click(screen.getByRole('button', { name: /Trash/i }));
         expect(screen.getByText('Deleted')).toBeDefined();
-        expect(screen.getByText('1 Notiz')).toBeDefined();
+        expect(screen.getByText('1 deleted note')).toBeDefined();
 
-        // 6. Switch to About tab (letzter Reiter)
+        // 6. Switch to About tab
         fireEvent.click(screen.getByRole('button', { name: /About/i }));
-        expect(screen.getByText('Application Info')).toBeDefined();
         expect(screen.getByText('LamaNotes')).toBeDefined();
         expect(screen.getByText(/Tobias Theunissen/i)).toBeDefined();
     });
@@ -101,13 +99,13 @@ describe('SettingsModal', () => {
             />
         );
 
-        expect(screen.getByText('Notizen-Anzahl neben Ordnern')).toBeDefined();
-        const toggleBtn = screen.getByTitle('Notizen-Anzahl umschalten');
+        expect(screen.getByText('Note Counts beside Folders')).toBeDefined();
+        const toggleBtn = screen.getByTitle('Note Counts beside Folders');
         fireEvent.click(toggleBtn);
         expect(onToggleShowNoteCounts).toHaveBeenCalledWith(true);
     });
 
-    it('renders local mode status and Zum Startbildschirm wechseln button in Cloud Sync tab when offline/local', () => {
+    it('renders local mode status and Use locally button in Cloud Sync tab when offline/local', () => {
         const onSignOut = vi.fn().mockResolvedValue(undefined);
 
         render(
@@ -133,9 +131,9 @@ describe('SettingsModal', () => {
 
         // Switch to Cloud Sync tab
         fireEvent.click(screen.getByRole('button', { name: /Cloud Sync/i }));
-        expect(screen.getByText('Lokaler Modus (Offline)')).toBeDefined();
+        expect(screen.getByText('Local Offline Storage')).toBeDefined();
 
-        const exitBtn = screen.getByText('Zum Startbildschirm wechseln');
+        const exitBtn = screen.getByText('Use Locally Only');
         expect(exitBtn).toBeDefined();
         fireEvent.click(exitBtn);
         expect(onSignOut).toHaveBeenCalledWith(false);
@@ -166,16 +164,18 @@ describe('SettingsModal', () => {
 
         // Switch to Storage tab
         fireEvent.click(screen.getByRole('button', { name: /Backup & Data/i }));
-        expect(screen.getByText('Lokale Datenbank leeren')).toBeDefined();
+        const resetElements = screen.getAllByText('Reset Database');
+        expect(resetElements.length).toBeGreaterThan(0);
 
-        const resetBtn = screen.getByText('Datenbank zurücksetzen');
+        const resetBtn = resetElements[resetElements.length - 1];
         fireEvent.click(resetBtn);
 
         // Confirmation step
-        expect(screen.getByText(/Bist du sicher/i)).toBeDefined();
-        const confirmBtn = screen.getByText('Jetzt leeren');
+        expect(screen.getByText('Delete Everything')).toBeDefined();
+        const confirmBtn = screen.getByText('Delete Everything');
         fireEvent.click(confirmBtn);
 
         expect(onResetDatabase).toHaveBeenCalled();
     });
 });
+

@@ -37,9 +37,9 @@ describe('TrashSection', () => {
             />
         );
 
-        expect(screen.getByText('Der Papierkorb ist leer')).toBeDefined();
-        expect(screen.getByText('0 Notizen')).toBeDefined();
-        expect(screen.queryByText('Papierkorb leeren')).toBeNull();
+        expect(screen.getByText('Trash is empty')).toBeDefined();
+        expect(screen.getByText('0 deleted notes')).toBeDefined();
+        expect(screen.queryByText('Empty Trash')).toBeNull();
     });
 
     it('renders list of notes with titles, folders, and remaining days', () => {
@@ -52,12 +52,12 @@ describe('TrashSection', () => {
             />
         );
 
-        expect(screen.getByText('2 Notizen')).toBeDefined();
+        expect(screen.getByText('2 deleted notes')).toBeDefined();
         expect(screen.getByText('Old Project Ideas')).toBeDefined();
         expect(screen.getByText('Grocery list')).toBeDefined();
         expect(screen.getByText('Ideas')).toBeDefined();
-        expect(screen.getByText('Noch 25 Tage verbleibend')).toBeDefined();
-        expect(screen.getByText('Noch 1 Tag verbleibend')).toBeDefined();
+        expect(screen.getByText('25 days remaining')).toBeDefined();
+        expect(screen.getByText('1 day remaining')).toBeDefined();
     });
 
     it('handles restore with exit animation and triggers onRestoreNote', async () => {
@@ -72,7 +72,7 @@ describe('TrashSection', () => {
             />
         );
 
-        const restoreButtons = screen.getAllByRole('button', { name: /Wiederherstellen/i });
+        const restoreButtons = screen.getAllByRole('button', { name: /Restore/i });
         fireEvent.click(restoreButtons[0]);
 
         // Verify animation delay (220ms) before onRestore is called
@@ -97,12 +97,12 @@ describe('TrashSection', () => {
             />
         );
 
-        const deleteButtons = screen.getAllByTitle('Endgültig löschen');
+        const deleteButtons = screen.getAllByTitle('Delete permanently');
         fireEvent.click(deleteButtons[0]);
 
         // Confirmation buttons appear
-        const confirmBtn = screen.getByRole('button', { name: /^Löschen$/i });
-        const cancelBtn = screen.getByRole('button', { name: /Abbrechen/i });
+        const confirmBtn = screen.getByRole('button', { name: /^Delete$/i });
+        const cancelBtn = screen.getByRole('button', { name: /Cancel/i });
         expect(confirmBtn).toBeDefined();
         expect(cancelBtn).toBeDefined();
 
@@ -130,10 +130,10 @@ describe('TrashSection', () => {
             />
         );
 
-        const emptyBtn = screen.getByRole('button', { name: /Papierkorb leeren/i });
+        const emptyBtn = screen.getByRole('button', { name: /Empty Trash/i });
         fireEvent.click(emptyBtn);
 
-        const confirmBtn = screen.getByRole('button', { name: /Jetzt leeren/i });
+        const confirmBtn = screen.getByRole('button', { name: /Empty Trash/i });
         expect(confirmBtn).toBeDefined();
 
         fireEvent.click(confirmBtn);
@@ -166,7 +166,7 @@ describe('TrashSection', () => {
             />
         );
 
-        const searchInput = screen.getByPlaceholderText('Gelöschte Notizen durchsuchen...');
+        const searchInput = screen.getByPlaceholderText('Search notes...');
         fireEvent.change(searchInput, { target: { value: 'Grocery' } });
 
         expect(screen.getByText('Grocery list')).toBeDefined();
@@ -174,3 +174,4 @@ describe('TrashSection', () => {
         expect(screen.queryByText('Work Meeting')).toBeNull();
     });
 });
+

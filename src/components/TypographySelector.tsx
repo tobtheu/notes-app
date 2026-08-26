@@ -1,5 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
+import { useTranslation } from '../i18n';
 
 export type FontFamily = 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system';
 export type FontSize = 'small' | 'medium' | 'large';
@@ -17,9 +18,11 @@ export const TypographySelector: React.FC<TypographySelectorProps> = ({
     fontSize,
     setFontSize,
 }) => {
+    const { t } = useTranslation();
+
     return (
         <div className="pt-3 border-t border-[var(--border-subtle)]">
-            <label className="block font-semibold text-[var(--text-main)] mb-2">Editor Typography</label>
+            <label className="block font-semibold text-[var(--text-main)] mb-2">{t('settings.appearance.typography')}</label>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 mb-4">
                 <button
                     type="button"
@@ -84,7 +87,7 @@ export const TypographySelector: React.FC<TypographySelectorProps> = ({
             </div>
 
             {/* Font Size Selection */}
-            <label className="block font-semibold text-[var(--text-main)] mb-2">Font Size</label>
+            <label className="block font-semibold text-[var(--text-main)] mb-2">{t('settings.appearance.fontSize')}</label>
             <div className="flex items-center gap-1.5 p-1 bg-[var(--card-hover)] rounded-xl border border-[var(--border-subtle)]">
                 <button
                     type="button"
@@ -94,7 +97,7 @@ export const TypographySelector: React.FC<TypographySelectorProps> = ({
                         fontSize === 'small' ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                     )}
                 >
-                    Small
+                    {t('settings.appearance.sizeSmall')}
                 </button>
                 <button
                     type="button"
@@ -104,7 +107,7 @@ export const TypographySelector: React.FC<TypographySelectorProps> = ({
                         fontSize === 'medium' ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                     )}
                 >
-                    Medium
+                    {t('settings.appearance.sizeMedium')}
                 </button>
                 <button
                     type="button"
@@ -114,9 +117,10 @@ export const TypographySelector: React.FC<TypographySelectorProps> = ({
                         fontSize === 'large' ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
                     )}
                 >
-                    Large
+                    {t('settings.appearance.sizeLarge')}
                 </button>
             </div>
         </div>
     );
 };
+

@@ -1,6 +1,7 @@
 import { RefreshCw, CheckCircle2, Download, FileText, FolderInput } from 'lucide-react';
 import type { ImportProgress } from '../hooks/useNotesWorkspace';
 import { DangerZoneCard } from './DangerZoneCard';
+import { useTranslation } from '../i18n';
 
 interface StorageSectionProps {
     hasImportFolderOption?: boolean;
@@ -39,16 +40,18 @@ export function StorageSection({
     setResetDbStep,
     onResetDatabaseClick
 }: StorageSectionProps) {
+    const { t } = useTranslation();
+
     return (
         <div className="space-y-6 text-xs select-none pb-6">
             {/* Export Section */}
             <div>
-                <label className="block font-semibold text-[var(--text-main)] mb-2.5">Backup & Export</label>
+                <label className="block font-semibold text-[var(--text-main)] mb-2.5">{t('settings.storageSection.title')}</label>
                 <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                        <div className="font-semibold text-[var(--text-main)] truncate">Notizen exportieren</div>
+                        <div className="font-semibold text-[var(--text-main)] truncate">{t('settings.storageSection.exportBackup')}</div>
                         <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                            Alle Notizen als echte Ordner und Markdown-Dateien (.md) sichern
+                            {t('settings.storageSection.exportBackupDesc')}
                         </div>
                     </div>
                     {onExportBackup && (
@@ -67,10 +70,10 @@ export function StorageSection({
                             )}
                             <span>
                                 {exportState === 'done'
-                                    ? `${exportCount} Notizen exportiert`
+                                    ? t('settings.storageSection.exportSuccess')
                                     : exportState === 'loading'
-                                    ? 'Exportiert...'
-                                    : 'Exportieren'}
+                                    ? t('common.loading')
+                                    : t('common.save')}
                             </span>
                         </button>
                     )}
@@ -79,16 +82,16 @@ export function StorageSection({
 
             {/* Import Section */}
             <div className="pt-3 border-t border-[var(--border-subtle)] space-y-3">
-                <label className="block font-semibold text-[var(--text-main)] mb-1">Import</label>
+                <label className="block font-semibold text-[var(--text-main)] mb-1">{t('settings.storageSection.importFiles')}</label>
                 
                 {/* Folder Import */}
                 {hasImportFolderOption && onImportFolderClick && (
                     <div>
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0 flex-1">
-                                <div className="font-semibold text-[var(--text-main)] truncate">Ordner importieren</div>
+                                <div className="font-semibold text-[var(--text-main)] truncate">{t('settings.storageSection.importFolder')}</div>
                                 <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                                    Einen kompletten Ordner mit Markdown-Dateien samt Unterordnern importieren
+                                    {t('settings.storageSection.importFolderDesc')}
                                 </div>
                             </div>
                             <button
@@ -106,10 +109,10 @@ export function StorageSection({
                                 )}
                                 <span>
                                     {importState === 'done'
-                                        ? `${importCount} Notizen importiert`
+                                        ? t('settings.storageSection.importSuccess', { count: importCount })
                                         : importState === 'loading'
-                                        ? 'Importiert...'
-                                        : 'Ordner wählen'}
+                                        ? t('common.loading')
+                                        : t('settings.storageSection.importFolder')}
                                 </span>
                             </button>
                         </div>
@@ -135,9 +138,9 @@ export function StorageSection({
                     <div>
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0 flex-1">
-                                <div className="font-semibold text-[var(--text-main)] truncate">Dateien importieren</div>
+                                <div className="font-semibold text-[var(--text-main)] truncate">{t('settings.storageSection.importFiles')}</div>
                                 <div className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                                    Einzelne oder mehrere Markdown-Dateien (.md) auswählen
+                                    {t('settings.storageSection.importFilesDesc')}
                                 </div>
                             </div>
                             <button
@@ -155,10 +158,10 @@ export function StorageSection({
                                 )}
                                 <span>
                                     {importFilesState === 'done'
-                                        ? `${importFilesCount} Dateien importiert`
+                                        ? t('settings.storageSection.importSuccess', { count: importFilesCount })
                                         : importFilesState === 'loading'
-                                        ? 'Importiert...'
-                                        : 'Dateien wählen'}
+                                        ? t('common.loading')
+                                        : t('settings.storageSection.importFiles')}
                                 </span>
                             </button>
                         </div>
@@ -190,3 +193,4 @@ export function StorageSection({
         </div>
     );
 }
+

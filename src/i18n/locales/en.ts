@@ -213,6 +213,9 @@ export const en = {
             permanentlyDelete: 'Delete permanently',
             noteCount_one: '{count} deleted note',
             noteCount_other: '{count} deleted notes',
+            daysLeft_one: '1 day remaining',
+            daysLeft_other: '{count} days remaining',
+            deletingSoon: 'Deleting soon',
         },
         aboutSection: {
             title: 'About Lama Notes',

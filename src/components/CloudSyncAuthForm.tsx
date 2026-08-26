@@ -1,5 +1,6 @@
 import { Cloud, CloudOff, LogOut, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
+import { useTranslation } from '../i18n';
 
 interface CloudSyncAuthFormProps {
     authMode: 'signin' | 'signup';
@@ -28,6 +29,8 @@ export function CloudSyncAuthForm({
     handleSignOutConfirm,
     signOutLoading = false,
 }: CloudSyncAuthFormProps) {
+    const { t } = useTranslation();
+
     return (
         <div className="flex flex-col gap-4">
             {/* Local Mode Status & Exit */}
@@ -37,9 +40,9 @@ export function CloudSyncAuthForm({
                         <CloudOff size={18} />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-xs text-[var(--text-main)] truncate">Lokaler Modus (Offline)</p>
+                        <p className="font-semibold text-xs text-[var(--text-main)] truncate">{t('onboarding.localTitle')}</p>
                         <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                            Notizen werden ausschließlich lokal auf diesem Gerät gespeichert.
+                            {t('onboarding.localDesc')}
                         </p>
                     </div>
                 </div>
@@ -51,7 +54,7 @@ export function CloudSyncAuthForm({
                     className="smooth-transition flex items-center justify-center gap-2 w-full py-2 text-xs font-semibold bg-[var(--canvas-bg)] border border-[var(--border-subtle)] text-[var(--text-main)] hover:border-[var(--accent-color)] rounded-xl transition-colors active:scale-95 shadow-sm disabled:opacity-50"
                 >
                     <LogOut size={13} />
-                    <span>Zum Startbildschirm wechseln</span>
+                    <span>{t('onboarding.useLocally')}</span>
                 </button>
             </div>
 
@@ -62,9 +65,9 @@ export function CloudSyncAuthForm({
                         <Cloud size={18} />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-xs text-[var(--text-main)] truncate">LamaNotes Cloud verbinden</p>
+                        <p className="font-semibold text-xs text-[var(--text-main)] truncate">{t('settings.syncSection.title')}</p>
                         <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                            Melde dich an, um Notizen nahtlos auf allen Geräten zu synchronisieren.
+                            {t('settings.syncSection.description')}
                         </p>
                     </div>
                 </div>
@@ -81,7 +84,7 @@ export function CloudSyncAuthForm({
                                 : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                         )}
                     >
-                        Sign In
+                        {t('settings.syncSection.signIn')}
                     </button>
                     <button
                         type="button"
@@ -93,21 +96,21 @@ export function CloudSyncAuthForm({
                                 : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                         )}
                     >
-                        Sign Up
+                        {t('settings.syncSection.signUp')}
                     </button>
                 </div>
 
                 <div className="space-y-2">
                     <input
                         type="email"
-                        placeholder="Email address"
+                        placeholder={t('settings.syncSection.email')}
                         value={authEmail}
                         onChange={e => setAuthEmail(e.target.value)}
                         className="smooth-transition w-full px-3 py-2 text-xs rounded-xl border border-[var(--border-subtle)] bg-[var(--canvas-bg)] text-[var(--text-main)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent-color)] focus:ring-1 focus:ring-[var(--accent-color)]/30"
                     />
                     <input
                         type="password"
-                        placeholder="Password"
+                        placeholder={t('settings.syncSection.password')}
                         value={authPassword}
                         onChange={e => setAuthPassword(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleAuth()}
@@ -126,10 +129,11 @@ export function CloudSyncAuthForm({
                     className="smooth-transition w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold bg-[var(--accent-color)] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-sm active:scale-95"
                 >
                     {authLoading ? (
-                        <><RefreshCw size={13} className="animate-spin" /> Please wait…</>
-                    ) : authMode === 'signin' ? 'Sign In' : 'Create Account'}
+                        <><RefreshCw size={13} className="animate-spin" /> {t('common.loading')}</>
+                    ) : authMode === 'signin' ? t('settings.syncSection.signIn') : t('settings.syncSection.signUp')}
                 </button>
             </div>
         </div>
     );
 }
+
