@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import type { Editor } from '@tiptap/react';
 import { buildToolbarItems, type ToolbarItem } from '../utils/toolbarItems';
+import { useTranslation } from '../i18n';
 
 export type { ToolbarItem };
 
@@ -17,6 +18,7 @@ export function useEditorToolbar({
     onLinkClick,
     mobile = false
 }: UseEditorToolbarProps) {
+    const { t } = useTranslation();
     const [, setUpdateCount] = useState(0);
     const [visibleCount, setVisibleCount] = useState<number>(99);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -58,7 +60,7 @@ export function useEditorToolbar({
     const iconSize = mobile ? 20 : 16;
     const btnPadding = mobile ? "p-2.5" : "p-1.5";
 
-    const items = buildToolbarItems({ editor, onLinkClick });
+    const items = buildToolbarItems({ editor, onLinkClick, t });
 
     const filteredItems = items.filter(item => !isCompact || item.showInCompact);
 

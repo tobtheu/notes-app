@@ -19,20 +19,24 @@ export interface ToolbarItem {
 export interface BuildToolbarItemsOptions {
     editor: Editor | null;
     onLinkClick?: () => void;
+    t?: (key: any) => string;
 }
 
 export function buildToolbarItems({
     editor,
     onLinkClick,
+    t,
 }: BuildToolbarItemsOptions): ToolbarItem[] {
     if (!editor) return [];
+
+    const getLabel = (key: string, fallback: string) => (t ? t(key) : fallback);
 
     return [
         {
             type: 'button',
             id: 'bold',
             icon: Bold,
-            label: "Bold",
+            label: getLabel('editor.bold', 'Bold'),
             action: () => toggleSmartMark(editor, 'bold'),
             isActive: editor.isActive('bold'),
             showInCompact: true
@@ -41,7 +45,7 @@ export function buildToolbarItems({
             type: 'button',
             id: 'italic',
             icon: Italic,
-            label: "Italic",
+            label: getLabel('editor.italic', 'Italic'),
             action: () => toggleSmartMark(editor, 'italic'),
             isActive: editor.isActive('italic'),
             showInCompact: true
@@ -50,7 +54,7 @@ export function buildToolbarItems({
             type: 'button',
             id: 'highlight',
             icon: Highlighter,
-            label: "Highlight",
+            label: getLabel('editor.highlight', 'Highlight'),
             action: () => toggleSmartMark(editor, 'highlight'),
             isActive: editor.isActive('highlight'),
             showInCompact: true
@@ -60,7 +64,7 @@ export function buildToolbarItems({
             type: 'button',
             id: 'heading1',
             icon: Heading1,
-            label: "Heading 1",
+            label: getLabel('editor.heading1', 'Heading 1'),
             action: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
             isActive: editor.isActive('heading', { level: 1 }),
             showInCompact: false
@@ -69,7 +73,7 @@ export function buildToolbarItems({
             type: 'button',
             id: 'heading2',
             icon: Heading2,
-            label: "Heading 2",
+            label: getLabel('editor.heading2', 'Heading 2'),
             action: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
             isActive: editor.isActive('heading', { level: 2 }),
             showInCompact: false
@@ -78,7 +82,7 @@ export function buildToolbarItems({
             type: 'button',
             id: 'heading3',
             icon: Heading3,
-            label: "Heading 3",
+            label: getLabel('editor.heading3', 'Heading 3'),
             action: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
             isActive: editor.isActive('heading', { level: 3 }),
             showInCompact: false
@@ -88,7 +92,7 @@ export function buildToolbarItems({
             type: 'button',
             id: 'bulletList',
             icon: List,
-            label: "Bullet List",
+            label: getLabel('editor.bulletList', 'Bullet List'),
             action: () => editor.chain().focus().toggleBulletList().run(),
             isActive: editor.isActive('bulletList'),
             showInCompact: false
@@ -97,7 +101,7 @@ export function buildToolbarItems({
             type: 'button',
             id: 'taskList',
             icon: CheckSquare,
-            label: "Task List",
+            label: getLabel('editor.taskList', 'Task List'),
             action: () => editor.chain().focus().toggleTaskList().run(),
             isActive: editor.isActive('taskList'),
             showInCompact: false
@@ -107,7 +111,7 @@ export function buildToolbarItems({
             type: 'button',
             id: 'blockquote',
             icon: Quote,
-            label: "Quote",
+            label: getLabel('editor.quote', 'Quote'),
             action: () => editor.chain().focus().toggleBlockquote().run(),
             isActive: editor.isActive('blockquote'),
             showInCompact: false
@@ -116,7 +120,7 @@ export function buildToolbarItems({
             type: 'button',
             id: 'codeBlock',
             icon: Code,
-            label: "Code Block",
+            label: getLabel('editor.codeBlock', 'Code Block'),
             action: () => editor.chain().focus().toggleCodeBlock().run(),
             isActive: editor.isActive('codeBlock'),
             showInCompact: false
@@ -126,7 +130,7 @@ export function buildToolbarItems({
             type: 'button',
             id: 'table',
             icon: Table,
-            label: "Insert Table",
+            label: getLabel('editor.insertTable', 'Insert Table'),
             action: () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
             isActive: editor.isActive('table'),
             showInCompact: false
@@ -136,7 +140,7 @@ export function buildToolbarItems({
             type: 'button',
             id: 'link',
             icon: LinkIcon,
-            label: "Link",
+            label: getLabel('editor.link', 'Link'),
             action: () => {
                 if (onLinkClick) {
                     onLinkClick();

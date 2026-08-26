@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import clsx from 'clsx';
+import { useTranslation } from '../i18n';
 
 interface SlashMenuProps {
     items: any[];
@@ -7,6 +8,7 @@ interface SlashMenuProps {
 }
 
 export const SlashMenu = forwardRef((props: SlashMenuProps, ref) => {
+    const { t } = useTranslation();
     const [selectedIndex, setSelectedIndex] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
     const lastMousePos = useRef({ x: 0, y: 0 });
@@ -54,7 +56,7 @@ export const SlashMenu = forwardRef((props: SlashMenuProps, ref) => {
 
     return (
         <div ref={containerRef} className="bg-white dark:bg-gray-800 shadow-2xl rounded-xl border border-gray-200 dark:border-gray-700 p-1.5 min-w-[220px] max-h-[300px] overflow-y-auto z-[1000] overflow-hidden custom-scrollbar">
-            <div className="text-[10px] text-gray-400 p-2 font-black uppercase tracking-widest opacity-60">Add Block</div>
+            <div className="text-[10px] text-gray-400 p-2 font-black uppercase tracking-widest opacity-60">{t('editor.addBlock')}</div>
             {props.items.map((item: any, index: number) => (
                 <button
                     key={index}
@@ -83,3 +85,4 @@ export const SlashMenu = forwardRef((props: SlashMenuProps, ref) => {
 });
 
 SlashMenu.displayName = 'SlashMenu';
+

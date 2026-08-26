@@ -2,6 +2,7 @@ import React from 'react'
 import { Trash2, Plus, Minus, Heading } from 'lucide-react'
 import clsx from 'clsx'
 import { Editor } from '@tiptap/react'
+import { useTranslation } from '../i18n'
 
 interface TableHoverToolbarProps {
     editor: Editor
@@ -15,6 +16,8 @@ interface TableHoverToolbarProps {
  * Provides granular controls for rows, columns, and table-wide actions.
  */
 export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, node, getPos }) => {
+    const { t } = useTranslation()
+
     /**
      * --- SELECTION HELPERS ---
      * Tiptap/ProseMirror table commands depend on the current selection.
@@ -72,7 +75,7 @@ export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, no
                         editor.chain().setTextSelection(pos + 2).toggleHeaderRow().focus().run()
                     })}
                     className="p-1.5 hover:bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-lg transition-colors"
-                    title="Toggle Header Row"
+                    title={t('editor.toggleHeaderRow')}
                 >
                     <Heading size={13} />
                 </button>
@@ -80,7 +83,7 @@ export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, no
 
             {/* --- ROW CONTROLS --- */}
             <div className="flex items-center gap-0.5 border-r border-[var(--border-subtle)] pr-1 mr-0.5">
-                <span className="text-[10px] text-[var(--text-muted)] font-bold uppercase px-1 mr-0.5">Row</span>
+                <span className="text-[10px] text-[var(--text-muted)] font-bold uppercase px-1 mr-0.5">{t('editor.tableRow')}</span>
                 <button
                     type="button"
                     onMouseDown={exec((pos) => {
@@ -88,7 +91,7 @@ export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, no
                         editor.chain().addRowAfter().focus().run()
                     })}
                     className="p-1.5 hover:bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-lg transition-colors"
-                    title="Add Row to Bottom"
+                    title={t('editor.addRowToBottom')}
                 >
                     <Plus size={13} />
                 </button>
@@ -99,7 +102,7 @@ export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, no
                         editor.chain().deleteRow().focus().run()
                     })}
                     className="p-1.5 hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-500 rounded-lg transition-colors"
-                    title="Delete Last Row"
+                    title={t('editor.deleteLastRow')}
                 >
                     <Minus size={13} />
                 </button>
@@ -107,7 +110,7 @@ export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, no
 
             {/* --- COLUMN CONTROLS --- */}
             <div className="flex items-center gap-0.5 border-r border-[var(--border-subtle)] pr-1 mr-0.5">
-                <span className="text-[10px] text-[var(--text-muted)] font-bold uppercase px-1 mr-0.5">Col</span>
+                <span className="text-[10px] text-[var(--text-muted)] font-bold uppercase px-1 mr-0.5">{t('editor.tableCol')}</span>
                 <button
                     type="button"
                     onMouseDown={exec((pos) => {
@@ -115,7 +118,7 @@ export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, no
                         editor.chain().addColumnAfter().focus().run()
                     })}
                     className="p-1.5 hover:bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-lg transition-colors"
-                    title="Add Column to Right"
+                    title={t('editor.addColumnToRight')}
                 >
                     <Plus size={13} />
                 </button>
@@ -126,7 +129,7 @@ export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, no
                         editor.chain().deleteColumn().focus().run()
                     })}
                     className="p-1.5 hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-500 rounded-lg transition-colors"
-                    title="Delete Last Column"
+                    title={t('editor.deleteLastColumn')}
                 >
                     <Minus size={13} />
                 </button>
@@ -137,7 +140,7 @@ export const TableHoverToolbar: React.FC<TableHoverToolbarProps> = ({ editor, no
                 type="button"
                 onMouseDown={exec(handleDeleteTable)}
                 className="flex items-center gap-1 p-1.5 hover:bg-red-500/10 text-red-500 hover:text-red-600 rounded-lg transition-colors text-xs font-medium"
-                title="Delete Entire Table"
+                title={t('editor.deleteEntireTable')}
             >
                 <Trash2 size={13} />
             </button>

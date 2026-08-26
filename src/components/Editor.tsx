@@ -7,6 +7,7 @@ import { EditorMenu } from './EditorMenu';
 import { EditorFocusControls } from './EditorFocusControls';
 import { EditorTitleInput } from './EditorTitleInput';
 import { useNoteEditor } from '../hooks/useNoteEditor';
+import { useTranslation } from '../i18n';
 
 interface EditorProps {
     note: Note;
@@ -47,6 +48,8 @@ export const Editor = React.memo(function Editor(props: EditorProps) {
         markdownEnabled,
         onNavigate
     } = props;
+
+    const { t } = useTranslation();
 
     const {
         title,
@@ -145,7 +148,7 @@ export const Editor = React.memo(function Editor(props: EditorProps) {
                 <div className="absolute inset-0 z-40 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-300">
                     <div className="flex flex-col items-center gap-3">
                         <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
-                        <span className="text-sm font-medium text-gray-400">Loading content...</span>
+                        <span className="text-sm font-medium text-gray-400">{t('editor.loadingContent')}</span>
                     </div>
                 </div>
             )}
@@ -153,7 +156,7 @@ export const Editor = React.memo(function Editor(props: EditorProps) {
             {/* Large-file notice */}
             {isLargeFile && markdownEnabled && (
                 <div className="mx-8 mb-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs">
-                    Large file — rich-text editor disabled for better performance.
+                    {t('editor.largeFileWarning')}
                 </div>
             )}
 
@@ -200,7 +203,7 @@ export const Editor = React.memo(function Editor(props: EditorProps) {
                     <textarea
                         ref={textareaRef as React.RefObject<HTMLTextAreaElement>}
                         className="w-full p-0 text-sm bg-transparent border-none outline-none resize-none text-[var(--text-main)] placeholder-[var(--text-muted)] leading-relaxed flex-1"
-                        placeholder="Start typing your note here..."
+                        placeholder={t('editor.placeholder')}
                         value={body}
                         onChange={(e) => handleBodyChange(e.target.value)}
                         onBlur={() => throttledSync()}

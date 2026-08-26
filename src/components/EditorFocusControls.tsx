@@ -1,5 +1,6 @@
 import { Eye, EyeOff, X } from 'lucide-react';
 import clsx from 'clsx';
+import { useTranslation } from '../i18n';
 
 interface EditorFocusControlsProps {
     toolbarVisible: boolean;
@@ -14,6 +15,8 @@ export function EditorFocusControls({
     onExitFocus,
     isExitingFocus,
 }: EditorFocusControlsProps) {
+    const { t } = useTranslation();
+
     return (
         <div
             className={clsx(
@@ -30,7 +33,7 @@ export function EditorFocusControls({
                         ? "text-primary-600 bg-primary-50 dark:bg-primary-900/40"
                         : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                 )}
-                title={toolbarVisible ? "Hide Toolbar" : "Show Toolbar"}
+                title={toolbarVisible ? t('editor.hideToolbar') : t('editor.showToolbar')}
             >
                 {toolbarVisible ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
@@ -38,7 +41,7 @@ export function EditorFocusControls({
                 type="button"
                 onClick={onExitFocus}
                 className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all active:scale-90"
-                title="Exit Focus Mode (Esc)"
+                title={t('editor.exitFocusMode')}
             >
                 <X size={24} />
             </button>

@@ -7,26 +7,29 @@ import {
     Code as CodeIcon, Table as TableIcon, Link as LinkIcon
 } from 'lucide-react';
 import { SlashMenu } from '../components/SlashMenu';
+import { translate } from '../i18n';
 
-export const items = [
-    { title: 'Heading 1', icon: Heading1, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 1 }).run() },
-    { title: 'Heading 2', icon: Heading2, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 2 }).run() },
-    { title: 'Heading 3', icon: Heading3, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 3 }).run() },
-    { title: 'Bullet List', icon: List, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleBulletList().run() },
-    { title: 'Ordered List', icon: ListOrdered, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleOrderedList().run() },
-    { title: 'Task List', icon: CheckSquare, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleTaskList().run() },
-    { title: 'Table', icon: TableIcon, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
-    { title: 'Blockquote', icon: Quote, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleBlockquote().run() },
-    { title: 'Code Block', icon: CodeIcon, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run() },
+export const getSlashCommandItems = () => [
+    { title: translate('editor.heading1'), icon: Heading1, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 1 }).run() },
+    { title: translate('editor.heading2'), icon: Heading2, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 2 }).run() },
+    { title: translate('editor.heading3'), icon: Heading3, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).setNode('heading', { level: 3 }).run() },
+    { title: translate('editor.bulletList'), icon: List, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleBulletList().run() },
+    { title: translate('editor.numberedList'), icon: ListOrdered, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleOrderedList().run() },
+    { title: translate('editor.taskList'), icon: CheckSquare, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleTaskList().run() },
+    { title: translate('editor.table'), icon: TableIcon, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
+    { title: translate('editor.quote'), icon: Quote, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleBlockquote().run() },
+    { title: translate('editor.codeBlock'), icon: CodeIcon, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run() },
     {
-        title: 'Link', icon: LinkIcon, command: ({ editor, range }: any) => {
+        title: translate('editor.link'), icon: LinkIcon, command: ({ editor, range }: any) => {
             editor.chain().focus().deleteRange(range).run();
             // Trigger link modal via custom event (handled in MarkdownEditor)
             window.dispatchEvent(new CustomEvent('tiptap:openLinkModal'));
         }
     },
-    { title: 'Divider', icon: Minus, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).setHorizontalRule().run() },
+    { title: translate('editor.divider'), icon: Minus, command: ({ editor, range }: any) => editor.chain().focus().deleteRange(range).setHorizontalRule().run() },
 ];
+
+export const items = getSlashCommandItems();
 
 export const SlashCommands = Extension.create({
     name: 'slashCommands',
@@ -77,7 +80,8 @@ export const SlashCommands = Extension.create({
                     props.command({ editor, range });
                 },
                 items: ({ query }: { query: string }) => {
-                    return items.filter(item => item.title.toLowerCase().startsWith(query.toLowerCase()));
+                    const q = (query || '').toLowerCase();
+                    return getSlashCommandItems().filter(item => (item.title || '').toLowerCase().startsWith(q));
                 },
                 render: () => {
                     let component: any;

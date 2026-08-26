@@ -1,5 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
+import { useTranslation } from '../i18n';
 
 interface EditorTitleInputProps {
     title: string;
@@ -20,6 +21,8 @@ export function EditorTitleInput({
     onKeyDown,
     onBlur,
 }: EditorTitleInputProps) {
+    const { t } = useTranslation();
+
     return (
         <div className={clsx("w-full", isFocusMode ? "pt-8 mb-6" : "pt-4 pb-2")}>
             <textarea
@@ -29,7 +32,7 @@ export function EditorTitleInput({
                     "w-full p-0 font-extrabold bg-transparent border-none outline-none resize-none overflow-hidden text-[var(--text-main)] leading-tight placeholder-[var(--text-muted)]",
                     isFocusMode ? "text-5xl font-black text-center" : "text-3xl pr-12"
                 )}
-                placeholder="Note Title"
+                placeholder={t('editor.titlePlaceholder')}
                 value={title}
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={onKeyDown}

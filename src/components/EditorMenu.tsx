@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { MoreVertical, FileDown, Eye, EyeOff, Zap } from 'lucide-react';
+import { useTranslation } from '../i18n';
 
 interface EditorMenuProps {
     isIOS: boolean;
@@ -16,6 +17,7 @@ export function EditorMenu({
     onToggleFocus,
     onExport
 }: EditorMenuProps) {
+    const { t } = useTranslation();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +43,7 @@ export function EditorMenu({
                     type="button"
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                     className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-md transition-colors active:scale-90"
-                    title="Actions"
+                    title={t('common.options')}
                 >
                     <MoreVertical size={18} />
                 </button>
@@ -55,7 +57,7 @@ export function EditorMenu({
                             <div className="w-8 h-8 rounded-md bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-500 transition-colors group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 group-hover:text-primary-600 dark:group-hover:text-primary-400">
                                 <FileDown size={16} />
                             </div>
-                            <span className="font-medium">Export PDF</span>
+                            <span className="font-medium">{t('editor.exportPdf')}</span>
                         </button>
                     </div>
                 )}
@@ -70,7 +72,7 @@ export function EditorMenu({
                     type="button"
                     onClick={() => setIsMenuOpen(!isMenuOpen)}
                     className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg transition-colors"
-                    title="Actions"
+                    title={t('common.options')}
                 >
                     <MoreVertical size={18} />
                 </button>
@@ -85,7 +87,7 @@ export function EditorMenu({
                             <div className="w-7 h-7 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-[var(--text-muted)] transition-colors group-hover:text-[var(--accent-color)]">
                                 <Zap size={15} />
                             </div>
-                            <span className="font-medium">Focus Mode</span>
+                            <span className="font-medium">{t('editor.focusMode')}</span>
                         </button>
 
                         <div className="h-px bg-[var(--border-subtle)] my-1 mx-1.5" />
@@ -98,7 +100,7 @@ export function EditorMenu({
                             <div className="w-7 h-7 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-[var(--text-muted)] transition-colors group-hover:text-[var(--accent-color)]">
                                 <FileDown size={15} />
                             </div>
-                            <span className="font-medium">Export PDF</span>
+                            <span className="font-medium">{t('editor.exportPdf')}</span>
                         </button>
 
                         <button
@@ -109,7 +111,7 @@ export function EditorMenu({
                             <div className="w-7 h-7 rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-[var(--text-muted)] transition-colors group-hover:text-[var(--accent-color)]">
                                 {toolbarVisible ? <EyeOff size={15} /> : <Eye size={15} />}
                             </div>
-                            <span className="font-medium">{toolbarVisible ? 'Hide' : 'Show'} Toolbar</span>
+                            <span className="font-medium">{toolbarVisible ? t('editor.hideToolbar') : t('editor.showToolbar')}</span>
                         </button>
                     </div>
                 )}

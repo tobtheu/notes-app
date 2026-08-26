@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { ExternalLink, Edit2, Trash2, Link as LinkIcon } from 'lucide-react';
 import { toggleSmartMark } from '../utils/editor';
+import { useTranslation } from '../i18n';
 
 interface BubbleToolbarContentProps {
     editor: any;
@@ -18,6 +19,7 @@ export const BubbleToolbarContent: React.FC<BubbleToolbarContentProps> = ({
     hoveredLink,
     onNavigate
 }) => {
+    const { t } = useTranslation();
     // Add a local state to force re-renders when the editor state changes
     const [, setUpdateCount] = useState(0);
 
@@ -54,7 +56,7 @@ export const BubbleToolbarContent: React.FC<BubbleToolbarContentProps> = ({
                     "p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors",
                     editor.isActive('bold') && "bg-primary-50 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
                 )}
-                title="Bold"
+                title={t('editor.bold')}
             >
                 <span className="font-bold text-sm">B</span>
             </button>
@@ -64,7 +66,7 @@ export const BubbleToolbarContent: React.FC<BubbleToolbarContentProps> = ({
                     "p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors",
                     editor.isActive('italic') && "bg-primary-50 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
                 )}
-                title="Italic"
+                title={t('editor.italic')}
             >
                 <span className="italic font-serif text-sm">I</span>
             </button>
@@ -74,7 +76,7 @@ export const BubbleToolbarContent: React.FC<BubbleToolbarContentProps> = ({
                     "p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors",
                     editor.isActive('highlight') && "bg-primary-50 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
                 )}
-                title="Highlight"
+                title={t('editor.highlight')}
             >
                 <div className="w-3 h-3 bg-yellow-200 rounded-sm" />
             </button>
@@ -109,7 +111,7 @@ export const BubbleToolbarContent: React.FC<BubbleToolbarContentProps> = ({
                             }
                         }}
                         className="p-1.5 rounded-md hover:bg-primary-50 dark:hover:bg-primary-900/40 text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                        title="Open Link"
+                        title={t('editor.openLink')}
                     >
                         <ExternalLink size={14} />
                     </button>
@@ -122,7 +124,7 @@ export const BubbleToolbarContent: React.FC<BubbleToolbarContentProps> = ({
                             onLinkClick();
                         }}
                         className="p-1.5 rounded-md hover:bg-primary-50 dark:hover:bg-primary-900/40 text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                        title="Edit Link"
+                        title={t('editor.editLink')}
                     >
                         <Edit2 size={14} />
                     </button>
@@ -139,7 +141,7 @@ export const BubbleToolbarContent: React.FC<BubbleToolbarContentProps> = ({
                             }
                         }}
                         className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/40 text-gray-600 dark:text-gray-300 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                        title="Remove Link"
+                        title={t('editor.removeLink')}
                     >
                         <Trash2 size={14} />
                     </button>
@@ -154,7 +156,7 @@ export const BubbleToolbarContent: React.FC<BubbleToolbarContentProps> = ({
                             "p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors",
                             editor.isActive('link') && "bg-primary-50 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
                         )}
-                        title="Add Link"
+                        title={t('editor.addLink')}
                     >
                         <LinkIcon size={14} />
                     </button>
