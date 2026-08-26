@@ -200,7 +200,7 @@ export function NoteList({
                                         type="button"
                                         onClick={onCreateNote}
                                         className="smooth-transition text-[var(--text-muted)] hover:text-[var(--text-main)] p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                                        title={t('notes.newNote')}
+                                        title={`${t('notes.newNote')} (${isMac ? '⌘N' : 'Ctrl+N'})`}
                                     >
                                         <Plus size={13} />
                                     </button>
