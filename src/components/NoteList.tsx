@@ -135,14 +135,11 @@ export function NoteList({
     const categoryTitle = selectedCategory ? selectedCategory.toUpperCase() : t('sidebar.allNotes').toUpperCase();
 
     return (
-        <div
-            className={clsx(
-                "notelist-fluid flex flex-col h-full shrink-0 select-none border-r border-[var(--border-subtle)] transition-all duration-300",
-                className
-            )}
-            style={{ backgroundColor: 'var(--shell-bg)' }}
-        >
-            {/* --- NOTE LIST HEADER --- */}
+        <div className={clsx(
+            "flex flex-col h-full w-full bg-[var(--canvas-bg)] transition-colors duration-300",
+            className
+        )}>
+            {/* --- SEARCH BAR --- */}
             <NoteListHeader
                 searchVisible={searchVisible}
                 isIOS={isIOS}
@@ -150,12 +147,8 @@ export function NoteList({
                 onSearchChange={onSearchChange}
             />
 
-            {/* --- NOTES LIST --- */}
-            <div
-                ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto px-2 py-1 space-y-3 custom-scrollbar min-h-0"
-                onScroll={handleNotesScroll}
-            >
+            {/* --- NOTES SCROLL AREA --- */}
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-3 pb-[calc(1rem+var(--safe-bottom,0vh))] custom-scrollbar space-y-3" onScroll={handleNotesScroll}>
                 {notes.length === 0 ? (
                     <div className="p-8 text-center text-[var(--text-muted)] text-xs">
                         {t('notes.noNotes')}
