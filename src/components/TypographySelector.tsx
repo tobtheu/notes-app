@@ -12,6 +12,8 @@ interface TypographySelectorProps {
     setFontSize: (fontSize: FontSize) => void;
 }
 
+import { SlidingSegmentedControl } from './SlidingSegmentedControl';
+
 export const TypographySelector: React.FC<TypographySelectorProps> = ({
     fontFamily,
     setFontFamily,
@@ -88,38 +90,15 @@ export const TypographySelector: React.FC<TypographySelectorProps> = ({
 
             {/* Font Size Selection */}
             <label className="block font-semibold text-[var(--text-main)] mb-2">{t('settings.appearance.fontSize')}</label>
-            <div className="flex items-center gap-1.5 p-1 bg-[var(--card-hover)] rounded-xl border border-[var(--border-subtle)]">
-                <button
-                    type="button"
-                    onClick={() => setFontSize('small')}
-                    className={clsx(
-                        "flex-1 py-1.5 px-2.5 rounded-lg transition-all text-xs min-w-0 truncate",
-                        fontSize === 'small' ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                    )}
-                >
-                    {t('settings.appearance.sizeSmall')}
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setFontSize('medium')}
-                    className={clsx(
-                        "flex-1 py-1.5 px-2.5 rounded-lg transition-all text-xs min-w-0 truncate",
-                        fontSize === 'medium' ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                    )}
-                >
-                    {t('settings.appearance.sizeMedium')}
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setFontSize('large')}
-                    className={clsx(
-                        "flex-1 py-1.5 px-2.5 rounded-lg transition-all text-xs min-w-0 truncate",
-                        fontSize === 'large' ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]" : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                    )}
-                >
-                    {t('settings.appearance.sizeLarge')}
-                </button>
-            </div>
+            <SlidingSegmentedControl<FontSize>
+                value={fontSize}
+                onChange={setFontSize}
+                options={[
+                    { value: 'small', label: t('settings.appearance.sizeSmall') },
+                    { value: 'medium', label: t('settings.appearance.sizeMedium') },
+                    { value: 'large', label: t('settings.appearance.sizeLarge') },
+                ]}
+            />
         </div>
     );
 };

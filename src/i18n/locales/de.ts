@@ -255,7 +255,7 @@ export const de: TranslationSchema = {
             changelog: 'Änderungsprotokoll',
             github: 'GitHub Repository',
             license: 'MIT-Lizenz',
-            developer: 'Entwickelt mit Leidenschaft von Tobias Theunissen',
+            developer: '© by Tobias Theunissen',
         },
     },
     modals: {

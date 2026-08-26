@@ -253,7 +253,7 @@ export const en = {
             changelog: 'Changelog',
             github: 'GitHub Repository',
             license: 'MIT License',
-            developer: 'Developed with passion by Tobias Theunissen',
+            developer: '© by Tobias Theunissen',
         },
     },
     modals: {

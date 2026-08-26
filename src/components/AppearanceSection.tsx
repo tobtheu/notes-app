@@ -4,6 +4,8 @@ import { ThemeSelector } from './ThemeSelector';
 import { TypographySelector, type FontFamily, type FontSize } from './TypographySelector';
 import { useTranslation, type LanguageOption } from '../i18n';
 
+import { SlidingSegmentedControl } from './SlidingSegmentedControl';
+
 interface AppearanceSectionProps {
     theme: Theme;
     setTheme: (theme: Theme, origin?: ThemeOrigin) => void;
@@ -57,44 +59,15 @@ export function AppearanceSection({
                         {currentLanguage === 'system' ? `${t('settings.language.system')} (${activeLocale === 'de' ? 'Deutsch' : 'English'})` : ''}
                     </span>
                 </div>
-                <div className="grid grid-cols-3 gap-1.5 p-1 bg-[var(--card-hover)] rounded-xl border border-[var(--border-subtle)]">
-                    <button
-                        type="button"
-                        onClick={() => updateLanguage('system')}
-                        className={clsx(
-                            "py-1.5 px-2.5 rounded-lg transition-all text-xs text-center truncate",
-                            currentLanguage === 'system'
-                                ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]"
-                                : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                        )}
-                    >
-                        {t('settings.language.system')}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => updateLanguage('en')}
-                        className={clsx(
-                            "py-1.5 px-2.5 rounded-lg transition-all text-xs text-center truncate",
-                            currentLanguage === 'en'
-                                ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]"
-                                : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                        )}
-                    >
-                        {t('settings.language.en')}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => updateLanguage('de')}
-                        className={clsx(
-                            "py-1.5 px-2.5 rounded-lg transition-all text-xs text-center truncate",
-                            currentLanguage === 'de'
-                                ? "bg-[var(--canvas-bg)] shadow-sm font-semibold text-[var(--text-main)]"
-                                : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
-                        )}
-                    >
-                        {t('settings.language.de')}
-                    </button>
-                </div>
+                <SlidingSegmentedControl<LanguageOption>
+                    value={currentLanguage}
+                    onChange={updateLanguage}
+                    options={[
+                        { value: 'system', label: t('settings.language.system') },
+                        { value: 'en', label: t('settings.language.en') },
+                        { value: 'de', label: t('settings.language.de') },
+                    ]}
+                />
             </div>
 
             {/* Theme Configuration */}
