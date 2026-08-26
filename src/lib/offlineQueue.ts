@@ -199,9 +199,6 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
   log.info(`[offlineQueue] flush starting — user: ${session.user.id}`);
   await ensureFreshToken();
 
-  // Purge any stale 'local' or invalid writes that were enqueued previously
-  await db.query(`DELETE FROM pending_writes WHERE payload->>'user_id' = 'local' OR payload->>'user_id' IS NULL`);
-
   const { rows } = await db.query<{
     id: string;
     table_name: string;
@@ -212,12 +209,10 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
   }>(
     /* sql */ `
     SELECT * FROM pending_writes
-    WHERE payload->>'user_id' = $1
-      AND CAST(next_retry_at AS timestamptz) <= NOW()
+    WHERE CAST(next_retry_at AS timestamptz) <= NOW()
     ORDER BY created_at ASC
     LIMIT 50
     `,
-    [session.user.id],
   );
 
   if (rows.length === 0) {
@@ -225,12 +220,41 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
     return 0;
   }
 
-  log.info(`[offlineQueue] flushing ${rows.length} pending write(s)...`);
+  // Purge any stale 'local', malformed, or mismatched user writes from pending_writes
+  const invalidWrites = rows.filter(r => {
+    try {
+      const p = JSON.parse(r.payload);
+      return !p.user_id || p.user_id === 'local' || p.user_id !== session.user.id;
+    } catch {
+      return true;
+    }
+  });
+
+  if (invalidWrites.length > 0) {
+    const invalidIds = invalidWrites.map(r => r.id);
+    await db.query(`DELETE FROM pending_writes WHERE id = ANY($1::text[])`, [invalidIds]);
+  }
+
+  const validRows = rows.filter(r => {
+    try {
+      const p = JSON.parse(r.payload);
+      return p.user_id && p.user_id === session.user.id;
+    } catch {
+      return false;
+    }
+  });
+
+  if (validRows.length === 0) {
+    log.info('[offlineQueue] flush — no valid writes for current session');
+    return 0;
+  }
+
+  log.info(`[offlineQueue] flushing ${validRows.length} pending write(s)...`);
   let flushed = 0;
 
   // Group writes by table + operation
-  const byGroup = new Map<string, typeof rows>();
-  for (const row of rows) {
+  const byGroup = new Map<string, typeof validRows>();
+  for (const row of validRows) {
     const key = `${row.table_name}:${row.operation}`;
     if (!byGroup.has(key)) byGroup.set(key, []);
     byGroup.get(key)!.push(row);
