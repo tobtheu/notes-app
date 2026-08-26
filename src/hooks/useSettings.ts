@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Theme, LightTheme } from './useTheme';
+import type { LanguageOption } from '../i18n/types';
 
 export type FontFamily = 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system';
 export type FontSize = 'small' | 'medium' | 'large';
@@ -18,6 +19,7 @@ export interface AllSettings {
     showIconsWhenCollapsed: boolean;
     showNoteCounts: boolean;
     landscapeFullscreen: boolean;
+    language: LanguageOption;
 }
 
 function loadInitialSettings(): AllSettings {
@@ -52,6 +54,9 @@ function loadInitialSettings(): AllSettings {
     const showNoteCounts = localStorage.getItem('show-note-counts') === 'true';
     const landscapeFullscreen = localStorage.getItem('landscape-fullscreen') === 'true';
 
+    const savedLang = localStorage.getItem('language');
+    const language: LanguageOption = (savedLang === 'system' || savedLang === 'en' || savedLang === 'de') ? savedLang : 'system';
+
     return {
         theme,
         autoTheme,
@@ -66,6 +71,7 @@ function loadInitialSettings(): AllSettings {
         showIconsWhenCollapsed,
         showNoteCounts,
         landscapeFullscreen,
+        language,
     };
 }
 
@@ -134,6 +140,10 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
                     next.landscapeFullscreen = metadataSettings.landscapeFullscreen;
                     hasChange = true;
                 }
+                if (metadataSettings.language !== undefined && (['system', 'en', 'de'].includes(metadataSettings.language)) && metadataSettings.language !== prev.language) {
+                    next.language = metadataSettings.language;
+                    hasChange = true;
+                }
 
                 return hasChange ? next : prev;
             });
@@ -160,6 +170,7 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         localStorage.setItem('show-icons-when-collapsed', String(settings.showIconsWhenCollapsed));
         localStorage.setItem('show-note-counts', String(settings.showNoteCounts));
         localStorage.setItem('landscape-fullscreen', String(settings.landscapeFullscreen));
+        localStorage.setItem('language', settings.language);
     }, [settings]);
 
     /** --- 4. CLOUD SYNC: SAVING (USER INITIATED WRAPPERS) --- **/
@@ -182,6 +193,7 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
                 showIconsWhenCollapsed: overrides.showIconsWhenCollapsed ?? settings.showIconsWhenCollapsed,
                 showNoteCounts: overrides.showNoteCounts ?? settings.showNoteCounts,
                 landscapeFullscreen: overrides.landscapeFullscreen ?? settings.landscapeFullscreen,
+                language: overrides.language ?? settings.language,
             });
         }
     }, [settings, onSaveSettings]);
@@ -227,5 +239,8 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
         setShowIconsWhenCollapsed: useCallback((v: boolean) => updateSetting('showIconsWhenCollapsed', v), [updateSetting]),
         showNoteCounts: settings.showNoteCounts,
         setShowNoteCounts: useCallback((v: boolean) => updateSetting('showNoteCounts', v), [updateSetting]),
+        language: settings.language,
+        setLanguage: useCallback((v: LanguageOption) => updateSetting('language', v), [updateSetting]),
     };
 }
+

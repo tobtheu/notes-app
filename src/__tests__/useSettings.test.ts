@@ -63,6 +63,11 @@ describe('useSettings', () => {
             const { result } = renderHook(() => useSettings())
             expect(result.current.showNoteCounts).toBe(false)
         })
+
+        it('language defaults to system', () => {
+            const { result } = renderHook(() => useSettings())
+            expect(result.current.language).toBe('system')
+        })
     })
 
     // -----------------------------------------------------------------------
@@ -78,6 +83,7 @@ describe('useSettings', () => {
             localStorage.setItem('spellcheck-enabled', 'false')
             localStorage.setItem('landscape-fullscreen', 'true')
             localStorage.setItem('show-note-counts', 'true')
+            localStorage.setItem('language', 'de')
 
             const { result } = renderHook(() => useSettings())
             expect(result.current.markdownEnabled).toBe(false)
@@ -88,6 +94,7 @@ describe('useSettings', () => {
             expect(result.current.spellcheckEnabled).toBe(false)
             expect(result.current.landscapeFullscreen).toBe(true)
             expect(result.current.showNoteCounts).toBe(true)
+            expect(result.current.language).toBe('de')
         })
 
         it('persists changes back to localStorage', () => {
@@ -107,6 +114,11 @@ describe('useSettings', () => {
                 result.current.setShowNoteCounts(true)
             })
             expect(localStorage.getItem('show-note-counts')).toBe('true')
+
+            act(() => {
+                result.current.setLanguage('de')
+            })
+            expect(localStorage.getItem('language')).toBe('de')
         })
 
         it('ignores invalid fontFamily values and defaults to inter', () => {
@@ -141,6 +153,7 @@ describe('useSettings', () => {
                 showIconsWhenCollapsed: true,
                 showNoteCounts: true,
                 landscapeFullscreen: true,
+                language: 'de',
             }
             const { result } = renderHook(() => useSettings(metadataSettings))
 
@@ -157,6 +170,7 @@ describe('useSettings', () => {
             expect(result.current.showIconsWhenCollapsed).toBe(true)
             expect(result.current.showNoteCounts).toBe(true)
             expect(result.current.landscapeFullscreen).toBe(true)
+            expect(result.current.language).toBe('de')
         })
 
         it('does not call onSaveSettings before metadata is loaded', () => {
