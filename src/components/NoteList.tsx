@@ -5,6 +5,7 @@ import type { Note } from '../types';
 import { NoteListItem } from './NoteListItem';
 import { NoteListHeader } from './NoteListHeader';
 import { useNoteListAnimations } from '../hooks/useNoteListAnimations';
+import { useTranslation } from '../i18n';
 
 interface NoteListProps {
     className?: string;
@@ -129,14 +130,19 @@ export function NoteList({
     // Separate notes into Pinned and Unpinned
     const pinnedNotes = notes.filter(n => isNotePinned(n));
     const unpinnedNotes = notes.filter(n => !isNotePinned(n));
-    const categoryTitle = (selectedCategory || 'All Notes').toUpperCase();
+    const { t } = useTranslation();
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    const categoryTitle = selectedCategory ? selectedCategory.toUpperCase() : t('sidebar.allNotes').toUpperCase();
 
     return (
-        <div className={clsx(
-            "flex flex-col h-full w-full bg-[var(--canvas-bg)] transition-colors duration-300",
-            className
-        )}>
-            {/* --- SEARCH BAR --- */}
+        <div
+            className={clsx(
+                "notelist-fluid flex flex-col h-full shrink-0 select-none border-r border-[var(--border-subtle)] transition-all duration-300",
+                className
+            )}
+            style={{ backgroundColor: 'var(--shell-bg)' }}
+        >
+            {/* --- NOTE LIST HEADER --- */}
             <NoteListHeader
                 searchVisible={searchVisible}
                 isIOS={isIOS}
@@ -144,11 +150,15 @@ export function NoteList({
                 onSearchChange={onSearchChange}
             />
 
-            {/* --- NOTES SCROLL AREA --- */}
-            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-3 pb-[calc(1rem+var(--safe-bottom,0vh))] custom-scrollbar space-y-3" onScroll={handleNotesScroll}>
+            {/* --- NOTES LIST --- */}
+            <div
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto px-2 py-1 space-y-3 custom-scrollbar min-h-0"
+                onScroll={handleNotesScroll}
+            >
                 {notes.length === 0 ? (
                     <div className="p-8 text-center text-[var(--text-muted)] text-xs">
-                        No notes found.
+                        {t('notes.noNotes')}
                     </div>
                 ) : (
                     <>
@@ -156,7 +166,7 @@ export function NoteList({
                         {pinnedNotes.length > 0 && (
                             <div>
                                 <div className="flex items-center justify-between px-1 mb-1.5 text-[10px] font-semibold tracking-wider text-[var(--text-muted)] uppercase select-none">
-                                    <span>PINNED</span>
+                                    <span>{t('notes.pinned')}</span>
                                     <span className="text-[9px] text-[var(--text-muted)] font-mono">{pinnedNotes.length}</span>
                                 </div>
                                 <div className="space-y-1">
@@ -197,7 +207,7 @@ export function NoteList({
                                         type="button"
                                         onClick={onCreateNote}
                                         className="smooth-transition text-[var(--text-muted)] hover:text-[var(--text-main)] p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                                        title="New Note"
+                                        title={t('notes.newNote')}
                                     >
                                         <Plus size={13} />
                                     </button>
@@ -237,13 +247,15 @@ export function NoteList({
             {/* --- NOTE LIST FOOTER --- */}
             {onCreateNote && (
                 <div className="p-2.5 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px] text-[var(--text-muted)] px-3 select-none shrink-0 bg-[var(--canvas-bg)]">
-                    <span className="font-mono">{notes.length} Notes</span>
+                    <span className="font-mono">
+                        {notes.length === 1 ? t('notes.noteCount_one', { count: 1 }) : t('notes.noteCount_other', { count: notes.length })}
+                    </span>
                     <button
                         type="button"
                         onClick={onCreateNote}
                         className="smooth-transition hover:text-[var(--text-main)] font-medium flex items-center gap-1 active:scale-95 text-[11px]"
                     >
-                        <span>New Note ({typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? '⌘N' : 'Ctrl+N'})</span>
+                        <span>{t('notes.newNote')} ({isMac ? '⌘N' : 'Ctrl+N'})</span>
                     </button>
                 </div>
             )}

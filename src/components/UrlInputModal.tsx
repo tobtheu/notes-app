@@ -2,6 +2,7 @@ import React from 'react';
 import { X, Link as LinkIcon, Globe, Type } from 'lucide-react';
 import clsx from 'clsx';
 import { useUrlInputModal } from '../hooks/useUrlInputModal';
+import { useTranslation } from '../i18n';
 
 interface UrlInputModalProps {
     isOpen: boolean;
@@ -19,6 +20,7 @@ interface UrlInputModalProps {
  */
 export const UrlInputModal: React.FC<UrlInputModalProps> = (props) => {
     const { isOpen, onClose, isIOS = false } = props;
+    const { t } = useTranslation();
 
     const {
         url,
@@ -51,7 +53,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = (props) => {
                         <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-black/5 dark:bg-white/5">
                             <LinkIcon size={15} className="text-[var(--accent-color)]" />
                         </div>
-                        <h2 className="text-sm font-bold text-[var(--text-main)]">Link einfügen</h2>
+                        <h2 className="text-sm font-bold text-[var(--text-main)]">{t('modals.insertLink')}</h2>
                     </div>
                     <button
                         type="button"
@@ -67,7 +69,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = (props) => {
                         {/* URL Input (Primary) */}
                         <div className="space-y-1.5">
                             <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                                <Globe size={12} /> URL
+                                <Globe size={12} /> {t('modals.linkUrl')}
                             </label>
                             <input
                                 ref={inputRef}
@@ -83,11 +85,11 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = (props) => {
                         {/* Link Text Input */}
                         <div className="space-y-1.5">
                             <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                                <Type size={12} /> Text (optional)
+                                <Type size={12} /> {t('modals.linkText')}
                             </label>
                             <input
                                 type="text"
-                                placeholder="Link-Text..."
+                                placeholder={t('modals.linkTextPlaceholder')}
                                 value={text}
                                 onChange={(e) => setText(e.target.value)}
                                 className="smooth-transition w-full px-3 py-2 bg-[var(--card-hover)] border border-transparent focus:border-[var(--border-subtle)] rounded-xl outline-none text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:ring-1 focus:ring-[var(--accent-color)]/30"
@@ -101,7 +103,7 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = (props) => {
                             type="submit"
                             className="smooth-transition px-4 py-1.5 text-xs font-semibold text-white bg-[var(--accent-color)] hover:opacity-90 rounded-xl shadow-sm active:scale-95 transition-all"
                         >
-                            Speichern
+                            {t('common.save')}
                         </button>
                     </div>
                 </form>
@@ -109,3 +111,4 @@ export const UrlInputModal: React.FC<UrlInputModalProps> = (props) => {
         </div>
     );
 };
+

@@ -2,6 +2,7 @@ import React from 'react';
 import { Plus, FileText, Command, FolderTree, Palette, GripVertical, MoreVertical } from 'lucide-react';
 import clsx from 'clsx';
 import logo from '../assets/logo.png';
+import { useTranslation } from '../i18n';
 
 interface EmptyStateTutorialProps {
     onCreateNote: () => void;
@@ -12,8 +13,9 @@ export const EmptyStateTutorial: React.FC<EmptyStateTutorialProps> = ({
     onCreateNote,
     className
 }) => {
+    const { t } = useTranslation();
     const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-    const modKey = isMac ? '⌘' : 'Strg';
+    const modKey = isMac ? '⌘' : 'Ctrl';
 
     return (
         <div className={clsx(
@@ -31,10 +33,10 @@ export const EmptyStateTutorial: React.FC<EmptyStateTutorialProps> = ({
                 {/* Header Text */}
                 <div className="space-y-1.5">
                     <h2 className="text-lg sm:text-xl font-bold text-[var(--text-main)] tracking-tight">
-                        Willkommen bei Lama Notes
+                        {t('tutorial.welcome')}
                     </h2>
                     <p className="text-xs text-[var(--text-muted)] leading-relaxed max-w-sm">
-                        Wähle eine Notiz aus der Liste oder erstelle direkt ein neues Dokument, um loszulegen.
+                        {t('tutorial.welcomeDesc')}
                     </p>
                 </div>
 
@@ -45,9 +47,9 @@ export const EmptyStateTutorial: React.FC<EmptyStateTutorialProps> = ({
                     className="smooth-transition flex items-center gap-2.5 px-5 py-2.5 rounded-2xl bg-[var(--accent-color)] text-white text-xs font-semibold shadow-sm hover:opacity-90 active:scale-95 transition-all"
                 >
                     <Plus size={15} />
-                    <span>Neue Notiz erstellen</span>
+                    <span>{t('tutorial.createNote')}</span>
                     <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/20 text-[10px] font-mono tracking-tight">
-                        {isMac ? '⌘ N' : 'Strg+N'}
+                        {isMac ? '⌘ N' : 'Ctrl+N'}
                     </span>
                 </button>
 
@@ -58,14 +60,14 @@ export const EmptyStateTutorial: React.FC<EmptyStateTutorialProps> = ({
                         <div className="flex items-center justify-between">
                             <span className="text-[11px] font-semibold text-[var(--text-main)] flex items-center gap-1.5">
                                 <FileText size={13} className="text-[var(--accent-color)]" />
-                                Neue Notiz
+                                {t('tutorial.newNoteTitle')}
                             </span>
                             <kbd className="px-1.5 py-0.5 rounded-md bg-[var(--canvas-bg)] border border-[var(--border-subtle)] font-mono text-[10px] text-[var(--text-main)] shadow-2xs">
-                                {isMac ? '⌘ N' : 'Strg + N'}
+                                {isMac ? '⌘ N' : 'Ctrl + N'}
                             </kbd>
                         </div>
                         <p className="text-[10px] text-[var(--text-muted)] leading-normal">
-                            Erstellt sofort eine leere Notiz im aktuellen Ordner.
+                            {t('tutorial.newNoteDesc')}
                         </p>
                     </div>
 
@@ -74,14 +76,14 @@ export const EmptyStateTutorial: React.FC<EmptyStateTutorialProps> = ({
                         <div className="flex items-center justify-between">
                             <span className="text-[11px] font-semibold text-[var(--text-main)] flex items-center gap-1.5">
                                 <Command size={13} className="text-[var(--accent-color)]" />
-                                Slash-Befehle
+                                {t('tutorial.slashCommands')}
                             </span>
                             <kbd className="px-1.5 py-0.5 rounded-md bg-[var(--canvas-bg)] border border-[var(--border-subtle)] font-mono text-[10px] text-[var(--text-main)] shadow-2xs">
                                 /
                             </kbd>
                         </div>
                         <p className="text-[10px] text-[var(--text-muted)] leading-normal">
-                            Tippe <span className="font-mono text-[10px] text-[var(--text-main)]">/</span> im Editor für Tabellen, To-Dos, Zitate und mehr.
+                            {t('tutorial.slashCommandsDesc')}
                         </p>
                     </div>
 
@@ -90,7 +92,7 @@ export const EmptyStateTutorial: React.FC<EmptyStateTutorialProps> = ({
                         <div className="flex items-center justify-between">
                             <span className="text-[11px] font-semibold text-[var(--text-main)] flex items-center gap-1.5">
                                 <FolderTree size={13} className="text-[var(--accent-color)]" />
-                                Organisation
+                                {t('tutorial.organization')}
                             </span>
                             <kbd className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[var(--canvas-bg)] border border-[var(--border-subtle)] font-mono text-[10px] text-[var(--text-main)] shadow-2xs">
                                 <GripVertical size={11} className="shrink-0 text-[var(--text-main)]" />
@@ -99,7 +101,7 @@ export const EmptyStateTutorial: React.FC<EmptyStateTutorialProps> = ({
                             </kbd>
                         </div>
                         <p className="text-[10px] text-[var(--text-muted)] leading-normal">
-                            Ordner per Drag & Drop sortieren und im Kontextmenü anpassen.
+                            {t('tutorial.organizationDesc')}
                         </p>
                     </div>
 
@@ -108,14 +110,14 @@ export const EmptyStateTutorial: React.FC<EmptyStateTutorialProps> = ({
                         <div className="flex items-center justify-between">
                             <span className="text-[11px] font-semibold text-[var(--text-main)] flex items-center gap-1.5">
                                 <Palette size={13} className="text-[var(--accent-color)]" />
-                                Einstellungen
+                                {t('tutorial.settingsTitle')}
                             </span>
                             <kbd className="px-1.5 py-0.5 rounded-md bg-[var(--canvas-bg)] border border-[var(--border-subtle)] font-mono text-[10px] text-[var(--text-main)] shadow-2xs">
                                 {modKey} ,
                             </kbd>
                         </div>
                         <p className="text-[10px] text-[var(--text-muted)] leading-normal">
-                            Dark Mode, Sage Green, Clay Themes & Schriftarten wählen.
+                            {t('tutorial.settingsDesc')}
                         </p>
                     </div>
                 </div>
@@ -123,3 +125,4 @@ export const EmptyStateTutorial: React.FC<EmptyStateTutorialProps> = ({
         </div>
     );
 };
+

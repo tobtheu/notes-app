@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { useTranslation } from '../i18n';
 
 interface UpdateModalProps {
     version: string;
@@ -19,6 +20,8 @@ interface UpdateModalProps {
  * Integrates with the Tauri updater status to show download progress.
  */
 export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, status }: UpdateModalProps) {
+    const { t } = useTranslation();
+
     return (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300" onClick={onCancel}>
             <div className="w-full max-w-sm rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()} style={{ backgroundColor: 'var(--app-bg)' }}>
@@ -35,10 +38,9 @@ export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, st
                         </button>
                     </div>
 
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Update Available!</h3>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{t('modals.updateTitle')}</h3>
                     <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-6">
-                        A new version <span className="font-mono font-bold text-primary-600 dark:text-primary-400">v{version}</span> is ready to download.
-                        Enjoy the latest features and improvements for your notes.
+                        {t('modals.updateDesc', { version })}
                     </p>
 
                     <div className="space-y-3">
@@ -48,7 +50,7 @@ export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, st
                                 onClick={onUpdate}
                                 className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-all shadow-md shadow-primary-500/20 active:scale-[0.98]"
                             >
-                                Update & Restart
+                                {t('modals.updateRestart')}
                             </button>
                         )}
 
@@ -77,7 +79,7 @@ export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, st
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
-                                Start Installation
+                                {t('modals.startInstallation')}
                             </button>
                         )}
 
@@ -95,13 +97,13 @@ export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, st
                                 onClick={onSkip}
                                 className="py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                             >
-                                Skip This Version
+                                {t('modals.skipVersion')}
                             </button>
                             <button
                                 onClick={onCancel}
                                 className="py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                             >
-                                Maybe Later
+                                {t('modals.later')}
                             </button>
                         </div>
                     </div>
@@ -110,3 +112,4 @@ export function UpdateModal({ version, onUpdate, onSkip, onCancel, onInstall, st
         </div>
     );
 }
+

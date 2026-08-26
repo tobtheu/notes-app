@@ -4,6 +4,7 @@ import { type } from '@tauri-apps/plugin-os';
 import { PanelLeftClose, PanelLeftOpen, ChevronLeft } from 'lucide-react';
 import { Minus, Square, X } from 'lucide-react';
 import clsx from 'clsx';
+import { useTranslation } from '../i18n';
 
 // Guard against module-level failure on iOS/environments where __TAURI_INTERNALS__
 // may not be injected yet when the module is evaluated.
@@ -25,6 +26,7 @@ interface TitleBarProps {
 }
 
 export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onBack, hideSidebarToggle }: TitleBarProps) => {
+    const { t } = useTranslation();
     const [platform, setPlatform] = useState<string | null>(null);
 
     useEffect(() => {
@@ -77,7 +79,7 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                         className="md:hidden no-drag mt-1 p-1.5 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-md text-gray-500 hover:text-primary-500 transition-all flex items-center gap-1 active:scale-95"
                     >
                         <ChevronLeft size={20} />
-                        <span className="text-sm font-semibold">Back</span>
+                        <span className="text-sm font-semibold">{t('common.back')}</span>
                     </button>
                 )}
 
@@ -93,7 +95,7 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                             isIOS ? "hidden" : "hidden md:flex p-1.5",
                             isMac && isSidebarCollapsed ? "absolute left-21" : "ml-auto"
                         )}
-                        title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                        title={isSidebarCollapsed ? t('sidebar.expandSidebar') : t('sidebar.collapseSidebar')}
                     >
                         {isSidebarCollapsed
                             ? <PanelLeftOpen size={isIOS && activeView !== 'editor' ? 20 : 18} />
@@ -117,7 +119,7 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                 <div className="flex h-full items-stretch relative z-10 no-drag" onMouseDown={e => e.stopPropagation()}>
                     <button
                         type="button"
-                        title="Minimize"
+                        title={t('common.minimize')}
                         onClick={() => appWindow?.minimize()}
                         className="flex items-center justify-center w-11 hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors no-drag"
                     >
@@ -125,7 +127,7 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                     </button>
                     <button
                         type="button"
-                        title="Maximize"
+                        title={t('common.maximize')}
                         onClick={async () => {
                             const isMax = await appWindow?.isMaximized();
                             if (isMax) {
@@ -140,7 +142,7 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
                     </button>
                     <button
                         type="button"
-                        title="Close"
+                        title={t('common.close')}
                         onClick={() => appWindow?.close()}
                         className="flex items-center justify-center w-12 hover:bg-red-500 hover:text-white text-gray-500 dark:text-gray-400 transition-colors no-drag"
                     >
@@ -153,3 +155,4 @@ export const TitleBar = ({ isSidebarCollapsed, onToggleCollapse, activeView, onB
         </div>
     );
 };
+

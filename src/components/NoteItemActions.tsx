@@ -1,6 +1,7 @@
 import { Pin, FolderTree, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { Note } from '../types';
+import { useTranslation } from '../i18n';
 
 interface NoteSwipeActionsProps {
     note: Note;
@@ -25,6 +26,8 @@ export function NoteSwipeActions({
     onDeleteNote,
     closeSwipe,
 }: NoteSwipeActionsProps) {
+    const { t } = useTranslation();
+
     return (
         <div
             style={{
@@ -40,7 +43,7 @@ export function NoteSwipeActions({
                     "flex items-center justify-center w-14 h-full text-white transition-colors shrink-0",
                     isPinned ? "bg-[var(--accent-color)]" : "bg-gray-400 dark:bg-gray-600"
                 )}
-                title={isPinned ? "Unpin Note" : "Pin Note"}
+                title={isPinned ? t('notes.unpinNote') : t('notes.pinNote')}
             >
                 <Pin size={16} fill={isPinned ? "currentColor" : "none"} />
             </button>
@@ -48,7 +51,7 @@ export function NoteSwipeActions({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setDropdownOpenId(dropdownOpenId === noteId ? null : noteId); closeSwipe(); }}
                 className="flex items-center justify-center w-14 h-full bg-blue-500 hover:bg-blue-600 text-white transition-colors shrink-0 folder-dropdown-trigger"
-                title="Move to Folder"
+                title={t('notes.moveToFolder')}
             >
                 <FolderTree size={16} />
             </button>
@@ -56,7 +59,7 @@ export function NoteSwipeActions({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onDeleteNote(noteId); closeSwipe(); }}
                 className="flex items-center justify-center w-14 h-full bg-red-500 hover:bg-red-600 text-white transition-colors shrink-0 rounded-r-xl"
-                title="Delete Note"
+                title={t('notes.deleteNote')}
             >
                 <Trash2 size={16} />
             </button>
@@ -87,6 +90,8 @@ export function NoteMenuPopover({
     onTogglePin,
     onDeleteNote,
 }: NoteMenuPopoverProps) {
+    const { t } = useTranslation();
+
     if (!isOpen) return null;
 
     return (
@@ -103,7 +108,7 @@ export function NoteMenuPopover({
                 className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-[var(--card-hover)] flex items-center gap-2 text-[var(--text-main)] active:scale-95"
             >
                 <Pin size={13} className={clsx("text-[var(--text-muted)]", isPinned && "fill-current text-[var(--accent-color)]")} />
-                <span>{isPinned ? 'Unpin Note' : 'Pin Note'}</span>
+                <span>{isPinned ? t('notes.unpinNote') : t('notes.pinNote')}</span>
             </button>
             <button
                 type="button"
@@ -114,7 +119,7 @@ export function NoteMenuPopover({
                 className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-[var(--card-hover)] flex items-center gap-2 text-[var(--text-main)] active:scale-95 folder-dropdown-trigger"
             >
                 <FolderTree size={13} className="text-[var(--text-muted)]" />
-                <span>Move to...</span>
+                <span>{t('notes.moveToFolder')}...</span>
             </button>
             <div className="h-px bg-[var(--border-subtle)] my-1 mx-2" />
             <button
@@ -126,8 +131,9 @@ export function NoteMenuPopover({
                 className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 flex items-center gap-2 active:scale-95"
             >
                 <Trash2 size={13} />
-                <span>Delete</span>
+                <span>{t('common.delete')}</span>
             </button>
         </div>
     );
 }
+

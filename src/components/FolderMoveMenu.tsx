@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Folder, FolderTree, Check } from 'lucide-react';
 import clsx from 'clsx';
+import { useTranslation } from '../i18n';
 
 interface FolderMoveMenuProps {
     noteFolder: string | null;
@@ -15,6 +16,7 @@ export function FolderMoveMenu({
     onMoveNote,
     onClose
 }: FolderMoveMenuProps) {
+    const { t } = useTranslation();
     const [dragY, setDragY] = useState(0);
     const dragStartY = useRef<number | null>(null);
 
@@ -49,7 +51,7 @@ export function FolderMoveMenu({
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="px-3 py-1.5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider sticky top-0 bg-[var(--canvas-bg)]/95 backdrop-blur-md border-b border-[var(--border-subtle)] select-none">
-                    Move Note to...
+                    {t('notes.moveToFolder')}...
                 </div>
                 <button
                     type="button"
@@ -64,7 +66,7 @@ export function FolderMoveMenu({
                     }}
                 >
                     <FolderTree size={13} className={clsx(!noteFolder ? "text-[var(--accent-color)]" : "text-[var(--text-muted)]")} />
-                    <span className="flex-1 truncate">All Notes (Root)</span>
+                    <span className="flex-1 truncate">{t('sidebar.allNotes')}</span>
                     {!noteFolder && <Check size={12} className="text-[var(--accent-color)] shrink-0" />}
                 </button>
                 {folders.map(folder => (
@@ -115,7 +117,7 @@ export function FolderMoveMenu({
                 >
                     <div className="w-10 h-1 bg-[var(--border-subtle)] rounded-full mx-auto mb-3" />
                     <h3 className="text-sm font-bold text-[var(--text-main)] text-center">
-                        Move Note to Folder
+                        {t('notes.moveToFolder')}
                     </h3>
                 </div>
 
@@ -135,7 +137,7 @@ export function FolderMoveMenu({
                         }}
                     >
                         <FolderTree size={15} className={clsx(!noteFolder ? "text-[var(--accent-color)]" : "text-[var(--text-muted)]")} />
-                        <span className="flex-1">All Notes (Root)</span>
+                        <span className="flex-1">{t('sidebar.allNotes')}</span>
                         {!noteFolder && <Check size={14} className="text-[var(--accent-color)]" />}
                     </button>
                     {folders.map(folder => (
@@ -164,3 +166,4 @@ export function FolderMoveMenu({
         </>
     );
 }
+

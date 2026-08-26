@@ -1,4 +1,5 @@
 import { Trash2, X, MoveUp } from 'lucide-react';
+import { useTranslation } from '../i18n';
 
 interface DeleteFolderModalProps {
     folderName: string;
@@ -13,6 +14,8 @@ interface DeleteFolderModalProps {
  * 2. Delete everything (Recursive deletion of category and its notes)
  */
 export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFolderModalProps) {
+    const { t } = useTranslation();
+
     return (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
             <div
@@ -22,7 +25,7 @@ export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFold
             >
                 {/* --- HEADER --- */}
                 <div className="px-4 py-3.5 border-b border-[var(--border-subtle)] flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-[var(--text-main)]">Delete Folder</h3>
+                    <h3 className="text-sm font-bold text-[var(--text-main)]">{t('modals.deleteFolderTitle')}</h3>
                     <button onClick={onClose} className="smooth-transition p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] active:scale-95">
                         <X size={16} />
                     </button>
@@ -31,7 +34,7 @@ export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFold
                 {/* --- BODY --- */}
                 <div className="p-4 space-y-3">
                     <p className="text-xs text-[var(--text-muted)] text-center mb-3">
-                        How would you like to delete the folder <span className="font-semibold text-[var(--text-main)]">"{folderName}"</span>?
+                        {t('modals.deleteFolderMessage', { name: folderName })}
                     </p>
 
                     <div className="space-y-2">
@@ -45,8 +48,8 @@ export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFold
                                 <MoveUp size={16} />
                             </div>
                             <div>
-                                <div className="font-semibold text-xs text-[var(--text-main)]">Move notes to All Notes</div>
-                                <div className="text-[10px] text-[var(--text-muted)] leading-tight">Delete folder but preserve all notes.</div>
+                                <div className="font-semibold text-xs text-[var(--text-main)]">{t('modals.deleteFolderKeepNotes')}</div>
+                                <div className="text-[10px] text-[var(--text-muted)] leading-tight">{t('modals.deleteFolderKeepNotesDesc')}</div>
                             </div>
                         </button>
 
@@ -60,8 +63,8 @@ export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFold
                                 <Trash2 size={16} />
                             </div>
                             <div>
-                                <div className="font-semibold text-xs text-red-600 dark:text-red-400">Delete everything</div>
-                                <div className="text-[10px] text-red-500/70 dark:text-red-400/60 leading-tight">Permanently delete folder and all notes inside.</div>
+                                <div className="font-semibold text-xs text-red-600 dark:text-red-400">{t('modals.deleteFolderAndNotes')}</div>
+                                <div className="text-[10px] text-red-500/70 dark:text-red-400/60 leading-tight">{t('modals.deleteFolderAndNotesDesc')}</div>
                             </div>
                         </button>
                     </div>
@@ -70,3 +73,4 @@ export function DeleteFolderModal({ folderName, onClose, onConfirm }: DeleteFold
         </div>
     );
 }
+

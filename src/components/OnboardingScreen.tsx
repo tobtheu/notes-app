@@ -2,6 +2,7 @@ import { useState } from 'react';
 import logo from '../assets/logo.png';
 import { OnboardingAuthCard } from './OnboardingAuthCard';
 import { OnboardingStorageCard } from './OnboardingStorageCard';
+import { useTranslation } from '../i18n';
 
 interface Props {
     onSelectFolder?: () => void;
@@ -15,6 +16,7 @@ type Screen = 'choice' | 'email';
 type AuthMode = 'signin' | 'signup';
 
 export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, onSignUp, onLocalOnly }: Props) {
+    const { t } = useTranslation();
     const [screen, setScreen] = useState<Screen>('choice');
     const [authMode, setAuthMode] = useState<AuthMode>('signin');
 
@@ -64,13 +66,13 @@ export function OnboardingScreen({ onSelectFolder, onSetupWorkspace, onSignIn, o
         } catch (e: any) {
             const msg = e?.toString() ?? '';
             if (msg.includes('Invalid login credentials') || msg.includes('invalid_grant')) {
-                setError('Email or password is incorrect.');
+                setError(t('onboarding.errInvalidCredentials'));
             } else if (msg.includes('User already registered')) {
-                setError('This email is already registered. Please sign in instead.');
+                setError(t('onboarding.errAlreadyRegistered'));
             } else if (msg.includes('Password should be at least')) {
-                setError('Password must be at least 6 characters long.');
+                setError(t('onboarding.errPasswordShort'));
             } else {
-                setError('Connection failed. Please check your internet connection.');
+                setError(t('onboarding.errConnectionFailed'));
             }
         } finally {
             setIsLoading(false);

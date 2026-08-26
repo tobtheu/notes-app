@@ -1,6 +1,7 @@
 import { Cloud, FolderOpen, ChevronRight } from 'lucide-react';
 import { FEATURES } from '../config/features';
 import clsx from 'clsx';
+import { useTranslation } from '../i18n';
 
 interface OnboardingStorageCardProps {
     onOpenEmailAuth: (mode: 'signin' | 'signup') => void;
@@ -13,15 +14,16 @@ export function OnboardingStorageCard({
     onLocalOnly,
     isLoading = false,
 }: OnboardingStorageCardProps) {
+    const { t } = useTranslation();
     const isSyncEnabled = FEATURES.SYNC;
 
     return (
         <div className="w-full animate-note-fade">
             <h1 className="text-2xl sm:text-3xl font-extrabold mb-1.5 tracking-tight text-[var(--text-main)]">
-                Welcome to Lama
+                {t('onboarding.welcomeTitle')}
             </h1>
             <p className="mb-6 text-[var(--text-muted)] text-sm leading-relaxed">
-                Your thoughts, beautifully formatted and stored securely.
+                {t('onboarding.welcomeSubtitle')}
             </p>
 
             <div className="grid gap-3 w-full">
@@ -46,15 +48,15 @@ export function OnboardingStorageCard({
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <span className="font-semibold text-xs sm:text-sm text-[var(--text-main)]">Sign In / Register</span>
+                                <span className="font-semibold text-xs sm:text-sm text-[var(--text-main)]">{t('onboarding.cloudTitle')}</span>
                                 {!isSyncEnabled && (
                                     <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-[var(--accent-color)]/15 text-[var(--accent-color)] border border-[var(--accent-color)]/30">
-                                        Coming Soon
+                                        {t('onboarding.cloudComingSoon')}
                                     </span>
                                 )}
                             </div>
                             <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                                {isSyncEnabled ? 'Sync across all your devices' : 'Cloud synchronization in development'}
+                                {isSyncEnabled ? t('onboarding.cloudDesc') : t('onboarding.cloudDisabledDesc')}
                             </div>
                         </div>
                     </div>
@@ -81,8 +83,8 @@ export function OnboardingStorageCard({
                             <FolderOpen size={18} />
                         </div>
                         <div>
-                            <div className="font-semibold text-xs sm:text-sm text-[var(--text-main)]">Use locally only</div>
-                            <div className="text-[11px] text-[var(--text-muted)] mt-0.5">Save notes offline on this device</div>
+                            <div className="font-semibold text-xs sm:text-sm text-[var(--text-main)]">{t('onboarding.useLocally')}</div>
+                            <div className="text-[11px] text-[var(--text-muted)] mt-0.5">{t('onboarding.localDesc')}</div>
                         </div>
                     </div>
                     <ChevronRight size={16} className="text-[var(--text-muted)] group-hover:text-[var(--text-main)] group-hover:translate-x-0.5 transition-all shrink-0" />
@@ -91,3 +93,4 @@ export function OnboardingStorageCard({
         </div>
     );
 }
+

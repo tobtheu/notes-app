@@ -1,5 +1,6 @@
 import { Loader2, ArrowLeft, Check } from 'lucide-react';
 import clsx from 'clsx';
+import { useTranslation } from '../i18n';
 
 interface OnboardingAuthCardProps {
     authMode: 'signin' | 'signup';
@@ -28,6 +29,8 @@ export function OnboardingAuthCard({
     onSubmit,
     onBack,
 }: OnboardingAuthCardProps) {
+    const { t } = useTranslation();
+
     return (
         <div className="w-full animate-note-fade">
             <button
@@ -36,23 +39,23 @@ export function OnboardingAuthCard({
                 className="smooth-transition flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] mb-4 -ml-1 py-1 px-2 rounded-lg hover:bg-[var(--card-hover)] active:scale-95"
             >
                 <ArrowLeft size={14} />
-                <span>Zurück</span>
+                <span>{t('onboarding.back')}</span>
             </button>
 
             <h1 className="text-xl sm:text-2xl font-extrabold mb-1 tracking-tight text-[var(--text-main)]">
-                {authMode === 'signin' ? 'Willkommen zurück' : 'Konto erstellen'}
+                {authMode === 'signin' ? t('onboarding.signInTitle') : t('onboarding.signUpTitle')}
             </h1>
             <p className="mb-5 text-[var(--text-muted)] text-xs leading-relaxed">
                 {authMode === 'signin'
-                    ? 'Melde dich an, um deine Notizen zu synchronisieren.'
-                    : 'Erstelle ein Konto für sichere Ende-zu-Ende-Cloud-Synchronisierung.'}
+                    ? t('onboarding.signInSubtitle')
+                    : t('onboarding.signUpSubtitle')}
             </p>
 
             <form onSubmit={onSubmit} className="space-y-3 w-full">
                 <input
                     type="email"
                     required
-                    placeholder="E-Mail-Adresse"
+                    placeholder={t('onboarding.emailPlaceholder')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading || success}
@@ -61,7 +64,7 @@ export function OnboardingAuthCard({
                 <input
                     type="password"
                     required
-                    placeholder="Passwort"
+                    placeholder={t('onboarding.passwordPlaceholder')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading || success}
@@ -87,10 +90,10 @@ export function OnboardingAuthCard({
                     ) : success ? (
                         <>
                             <Check size={14} />
-                            <span>Angemeldet!</span>
+                            <span>{t('onboarding.signedIn')}</span>
                         </>
                     ) : (
-                        <span>{authMode === 'signin' ? 'Anmelden' : 'Registrieren'}</span>
+                        <span>{authMode === 'signin' ? t('onboarding.signInBtn') : t('onboarding.signUpBtn')}</span>
                     )}
                 </button>
 
@@ -101,11 +104,12 @@ export function OnboardingAuthCard({
                         className="smooth-transition text-xs text-[var(--text-muted)] hover:text-[var(--accent-color)] py-1 px-2 rounded-lg hover:bg-[var(--card-hover)]"
                     >
                         {authMode === 'signin'
-                            ? 'Noch kein Konto? Jetzt registrieren'
-                            : 'Bereits ein Konto? Jetzt anmelden'}
+                            ? t('onboarding.needAccount')
+                            : t('onboarding.haveAccount')}
                     </button>
                 </div>
             </form>
         </div>
     );
 }
+

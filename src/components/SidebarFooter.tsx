@@ -2,6 +2,7 @@ import React from 'react';
 import { Settings } from 'lucide-react';
 import clsx from 'clsx';
 import type { SyncStatus } from '../types';
+import { useTranslation } from '../i18n';
 
 interface SidebarFooterProps {
     userId?: string | null;
@@ -20,35 +21,36 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({
     isCollapsed,
     onOpenSettings,
 }) => {
+    const { t } = useTranslation();
     const isLocalMode = !userId || userId === 'local' || !userEmail;
 
     const syncInfo = (() => {
         if (isLocalMode) {
             return {
-                label: 'Lokaler Modus',
+                label: t('onboarding.localTitle'),
                 dotClass: 'bg-gray-400 dark:bg-gray-500',
             };
         }
         if (syncStatus === 'pending' || hasPending) {
             return {
-                label: 'Synchronisiere...',
+                label: t('settings.syncSection.statusPending'),
                 dotClass: 'bg-amber-500 animate-pulse',
             };
         }
         if (syncStatus === 'error') {
             return {
-                label: 'Sync-Fehler',
+                label: t('settings.syncSection.statusError'),
                 dotClass: 'bg-red-500',
             };
         }
         if (syncStatus === 'offline') {
             return {
-                label: 'Offline',
+                label: t('settings.syncSection.statusOffline'),
                 dotClass: 'bg-gray-400',
             };
         }
         return {
-            label: 'Cloud Synced',
+            label: t('settings.syncSection.statusSynced'),
             dotClass: 'bg-emerald-500',
         };
     })();
@@ -63,10 +65,11 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({
                 type="button"
                 onClick={onOpenSettings}
                 className="smooth-transition p-1 text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-md hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 shrink-0"
-                title="Settings"
+                title={t('settings.title')}
             >
                 <Settings size={14} />
             </button>
         </div>
     );
 };
+

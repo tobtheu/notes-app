@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
+import { useTranslation } from '../i18n';
 
 interface FolderActionMenuProps {
     isOpen: boolean;
@@ -14,6 +15,7 @@ export function FolderActionMenu({
     onEdit,
     onDelete,
 }: FolderActionMenuProps) {
+    const { t } = useTranslation();
     const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -50,7 +52,7 @@ export function FolderActionMenu({
                     className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-[var(--card-hover)] flex items-center gap-2 text-[var(--text-main)] active:scale-95"
                 >
                     <Pencil size={13} className="text-[var(--text-muted)]" />
-                    <span>Edit Folder</span>
+                    <span>{t('modals.editFolder')}</span>
                 </button>
             )}
             {onDelete && (
@@ -65,10 +67,11 @@ export function FolderActionMenu({
                         className="smooth-transition w-full text-left px-3 py-1.5 hover:bg-red-500/10 flex items-center gap-2 text-red-500 active:scale-95"
                     >
                         <Trash2 size={13} />
-                        <span>Delete Folder</span>
+                        <span>{t('common.delete')}</span>
                     </button>
                 </>
             )}
         </div>
     );
 }
+

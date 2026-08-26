@@ -14,7 +14,7 @@ describe('Sidebar Status Indicator', () => {
         onOpenSettings: vi.fn(),
     };
 
-    it('renders "Lokaler Modus" when in local offline mode', () => {
+    it('renders "Local Offline Storage" when in local offline mode', () => {
         render(
             <Sidebar
                 {...defaultProps}
@@ -24,7 +24,7 @@ describe('Sidebar Status Indicator', () => {
             />
         );
 
-        expect(screen.getByText('Lokaler Modus')).toBeDefined();
+        expect(screen.getByText('Local Offline Storage')).toBeDefined();
     });
 
     it('renders "Cloud Synced" when cloud account is connected and synced', () => {
@@ -40,7 +40,7 @@ describe('Sidebar Status Indicator', () => {
         expect(screen.getByText('Cloud Synced')).toBeDefined();
     });
 
-    it('renders "Synchronisiere..." when sync is pending', () => {
+    it('renders "Syncing..." when sync is pending', () => {
         render(
             <Sidebar
                 {...defaultProps}
@@ -50,7 +50,7 @@ describe('Sidebar Status Indicator', () => {
             />
         );
 
-        expect(screen.getByText('Synchronisiere...')).toBeDefined();
+        expect(screen.getByText('Syncing...')).toBeDefined();
     });
 
     it('renders folder items uniquely without duplicate entries', () => {

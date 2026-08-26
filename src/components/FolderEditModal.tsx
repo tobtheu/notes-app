@@ -3,6 +3,7 @@ import { Type } from 'lucide-react';
 import type { FolderMetadata } from '../types';
 import { FolderColorGrid, FOLDER_COLORS } from './FolderColorGrid';
 import { FolderIconGrid, FOLDER_ICONS } from './FolderIconGrid';
+import { useTranslation } from '../i18n';
 
 interface FolderEditModalProps {
     isOpen: boolean;
@@ -13,6 +14,7 @@ interface FolderEditModalProps {
 }
 
 export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave }: FolderEditModalProps) {
+    const { t } = useTranslation();
     const [name, setName] = useState(folderName);
     const [selectedIcon, setSelectedIcon] = useState(metadata.icon || 'Folder');
     const [selectedColor, setSelectedColor] = useState(metadata.color || 'gray');
@@ -66,7 +68,7 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                         <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-black/5 dark:bg-white/5">
                             <SelectedIconComponent size={16} style={{ color: selectedColorData.hex }} />
                         </div>
-                        <h2 className="text-sm font-bold text-[var(--text-main)]">Edit Folder</h2>
+                        <h2 className="text-sm font-bold text-[var(--text-main)]">{t('modals.editFolder')}</h2>
                     </div>
                 </div>
 
@@ -74,7 +76,7 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                     {/* Name Input */}
                     <div className="space-y-1.5">
                         <label className="flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                            <Type size={12} /> Name
+                            <Type size={12} /> {t('common.save') !== 'Save' ? 'Name' : 'Name'}
                         </label>
                         <input
                             type="text"
@@ -83,7 +85,7 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                             onBlur={handleNameBlur}
                             onKeyDown={handleKeyDown}
                             className="smooth-transition w-full px-3 py-1.5 bg-[var(--card-hover)] border border-transparent focus:border-[var(--border-subtle)] rounded-xl outline-none text-xs text-[var(--text-main)] placeholder-[var(--text-muted)] focus:ring-1 focus:ring-[var(--accent-color)]/30"
-                            placeholder="Folder name..."
+                            placeholder={`${t('sidebar.newFolder')}...`}
                             autoFocus
                         />
                     </div>
@@ -108,10 +110,11 @@ export function FolderEditModal({ isOpen, onClose, folderName, metadata, onSave 
                         onClick={onClose}
                         className="smooth-transition px-4 py-1.5 text-xs font-semibold text-white bg-[var(--accent-color)] hover:opacity-90 rounded-xl shadow-sm active:scale-95"
                     >
-                        Done
+                        {t('common.done')}
                     </button>
                 </div>
             </div>
         </div>
     );
 }
+

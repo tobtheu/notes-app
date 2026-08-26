@@ -31,7 +31,7 @@ describe('OnboardingScreen', () => {
         );
 
         // Click "Use locally only"
-        const localBtn = screen.getByText('Use locally only');
+        const localBtn = screen.getByText('Use Locally Only');
         localBtn.click();
 
         expect(onLocalOnly).toHaveBeenCalled();

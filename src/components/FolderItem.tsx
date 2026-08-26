@@ -7,6 +7,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ICON_MAP, COLOR_MAP } from '../utils/sidebar';
 import { FolderActionMenu } from './FolderActionMenu';
+import { useTranslation } from '../i18n';
 
 export interface FolderItemProps {
     folder: string;
@@ -52,6 +53,7 @@ export const FolderItem = ({
     onSelectCategory, onEditCategory, onDeleteCategory,
     isDragging, isOverlay, setNodeRef, attributes, listeners, style
 }: FolderItemProps) => {
+    const { t } = useTranslation();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const longPressTimer = useRef<any>(null);
     const [isLongPressing, setIsLongPressing] = useState(false);
@@ -137,7 +139,7 @@ export const FolderItem = ({
                                         ? "text-[var(--text-muted)] cursor-grab active:cursor-grabbing opacity-100"
                                         : "opacity-0 group-hover/folder:opacity-100 text-[var(--text-muted)] cursor-grab active:cursor-grabbing pointer-events-none group-hover/folder:pointer-events-auto"
                                 )}
-                                title="Drag to reorder"
+                                title={t('sidebar.reorderFolders')}
                             >
                                 <GripVertical size={13} />
                             </div>
@@ -176,7 +178,7 @@ export const FolderItem = ({
                         "smooth-transition absolute right-1.5 p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/10 active:scale-95 z-20",
                         isMenuOpen ? "opacity-100 bg-black/5 dark:bg-white/10 text-[var(--text-main)]" : "opacity-0 group-hover/folder:opacity-100 pointer-events-none group-hover/folder:pointer-events-auto"
                     )}
-                    title="Folder Options"
+                    title={t('common.more')}
                 >
                     <MoreVertical size={13} />
                 </button>

@@ -6,6 +6,7 @@ import { extractNoteTitle, extractNotePreview } from '../utils/markdown';
 import { useNoteSwipe } from '../hooks/useNoteSwipe';
 import { FolderMoveMenu } from './FolderMoveMenu';
 import { NoteSwipeActions, NoteMenuPopover } from './NoteItemActions';
+import { useTranslation } from '../i18n';
 
 interface NoteListItemProps {
     note: Note;
@@ -40,6 +41,7 @@ export const NoteListItem = memo(({
     isNew = false,
     registerItemRef
 }: NoteListItemProps) => {
+    const { t } = useTranslation();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -168,7 +170,7 @@ export const NoteListItem = memo(({
                                     "smooth-transition absolute p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/10 active:scale-95",
                                     isMenuOpen ? "opacity-100 bg-black/5 dark:bg-white/10 text-[var(--text-main)]" : "opacity-0 group-hover/note:opacity-100 pointer-events-none group-hover/note:pointer-events-auto"
                                 )}
-                                title="Note Options"
+                                title={t('common.more')}
                             >
                                 <MoreVertical size={13} />
                             </button>

@@ -18,6 +18,7 @@ import {
 import { FolderItem, SortableFolderItem } from './FolderItem';
 import { SidebarFooter } from './SidebarFooter';
 import { useFolderDnd } from '../hooks/useFolderDnd';
+import { useTranslation } from '../i18n';
 
 interface SidebarProps {
     sidebarRef?: React.RefObject<HTMLDivElement | null>;
@@ -73,6 +74,7 @@ export function Sidebar({
     syncStatus,
     hasPending = false,
 }: SidebarProps) {
+    const { t } = useTranslation();
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
     const [newFolderName, setNewFolderName] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
@@ -125,7 +127,7 @@ export function Sidebar({
                         type="button"
                         onClick={onToggleCollapse}
                         className="p-1.5 rounded-md text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-all active:scale-95"
-                        title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                        title={isCollapsed ? t('sidebar.expandSidebar') : t('sidebar.collapseSidebar')}
                     >
                         {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
                     </button>
@@ -146,12 +148,12 @@ export function Sidebar({
                                 ? "bg-[var(--card-active)] shadow-sm text-[var(--text-main)] font-semibold border border-[var(--border-subtle)]"
                                 : "text-[var(--text-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--text-main)] border border-transparent"
                         )}
-                        title="All Notes"
+                        title={t('sidebar.allNotes')}
                     >
                         <Folder size={isCollapsed ? 18 : 15} className="text-[var(--accent-color)] shrink-0" />
                         {!isCollapsed && (
                             <>
-                                <span className="truncate">All Notes</span>
+                                <span className="truncate">{t('sidebar.allNotes')}</span>
                                 {showNoteCounts && (
                                     <span className="ml-auto text-[10px] font-mono text-[var(--text-muted)] pr-0.5">{totalNotesCount}</span>
                                 )}
@@ -165,7 +167,7 @@ export function Sidebar({
                     {/* Header (hidden when collapsed) */}
                     {!isCollapsed && (
                         <div className="flex items-center justify-between px-2 mb-1 text-[10px] font-semibold tracking-wider uppercase text-[var(--text-muted)]">
-                            <span>FOLDERS</span>
+                            <span>{t('sidebar.folders')}</span>
                             <div className="flex items-center gap-0.5">
                                 {isReorderMode ? (
                                     <button
@@ -174,7 +176,7 @@ export function Sidebar({
                                         className="smooth-transition text-xs text-[var(--accent-color)] font-semibold hover:underline px-1 py-0.5 active:scale-95 flex items-center gap-1"
                                     >
                                         <Check size={12} />
-                                        <span>Done</span>
+                                        <span>{t('common.done')}</span>
                                     </button>
                                 ) : (
                                     <>
@@ -182,7 +184,7 @@ export function Sidebar({
                                             type="button"
                                             onClick={() => setIsCreatingFolder(true)}
                                             className="smooth-transition text-[var(--text-muted)] hover:text-[var(--text-main)] p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                                            title="New Folder"
+                                            title={t('sidebar.newFolder')}
                                         >
                                             <Plus size={13} />
                                         </button>
@@ -190,7 +192,7 @@ export function Sidebar({
                                             type="button"
                                             onClick={() => setIsReorderMode(true)}
                                             className="smooth-transition text-[var(--text-muted)] hover:text-[var(--text-main)] p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 lg:hidden"
-                                            title="Reorder"
+                                            title={t('sidebar.reorderFolders')}
                                         >
                                             <Settings2 size={13} />
                                         </button>
@@ -254,7 +256,7 @@ export function Sidebar({
                                         ref={inputRef}
                                         type="text"
                                         className="w-full px-2.5 py-1.5 bg-[var(--canvas-bg)] border border-[var(--border-subtle)] rounded-xl text-xs text-[var(--text-main)] outline-none focus:ring-1 focus:ring-[var(--accent-color)]"
-                                        placeholder="Folder name..."
+                                        placeholder={`${t('sidebar.newFolder')}...`}
                                         autoFocus
                                         value={newFolderName}
                                         onChange={(e) => setNewFolderName(e.target.value)}
@@ -281,3 +283,4 @@ export function Sidebar({
         </aside>
     );
 }
+

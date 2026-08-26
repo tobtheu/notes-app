@@ -14,11 +14,11 @@ describe('UrlInputModal', () => {
             />
         );
 
-        expect(screen.getByText('Link einfügen')).toBeDefined();
+        expect(screen.getByText('Insert Link')).toBeDefined();
         expect(screen.getByPlaceholderText('https://example.com')).toBeDefined();
-        expect(screen.getByPlaceholderText('Link-Text...')).toBeDefined();
-        expect(screen.getByText('Speichern')).toBeDefined();
-        expect(screen.queryByText('Abbrechen')).toBeNull();
+        expect(screen.getByPlaceholderText('Link text...')).toBeDefined();
+        expect(screen.getByText('Save')).toBeDefined();
+        expect(screen.queryByText('Cancel')).toBeNull();
 
         // Verify tabs for internal/external are removed
         expect(screen.queryByText('External')).toBeNull();
@@ -40,7 +40,7 @@ describe('UrlInputModal', () => {
         const urlInput = screen.getByPlaceholderText('https://example.com');
         fireEvent.change(urlInput, { target: { value: '' } });
 
-        const saveButton = screen.getByText('Speichern');
+        const saveButton = screen.getByText('Save');
         fireEvent.click(saveButton);
 
         expect(handleSave).toHaveBeenCalledWith('', 'Some text');

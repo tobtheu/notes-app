@@ -7,8 +7,8 @@ describe('EmptyStateTutorial', () => {
         const onCreateNote = vi.fn();
         render(<EmptyStateTutorial onCreateNote={onCreateNote} />);
 
-        expect(screen.getByText('Willkommen bei Lama Notes')).toBeDefined();
-        expect(screen.getByText('Neue Notiz erstellen')).toBeDefined();
+        expect(screen.getByText('Welcome to Lama Notes')).toBeDefined();
+        expect(screen.getByText('Create New Note')).toBeDefined();
         const logoImg = screen.getByAltText('Lama Notes');
         expect(logoImg).toBeDefined();
     });
@@ -17,7 +17,7 @@ describe('EmptyStateTutorial', () => {
         const onCreateNote = vi.fn();
         const { container } = render(<EmptyStateTutorial onCreateNote={onCreateNote} />);
 
-        expect(screen.getByText('Organisation')).toBeDefined();
+        expect(screen.getByText('Organization')).toBeDefined();
         // Plain text "3-Punkte" should no longer exist
         expect(screen.queryByText('3-Punkte')).toBeNull();
 
