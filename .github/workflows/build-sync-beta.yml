@@ -13,17 +13,23 @@ on:
 jobs:
   build-beta:
     permissions:
-      contents: read
+      contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: "macos-latest"
+            target: "aarch64-apple-darwin"
             args: "--config src-tauri/tauri.beta.conf.json --target aarch64-apple-darwin"
             artifact_name: "lama-notes-beta-macos-arm64"
+          - platform: "macos-latest"
+            target: "x86_64-apple-darwin"
+            args: "--config src-tauri/tauri.beta.conf.json --target x86_64-apple-darwin"
+            artifact_name: "lama-notes-beta-macos-x64"
           - platform: "windows-latest"
+            target: "x86_64-pc-windows-msvc"
             args: "--config src-tauri/tauri.beta.conf.json"
-            artifact_name: "lama-notes-beta-windows"
+            artifact_name: "lama-notes-beta-windows-x64"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -37,13 +43,7 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
-
-      - name: install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: install frontend dependencies
         run: npm install
@@ -65,7 +65,7 @@ jobs:
           includeUpdaterJson: true
           args: ${{ matrix.args }}
 
-      - name: Upload Beta Build Artifact
+      - name: Upload Beta Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
@@ -73,3 +73,52 @@ jobs:
             src-tauri/target/**/bundle/**/*.dmg
             src-tauri/target/**/bundle/**/*.msi
             src-tauri/target/**/bundle/**/*.exe
+            src-tauri/target/**/bundle/**/*.tar.gz
+            src-tauri/target/**/bundle/**/*.zip
+            src-tauri/target/**/bundle/**/*.sig
+            src-tauri/target/**/bundle/**/latest.json
+
+  deploy-vps:
+    needs: build-beta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-beta-artifacts
+
+      - name: Prepare VPS Update Directory & Manifest
+        run: |
+          mkdir -p vps-deploy
+          find all-beta-artifacts/ -type f -name "*.dmg" -exec cp {} vps-deploy/ \;
+          find all-beta-artifacts/ -type f -name "*.exe" -exec cp {} vps-deploy/ \;
+          find all-beta-artifacts/ -type f -name "*.msi" -exec cp {} vps-deploy/ \;
+          find all-beta-artifacts/ -type f -name "*.tar.gz" -exec cp {} vps-deploy/ \;
+          find all-beta-artifacts/ -type f -name "*.zip" -exec cp {} vps-deploy/ \;
+          find all-beta-artifacts/ -type f -name "*.sig" -exec cp {} vps-deploy/ \;
+          
+          # Find latest.json from build artifacts and copy as beta.json
+          MANIFEST=$(find all-beta-artifacts/ -type f -name "latest.json" | head -n 1)
+          if [ -n "$MANIFEST" ]; then
+            cp "$MANIFEST" vps-deploy/beta.json
+          fi
+
+          echo "Deployment package contents:"
+          ls -la vps-deploy/
+
+      - name: Deploy to VPS via SSH / SCP
+        if: env.VPS_HOST != '' && env.VPS_SSH_KEY != ''
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME || 'root' }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          source: "vps-deploy/*"
+          target: "/var/www/lamanotes-updates/"
+          strip_components: 1
