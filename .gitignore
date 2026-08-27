@@ -29,8 +29,7 @@ dist-ssr
 *.sw?
 updater.key
 updater.key.pub
-  
-docs/ 
+docs/
 
 # Environment Variables
 .env
