@@ -7,6 +7,7 @@ interface UseNotesNoteOpsProps {
     dbRef: React.MutableRefObject<PGliteWithLive | null>;
     userId: string | null;
     notes: Note[];
+    trashNotes?: Note[];
     selectedNoteId: string | null;
     setSelectedNoteId: (id: string | null) => void;
     selectedCategory: string | null;
@@ -20,6 +21,7 @@ export function useNotesNoteOps({
     dbRef,
     userId,
     notes,
+    trashNotes,
     selectedNoteId,
     setSelectedNoteId,
     selectedCategory,
@@ -29,6 +31,7 @@ export function useNotesNoteOps({
     getNoteId
 }: UseNotesNoteOpsProps) {
     const savingNotes = useRef<Record<string, Promise<string> | undefined>>({});
+    const inFlightCreations = useRef<Set<string>>(new Set());
 
     /**
      * Unified, non-destructive note save.
@@ -63,30 +66,72 @@ export function useNotesNoteOps({
     /**
      * Instant, atomic note creation.
      * Generates a clean filename (Untitled note.md) in the active folder and opens the editor immediately.
+     * Prevents note overwriting and collisions across active notes, trash, and in-flight creations.
      */
     const createNote = useCallback(async () => {
         if (!userId) return;
         const folderStr = selectedCategory ?? '';
-        const normFolder = normalizeStr(folderStr);
-        const existingFilenames = new Set(
-            notes.filter(n => normalizeStr(n.folder) === normFolder).map(n => n.filename)
-        );
 
+        // 1. Gather all existing IDs (case-normalized) from active notes, trash, and in-flight creations
+        const existingIds = new Set<string>();
+        for (const n of notes) {
+            existingIds.add(normalizeStr(getNoteId(n)));
+        }
+        if (trashNotes) {
+            for (const n of trashNotes) {
+                existingIds.add(normalizeStr(getNoteId(n)));
+            }
+        }
+        for (const inFlight of inFlightCreations.current) {
+            existingIds.add(inFlight);
+        }
+
+        // 2. Compute first free candidate filename & ID synchronously so selection mounts in <1ms
         let filename = 'Untitled note.md';
+        let candidateId = getPathId(filename, folderStr);
         let counter = 1;
-        while (existingFilenames.has(filename)) {
+        while (existingIds.has(candidateId)) {
             filename = `Untitled note ${counter}.md`;
+            candidateId = getPathId(filename, folderStr);
             counter++;
         }
-        const id = getPathId(filename, folderStr);
+
+        // Reserve ID immediately so rapid consecutive calls won't pick the same ID
+        inFlightCreations.current.add(candidateId);
         const updatedAt = new Date().toISOString();
 
-        // 1. Select immediately so the editor mounts in <1ms
-        setSelectedNoteId(id);
+        // 3. Select immediately so the editor mounts in <1ms
+        setSelectedNoteId(candidateId);
 
-        // 2. Direct single-write into PGlite database
-        await writeNote(id, '# ', updatedAt, false);
-    }, [userId, notes, selectedCategory, setSelectedNoteId, writeNote]);
+        // 4. Verify against DB if available (defense-in-depth against external sync / trash collisions)
+        try {
+            if (dbRef.current) {
+                try {
+                    const res = await dbRef.current.query<{ id: string }>(
+                        `SELECT id FROM notes WHERE user_id = $1`,
+                        [userId]
+                    );
+                    const dbIds = new Set(res.rows.map(r => normalizeStr(r.id)));
+                    if (dbIds.has(candidateId)) {
+                        while (existingIds.has(candidateId) || dbIds.has(candidateId)) {
+                            filename = `Untitled note ${counter}.md`;
+                            candidateId = getPathId(filename, folderStr);
+                            counter++;
+                        }
+                        inFlightCreations.current.add(candidateId);
+                        setSelectedNoteId(candidateId);
+                    }
+                } catch {
+                    // Fall back to in-memory check
+                }
+            }
+
+            // 5. Direct single-write into PGlite database
+            await writeNote(candidateId, '# ', updatedAt, false);
+        } finally {
+            inFlightCreations.current.delete(candidateId);
+        }
+    }, [userId, notes, trashNotes, selectedCategory, setSelectedNoteId, writeNote, getNoteId, dbRef]);
 
     /**
      * Delete note with soft-delete flag in PGlite and clean up metadata pins.

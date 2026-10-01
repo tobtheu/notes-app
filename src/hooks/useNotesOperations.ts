@@ -10,6 +10,7 @@ interface UseNotesOperationsProps {
     metadata?: AppMetadata;
     metadataRef: React.MutableRefObject<AppMetadata>;
     notes: Note[];
+    trashNotes?: Note[];
     sortedFolders: string[];
     selectedNoteId: string | null;
     setSelectedNoteId: (id: string | null) => void;
@@ -25,6 +26,7 @@ export function useNotesOperations({
     userId,
     metadataRef,
     notes,
+    trashNotes,
     sortedFolders,
     selectedNoteId,
     setSelectedNoteId,
@@ -55,6 +57,7 @@ export function useNotesOperations({
         dbRef,
         userId,
         notes,
+        trashNotes,
         selectedNoteId,
         setSelectedNoteId,
         selectedCategory,

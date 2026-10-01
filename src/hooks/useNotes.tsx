@@ -200,6 +200,7 @@ export function useNotes() {
     dbRef,
     userId,
     notes,
+    trashNotes,
     sortedFolders: folders,
     metadata,
     metadataRef,

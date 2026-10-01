@@ -173,13 +173,13 @@ export function useNoteEditor({
         if (content === lastSavedContent.current) return;
 
         const timer = setTimeout(async () => {
-            await onSave(lastNoteId.current, note.filename, content, note.folder);
+            await onSave(currentNoteId, note.filename, content, note.folder);
             lastSavedContent.current = content;
             isDirty.current = false;
         }, 150);
 
         return () => clearTimeout(timer);
-    }, [content, note.filename, note.folder, onSave]);
+    }, [content, currentNoteId, note.filename, note.folder, onSave]);
 
     /**
      * --- FLUSH ON UNMOUNT / NOTE SWITCH ---
@@ -196,11 +196,11 @@ export function useNoteEditor({
     useEffect(() => {
         return () => {
             if (isDirty.current && contentRef.current !== lastSavedContent.current) {
-                onSaveRef.current(lastNoteId.current, note.filename, contentRef.current, note.folder);
+                onSaveRef.current(currentNoteId, note.filename, contentRef.current, note.folder);
             }
             onSyncRef.current?.();
         };
-    }, [note.filename, note.folder]);
+    }, [currentNoteId, note.filename, note.folder]);
 
     const handleExport = useCallback(() => {
         exportNoteToPdf(title, body);
