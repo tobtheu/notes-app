@@ -167,7 +167,7 @@ export function TrashSection({
                     </div>
                 ) : (
                     filteredNotes.map(note => {
-                        const noteId = getPathId(note.filename, note.folder);
+                        const noteId = note.id ?? (note.filename ? getPathId(note.filename, note.folder) : '');
                         return (
                             <TrashListItem
                                 key={noteId}

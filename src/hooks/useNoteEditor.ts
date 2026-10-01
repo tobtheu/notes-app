@@ -37,7 +37,7 @@ export function useNoteEditor({
     const markdownEditorRef = useRef<MarkdownEditorRef>(null);
     const plainTextContainerRef = useRef<HTMLDivElement>(null);
 
-    const currentNoteId = note.id ?? getPathId(note.filename, note.folder || "");
+    const currentNoteId = note.id ?? (note.filename ? getPathId(note.filename, note.folder || "") : "");
     const lastNoteId = useRef(currentNoteId);
     const lastSavedContent = useRef(note.content);
     const isDirty = useRef(false);
@@ -56,7 +56,7 @@ export function useNoteEditor({
      * --- STATE SYNC WHEN SWITCHING NOTES ---
      */
     useEffect(() => {
-        const id = note.id ?? getPathId(note.filename, note.folder || "");
+        const id = note.id ?? (note.filename ? getPathId(note.filename, note.folder || "") : "");
 
         if (id !== lastNoteId.current) {
             lastNoteId.current = id;

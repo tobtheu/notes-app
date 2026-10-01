@@ -36,7 +36,7 @@ describe('SettingsModal', () => {
                 onImportFiles={vi.fn().mockResolvedValue(3)}
                 onExportBackup={vi.fn().mockResolvedValue(10)}
                 trashNotes={[
-                    { filename: 'Deleted Note.md', folder: '', content: '# Deleted\nContent', updatedAt: new Date().toISOString() }
+                    { id: 'deleted-note-1', filename: 'Deleted Note.md', folder: '', content: '# Deleted\nContent', updatedAt: new Date().toISOString() }
                 ]}
             />
         );

@@ -14,12 +14,14 @@ describe('TrashSection', () => {
 
     const mockTrashNotes: Note[] = [
         {
+            id: 'trash-1',
             filename: 'Old Project Ideas.md',
             folder: 'Ideas',
             content: '# Old Project Ideas\nSome old brainstorming notes...',
             updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago (25 days left)
         },
         {
+            id: 'trash-2',
             filename: 'Grocery list.md',
             folder: '',
             content: '# Grocery list\nApples, Oranges, Bananas',
@@ -144,12 +146,14 @@ describe('TrashSection', () => {
         const manyNotes: Note[] = [
             ...mockTrashNotes,
             {
+                id: 'trash-3',
                 filename: 'Random note.md',
                 folder: 'Archive',
                 content: '# Random\nTesting content',
                 updatedAt: new Date().toISOString(),
             },
             {
+                id: 'trash-4',
                 filename: 'Work Meeting.md',
                 folder: 'Work',
                 content: '# Work Meeting\nDiscuss Q3 metrics',

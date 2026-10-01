@@ -33,7 +33,7 @@ export const TrashListItem: React.FC<TrashListItemProps> = ({
     onCancelConfirmDelete,
 }) => {
     const { t, formatDate } = useTranslation();
-    const noteId = getPathId(note.filename, note.folder);
+    const noteId = note.id ?? (note.filename ? getPathId(note.filename, note.folder) : '');
     const title = extractNoteTitle(note.content, note.filename);
     const preview = extractNotePreview(note.content);
     const daysLeft = getDaysRemaining(note.updatedAt);

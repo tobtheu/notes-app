@@ -97,7 +97,7 @@ export function useNotes() {
 
   // Note ID helper
   const getNoteId = useCallback((note: Note) => {
-    return note.id ?? getPathId(note.filename, note.folder);
+    return note.id ?? (note.filename ? getPathId(note.filename, note.folder) : '');
   }, []);
 
   // Pending writes indicator

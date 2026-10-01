@@ -12,11 +12,12 @@ import type { Note } from '../types'
  */
 
 function makeNote(filename: string, folder: string = ''): Note {
-    return { filename, folder, content: `# ${filename}`, updatedAt: new Date().toISOString() }
+    const id = getPathId(filename, folder || '');
+    return { id, filename, folder, content: `# ${filename}`, updatedAt: new Date().toISOString() };
 }
 
 function getNoteId(note: Note): string {
-    return getPathId(note.filename, note.folder || '')
+    return note.id ?? (note.filename ? getPathId(note.filename, note.folder || '') : '');
 }
 
 /**
@@ -32,7 +33,7 @@ function resolveCollision(
     currentNotes: Note[],
 ): string {
     const collision = currentNotes.some((n) =>
-        normalizeStr(n.filename) === normalizeStr(targetFilename) &&
+        normalizeStr(n.filename || '') === normalizeStr(targetFilename) &&
         normalizeStr(n.folder) === normalizeStr(folder || '') &&
         getNoteId(n) !== currentId
     )

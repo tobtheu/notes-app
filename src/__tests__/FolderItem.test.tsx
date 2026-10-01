@@ -50,8 +50,8 @@ describe('FolderItem and Sidebar Note Counts', () => {
                 selectedCategory={null}
                 isCollapsed={false}
                 allNotes={[
-                    { filename: '1.md', folder: 'Work', content: 'c', updatedAt: '2026-08-22' },
-                    { filename: '2.md', folder: 'Work', content: 'c', updatedAt: '2026-08-22' },
+                    { id: '1', filename: '1.md', folder: 'Work', content: 'c', updatedAt: '2026-08-22' },
+                    { id: '2', filename: '2.md', folder: 'Work', content: 'c', updatedAt: '2026-08-22' },
                 ]}
                 onCreateNote={vi.fn()}
                 onDeleteCategory={vi.fn()}
@@ -73,8 +73,8 @@ describe('FolderItem and Sidebar Note Counts', () => {
                 selectedCategory={null}
                 isCollapsed={false}
                 allNotes={[
-                    { filename: '1.md', folder: 'Work', content: 'c', updatedAt: '2026-08-22' },
-                    { filename: '2.md', folder: 'Work', content: 'c', updatedAt: '2026-08-22' },
+                    { id: '1', filename: '1.md', folder: 'Work', content: 'c', updatedAt: '2026-08-22' },
+                    { id: '2', filename: '2.md', folder: 'Work', content: 'c', updatedAt: '2026-08-22' },
                 ]}
                 onCreateNote={vi.fn()}
                 onDeleteCategory={vi.fn()}

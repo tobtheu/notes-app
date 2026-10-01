@@ -22,7 +22,7 @@ describe('useNotesOperations — Trash Features', () => {
         writeConfig = vi.fn().mockResolvedValue(undefined);
     });
 
-    const getNoteId = (n: Note) => getPathId(n.filename, n.folder);
+    const getNoteId = (n: Note) => n.id ?? (n.filename ? getPathId(n.filename, n.folder) : '');
 
     it('soft-deletes a note by calling writeNote with deleted = true', async () => {
         const notes: Note[] = [

@@ -7,7 +7,13 @@ import { log } from '../lib/logger';
 interface UseNotesTrashOpsProps {
     dbRef: React.MutableRefObject<PGliteWithLive | null>;
     userId: string | null;
-    writeNote: (id: string, content: string, updatedAt: string, deleted?: boolean) => Promise<void>;
+    writeNote: (
+        id: string,
+        folderOrContent: string,
+        contentOrUpdatedAt: string,
+        updatedAtOrDeleted?: string | boolean,
+        maybeDeleted?: boolean
+    ) => Promise<void>;
 }
 
 export function useNotesTrashOps({
