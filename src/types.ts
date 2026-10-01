@@ -4,10 +4,11 @@
  * synced by ElectricSQL. The .md files on disk are a read-only mirror.
  */
 export interface Note {
-    filename: string;
+    id: string;
     folder: string;
     content: string;
     updatedAt: string;
+    filename?: string;
 }
 
 /**
