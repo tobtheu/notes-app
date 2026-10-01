@@ -8,19 +8,20 @@ describe('exportBackup', () => {
         expect(sanitizeFilename('   ')).toBe('Untitled note');
     });
 
-    it('exports all notes to target directory structure using display title filenames', async () => {
+    it('exports all notes without filename property to target directory structure using display title filenames', async () => {
         const mockWrite = vi.fn().mockResolvedValue(undefined);
         (window as any).tauriAPI = { writeMirrorFile: mockWrite };
 
         const notes: Note[] = [
-            { filename: 'note-123.md', folder: '', content: '# Meeting Notes\nSome content', updatedAt: '2026-08-20T10:00:00Z' },
-            { filename: 'note-456.md', folder: 'Work', content: '# Project Roadmaps\nRoadmap details', updatedAt: '2026-08-20T11:00:00Z' },
-            { filename: 'note-789.md', folder: 'Work', content: '# Project Roadmaps\nDuplicate name note', updatedAt: '2026-08-20T12:00:00Z' }
+            { id: 'uuid-1', folder: '', content: '# Meeting Notes\nSome content', updatedAt: '2026-08-20T10:00:00Z' },
+            { id: 'uuid-2', folder: 'Work', content: '# Project Roadmaps\nRoadmap details', updatedAt: '2026-08-20T11:00:00Z' },
+            { id: 'uuid-3', folder: 'Work', content: '# Project Roadmaps\nDuplicate name note', updatedAt: '2026-08-20T12:00:00Z' },
+            { id: 'uuid-4', folder: 'Work', content: 'Plain text without header', updatedAt: '2026-08-20T13:00:00Z' },
         ];
 
         const count = await exportNotesToDirectory(notes, '/backup/folder');
-        expect(count).toBe(3);
-        expect(mockWrite).toHaveBeenCalledTimes(3);
+        expect(count).toBe(4);
+        expect(mockWrite).toHaveBeenCalledTimes(4);
 
         expect(mockWrite).toHaveBeenNthCalledWith(1, {
             mirrorFolder: '/backup/folder',
@@ -53,6 +54,18 @@ describe('exportBackup', () => {
                 folder: 'Work',
                 content: notes[2].content,
                 updatedAt: notes[2].updatedAt
+            }
+        });
+
+        // Plain text note falls back to 'Plain text without header.md' or 'Untitled note.md'
+        expect(mockWrite).toHaveBeenNthCalledWith(4, {
+            mirrorFolder: '/backup/folder',
+            note: {
+                ...notes[3],
+                filename: 'Plain text without header.md',
+                folder: 'Work',
+                content: notes[3].content,
+                updatedAt: notes[3].updatedAt
             }
         });
     });
