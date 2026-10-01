@@ -291,14 +291,16 @@ describe('stale-write rejection — timestamp-based conflict resolution', () => 
 describe('write payload structure', () => {
   it('note payload has all required Supabase columns', () => {
     const payload = {
-      id: 'work/meeting.md',
+      id: 'uuid-123',
       user_id: 'user-123',
+      folder: 'work',
       content: '# Meeting',
       updated_at: new Date().toISOString(),
       deleted: false,
     }
     expect(payload).toHaveProperty('id')
     expect(payload).toHaveProperty('user_id')
+    expect(payload).toHaveProperty('folder')
     expect(payload).toHaveProperty('content')
     expect(payload).toHaveProperty('updated_at')
     expect(payload).toHaveProperty('deleted')

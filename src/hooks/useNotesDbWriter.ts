@@ -13,47 +13,72 @@ const NOTE_SIZE_LIMIT = 5 * 1024 * 1024;
 export function useNotesDbWriter({ dbRef, userId }: UseNotesDbWriterProps) {
     const writeNote = useCallback(async (
         id: string,
-        content: string,
-        updatedAt: string,
-        deleted = false,
+        folderOrContent: string,
+        contentOrUpdatedAt: string,
+        updatedAtOrDeleted?: string | boolean,
+        maybeDeleted = false,
     ) => {
         if (!userId || !dbRef.current) return;
         const db = dbRef.current;
+
+        // Support both (id, folder, content, updatedAt, deleted) and (id, content, updatedAt, deleted)
+        let folder = '';
+        let content = '';
+        let updatedAt = '';
+        let deleted = false;
+
+        if (typeof updatedAtOrDeleted === 'boolean' || updatedAtOrDeleted === undefined) {
+            folder = '';
+            content = folderOrContent;
+            updatedAt = contentOrUpdatedAt;
+            deleted = !!updatedAtOrDeleted;
+        } else {
+            folder = folderOrContent;
+            content = contentOrUpdatedAt;
+            updatedAt = updatedAtOrDeleted;
+            deleted = maybeDeleted;
+        }
 
         if (!deleted && (content.length > 2_500_000 && new Blob([content]).size > NOTE_SIZE_LIMIT)) {
             log.warn(`[useNotes:writeNote] note ${id} exceeds 5MB size limit — write blocked`);
             throw new Error('Note is too large (max. 5 MB). Please shorten the content.');
         }
 
-        const existing = await db.query<{ updated_at: string }>(
-            `SELECT updated_at FROM notes WHERE id = $1 AND user_id = $2`,
+        const existing = await db.query<{ updated_at: string; folder: string }>(
+            `SELECT updated_at, folder FROM notes WHERE id = $1 AND user_id = $2`,
             [id, userId]
         );
         let finalUpdatedAt = updatedAt;
+        let finalFolder = folder;
         if (existing.rows.length > 0) {
             const existingTime = new Date(existing.rows[0].updated_at).getTime();
             const localTime = new Date(updatedAt).getTime();
             if (existingTime >= localTime) {
                 finalUpdatedAt = new Date(existingTime + 1).toISOString();
             }
+            if (!finalFolder && existing.rows[0].folder) {
+                finalFolder = existing.rows[0].folder;
+            }
         }
 
         await db.query(
             /* sql */ `
-      INSERT INTO notes (id, user_id, content, updated_at, deleted)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO notes (id, user_id, folder, content, updated_at, deleted)
+      VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (id, user_id) DO UPDATE SET
+        folder     = EXCLUDED.folder,
         content    = EXCLUDED.content,
         updated_at = EXCLUDED.updated_at,
         deleted    = EXCLUDED.deleted
       `,
-            [id, userId, content, finalUpdatedAt, deleted],
+            [id, userId, finalFolder, content, finalUpdatedAt, deleted],
         );
 
         if (userId !== 'local') {
             await enqueue(db, 'notes', 'upsert', {
                 id,
                 user_id: userId,
+                folder: finalFolder,
                 content,
                 updated_at: finalUpdatedAt,
                 deleted,

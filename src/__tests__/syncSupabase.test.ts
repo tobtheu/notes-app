@@ -24,8 +24,8 @@ describe('syncSupabase', () => {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockResolvedValue({
               data: [
-                { id: 'work/plan.md', user_id: 'user-123', content: '# Plan', updated_at: '2026-08-22T20:00:00Z', deleted: false },
-                { id: 'deleted-note.md', user_id: 'user-123', content: '', updated_at: '2026-08-22T20:00:00Z', deleted: true },
+                { id: 'uuid-1', user_id: 'user-123', folder: 'work', content: '# Plan', updated_at: '2026-08-22T20:00:00Z', deleted: false },
+                { id: 'uuid-2', user_id: 'user-123', folder: '', content: '', updated_at: '2026-08-22T20:00:00Z', deleted: true },
               ],
               error: null,
             }),

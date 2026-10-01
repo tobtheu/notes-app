@@ -23,7 +23,7 @@ export async function pullFromSupabase(
     const [notesRes, configRes] = await Promise.all([
       supabase
         .from('notes')
-        .select('id, user_id, content, updated_at, deleted')
+        .select('id, user_id, folder, content, updated_at, deleted')
         .eq('user_id', userId),
       supabase
         .from('app_config')
@@ -52,14 +52,15 @@ export async function pullFromSupabase(
         log.info(`[syncSupabase:pull] atomically applying ${remoteNotes.length} remote note(s)`);
         for (const row of remoteNotes) {
           await tx.query(
-            `INSERT INTO notes (id, user_id, content, updated_at, deleted)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO notes (id, user_id, folder, content, updated_at, deleted)
+             VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (id, user_id) DO UPDATE SET
+               folder     = EXCLUDED.folder,
                content    = EXCLUDED.content,
                updated_at = EXCLUDED.updated_at,
                deleted    = EXCLUDED.deleted
              WHERE CAST(EXCLUDED.updated_at AS timestamptz) >= CAST(notes.updated_at AS timestamptz)`,
-            [row.id, row.user_id, row.content, row.updated_at, row.deleted],
+            [row.id, row.user_id, (row as any).folder || '', row.content, row.updated_at, row.deleted],
           );
           notesCount++;
         }

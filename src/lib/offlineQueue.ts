@@ -28,6 +28,7 @@ import { log } from './logger';
 export interface NoteWritePayload {
   id: string;
   user_id: string;
+  folder: string;
   content: string;
   updated_at: string;
   deleted: boolean;
