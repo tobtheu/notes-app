@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient';
 import { setSupabaseSession } from './supabaseClient';
 import type { AppMetadata } from '../types';
 import { log } from './logger';
-import { updateSyncProgress } from './syncProgress';
+import { updateSyncProgress, getSyncProgress } from './syncProgress';
 
 /**
  * Offline-first write queue.
@@ -65,7 +65,7 @@ async function ensureFreshToken(): Promise<void> {
     // Refresh if less than 5 minutes remaining
     if (secondsLeft < 300) {
       log.info('[offlineQueue] token expiring soon, refreshing...');
-      const refreshed = await window.tauriAPI.refreshSupabaseToken().catch(() => null);
+      const refreshed = await window.tauriAPI?.refreshSupabaseToken?.().catch(() => null);
       if (refreshed) {
         await setSupabaseSession(refreshed.accessToken, refreshed.refreshToken);
         log.info('[offlineQueue] token refreshed ✓');
@@ -179,175 +179,219 @@ export async function enqueue(
  * Serialized — at most one flush runs at a time.
  * Returns the number of writes successfully flushed.
  */
-export function flushQueue(db: PGliteWithLive): Promise<number> {
+let _retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Schedule an automatic retry for failed writes after backoff delay.
+ */
+export function scheduleQueueFlush(db: PGliteWithLive, delayMs: number): void {
+  if (_retryTimer) clearTimeout(_retryTimer);
+  _retryTimer = setTimeout(() => {
+    _retryTimer = null;
+    flushQueue(db).catch((e) => log.error('[offlineQueue] scheduled flush error:', e));
+  }, delayMs);
+}
+
+/**
+ * Flush all pending writes to Supabase.
+ * Serialized — at most one flush runs at a time.
+ * If force=true, resets next_retry_at on all pending writes and flushes immediately.
+ * Returns the number of writes successfully flushed.
+ */
+export function flushQueue(db: PGliteWithLive, force = false): Promise<number> {
   if (_flushPromise) {
     // Chain onto the running flush so the caller gets a fresh result after it finishes
-    _flushPromise = _flushPromise.then(() => _doFlush(db));
+    _flushPromise = _flushPromise.then(() => _doFlush(db, force));
     return _flushPromise;
   }
-  _flushPromise = _doFlush(db).finally(() => { _flushPromise = null; });
+  _flushPromise = _doFlush(db, force).finally(() => { _flushPromise = null; });
   return _flushPromise;
 }
 
-async function _doFlush(db: PGliteWithLive): Promise<number> {
+async function _doFlush(db: PGliteWithLive, force = false): Promise<number> {
   if (!navigator.onLine) return 0;
 
-  // Refresh token before starting — avoids 401 mid-flush
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    log.warn('[offlineQueue] flush aborted — no active session');
-    return 0;
-  }
-  log.info(`[offlineQueue] flush starting — user: ${session.user.id}`);
-  await ensureFreshToken();
-
-  const { rows } = await db.query<{
-    id: string;
-    table_name: string;
-    operation: string;
-    payload: string;
-    attempts: number;
-    next_retry_at: string;
-  }>(
-    /* sql */ `
-    SELECT * FROM pending_writes
-    WHERE CAST(next_retry_at AS timestamptz) <= NOW()
-    ORDER BY created_at ASC
-    LIMIT 50
-    `,
-  );
-
-  if (rows.length === 0) {
-    log.info('[offlineQueue] flush — nothing due for retry');
-    return 0;
-  }
-
-  // Purge any stale 'local', malformed, or mismatched user writes from pending_writes
-  const invalidWrites = rows.filter(r => {
-    try {
-      const p = JSON.parse(r.payload);
-      return !p.user_id || p.user_id === 'local' || p.user_id !== session.user.id;
-    } catch {
-      return true;
+  try {
+    // Refresh token before starting — avoids 401 mid-flush
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      log.warn('[offlineQueue] flush aborted — no active session');
+      return 0;
     }
-  });
+    log.info(`[offlineQueue] flush starting — user: ${session.user.id}, force: ${force}`);
+    await ensureFreshToken();
 
-  if (invalidWrites.length > 0) {
-    const invalidIds = invalidWrites.map(r => r.id);
-    await db.query(`DELETE FROM pending_writes WHERE id = ANY($1::text[])`, [invalidIds]);
-  }
-
-  const validRows = rows.filter(r => {
-    try {
-      const p = JSON.parse(r.payload);
-      return p.user_id && p.user_id === session.user.id;
-    } catch {
-      return false;
-    }
-  });
-
-  if (validRows.length === 0) {
-    log.info('[offlineQueue] flush — no valid writes for current session');
-    return 0;
-  }
-
-  log.info(`[offlineQueue] flushing ${validRows.length} pending write(s)...`);
-  updateSyncProgress({
-    phase: 'pushing',
-    total: validRows.length,
-    completed: 0,
-    currentItem: `${validRows.length} ausstehende Änderungen...`,
-    error: undefined,
-  });
-  let flushed = 0;
-
-  // Group writes by table + operation
-  const byGroup = new Map<string, typeof validRows>();
-  for (const row of validRows) {
-    const key = `${row.table_name}:${row.operation}`;
-    if (!byGroup.has(key)) byGroup.set(key, []);
-    byGroup.get(key)!.push(row);
-  }
-
-  for (const [key, group] of byGroup) {
-    const [tableName, op] = key.split(':') as ['notes' | 'app_config', WriteOperation];
-    const payloads = group.map(r => JSON.parse(r.payload));
-    try {
-      if (op === 'delete') {
-        await deleteWithTimeout(tableName, payloads as NoteDeletePayload[]);
-      } else {
-        await upsertWithTimeout(tableName, payloads);
-      }
-      // Batch succeeded — delete all rows from pending_writes in one query
-      const ids = group.map(r => r.id);
+    // If manually forced, reset any future next_retry_at to NOW() so all items flush immediately
+    if (force) {
       await db.query(
-        `DELETE FROM pending_writes WHERE id = ANY($1::text[])`,
-        [ids],
+        /* sql */ `UPDATE pending_writes SET next_retry_at = NOW() WHERE CAST(next_retry_at AS timestamptz) > NOW()`
       );
-      flushed += group.length;
-      updateSyncProgress({
-        phase: 'pushing',
-        total: validRows.length,
-        completed: flushed,
-        currentItem: `${tableName === 'notes' ? 'Notizen' : 'Konfiguration'} (${op})`,
-      });
-      log.info(`[offlineQueue] ✓ batch-flushed ${group.length} ${tableName} ${op}(s)`);
-    } catch (batchErr) {
-      const batchMsg = batchErr instanceof Error ? batchErr.message : String(batchErr);
-      log.warn(`[offlineQueue] batch ${tableName} ${op} failed (${batchMsg}) — falling back to per-row`);
+    }
 
-      for (const write of group) {
-        try {
-          const payload = JSON.parse(write.payload);
-          if (op === 'delete') {
-            await deleteWithTimeout(tableName, payload);
-          } else {
-            await upsertWithTimeout(tableName, payload);
-          }
-          await db.query(`DELETE FROM pending_writes WHERE id = $1`, [write.id]);
-          flushed++;
-          let noteTitle = write.id;
+    const { rows } = await db.query<{
+      id: string;
+      table_name: string;
+      operation: string;
+      payload: string;
+      attempts: number;
+      next_retry_at: string;
+    }>(
+      /* sql */ `
+      SELECT * FROM pending_writes
+      WHERE CAST(next_retry_at AS timestamptz) <= NOW()
+      ORDER BY created_at ASC
+      LIMIT 50
+      `,
+    );
+
+    if (rows.length === 0) {
+      log.info('[offlineQueue] flush — nothing due for retry');
+      return 0;
+    }
+
+    // Purge any stale 'local', malformed, or mismatched user writes from pending_writes
+    const invalidWrites = rows.filter(r => {
+      try {
+        const p = JSON.parse(r.payload);
+        return !p.user_id || p.user_id === 'local' || p.user_id !== session.user.id;
+      } catch {
+        return true;
+      }
+    });
+
+    if (invalidWrites.length > 0) {
+      const invalidIds = invalidWrites.map(r => r.id);
+      await db.query(`DELETE FROM pending_writes WHERE id = ANY($1::text[])`, [invalidIds]);
+    }
+
+    const validRows = rows.filter(r => {
+      try {
+        const p = JSON.parse(r.payload);
+        return p.user_id && p.user_id === session.user.id;
+      } catch {
+        return false;
+      }
+    });
+
+    if (validRows.length === 0) {
+      log.info('[offlineQueue] flush — no valid writes for current session');
+      return 0;
+    }
+
+    log.info(`[offlineQueue] flushing ${validRows.length} pending write(s)...`);
+    updateSyncProgress({
+      phase: 'pushing',
+      total: validRows.length,
+      completed: 0,
+      currentItem: `${validRows.length} ausstehende Änderungen...`,
+      error: undefined,
+    });
+    let flushed = 0;
+    let minRetryDelay = Infinity;
+
+    // Group writes by table + operation
+    const byGroup = new Map<string, typeof validRows>();
+    for (const row of validRows) {
+      const key = `${row.table_name}:${row.operation}`;
+      if (!byGroup.has(key)) byGroup.set(key, []);
+      byGroup.get(key)!.push(row);
+    }
+
+    for (const [key, group] of byGroup) {
+      const [tableName, op] = key.split(':') as ['notes' | 'app_config', WriteOperation];
+      const payloads = group.map(r => JSON.parse(r.payload));
+      try {
+        if (op === 'delete') {
+          await deleteWithTimeout(tableName, payloads as NoteDeletePayload[]);
+        } else {
+          await upsertWithTimeout(tableName, payloads);
+        }
+        // Batch succeeded — delete all rows from pending_writes in one query
+        const ids = group.map(r => r.id);
+        await db.query(
+          `DELETE FROM pending_writes WHERE id = ANY($1::text[])`,
+          [ids],
+        );
+        flushed += group.length;
+        updateSyncProgress({
+          phase: 'pushing',
+          total: validRows.length,
+          completed: flushed,
+          currentItem: `${tableName === 'notes' ? 'Notizen' : 'Konfiguration'} (${op})`,
+        });
+        log.info(`[offlineQueue] ✓ batch-flushed ${group.length} ${tableName} ${op}(s)`);
+      } catch (batchErr) {
+        const batchMsg = batchErr instanceof Error ? batchErr.message : String(batchErr);
+        log.warn(`[offlineQueue] batch ${tableName} ${op} failed (${batchMsg}) — falling back to per-row`);
+
+        for (const write of group) {
           try {
-            if (write.table_name === 'notes' && payload.content) {
-              const line1 = payload.content.trim().split('\n')[0].replace(/^#+\s*/, '').trim();
-              if (line1) noteTitle = line1.slice(0, 30);
+            const payload = JSON.parse(write.payload);
+            if (op === 'delete') {
+              await deleteWithTimeout(tableName, payload);
+            } else {
+              await upsertWithTimeout(tableName, payload);
             }
-          } catch {}
-          updateSyncProgress({
-            phase: 'pushing',
-            total: validRows.length,
-            completed: flushed,
-            currentItem: `${op.toUpperCase()}: ${noteTitle}`,
-          });
-          log.info(`[offlineQueue] ✓ flushed ${write.id}`);
-        } catch (err) {
-          const newAttempts = write.attempts + 1;
-          const errMsg = err instanceof Error ? err.message : String(err);
-          log.error(`[offlineQueue] ✗ failed ${write.id} (attempt ${newAttempts}): ${errMsg}`);
-
-          if (newAttempts >= 10) {
             await db.query(`DELETE FROM pending_writes WHERE id = $1`, [write.id]);
-            log.error(`[offlineQueue] abandoned ${write.id} after 10 attempts`);
-          } else {
-            const nextRetry = new Date(Date.now() + backoffMs(newAttempts)).toISOString();
-            await db.query(
-              `UPDATE pending_writes SET attempts = $1, next_retry_at = $2 WHERE id = $3`,
-              [newAttempts, nextRetry, write.id],
-            );
-            log.info(`[offlineQueue] will retry ${write.id} after ${Math.round(backoffMs(newAttempts) / 1000)}s`);
+            flushed++;
+            let noteTitle = write.id;
+            try {
+              if (write.table_name === 'notes' && payload.content) {
+                const line1 = payload.content.trim().split('\n')[0].replace(/^#+\s*/, '').trim();
+                if (line1) noteTitle = line1.slice(0, 30);
+              }
+            } catch {}
+            updateSyncProgress({
+              phase: 'pushing',
+              total: validRows.length,
+              completed: flushed,
+              currentItem: `${op.toUpperCase()}: ${noteTitle}`,
+            });
+            log.info(`[offlineQueue] ✓ flushed ${write.id}`);
+          } catch (err) {
+            const newAttempts = write.attempts + 1;
+            const errMsg = err instanceof Error ? err.message : String(err);
+            log.error(`[offlineQueue] ✗ failed ${write.id} (attempt ${newAttempts}): ${errMsg}`);
+
+            if (newAttempts >= 10) {
+              await db.query(`DELETE FROM pending_writes WHERE id = $1`, [write.id]);
+              log.error(`[offlineQueue] abandoned ${write.id} after 10 attempts`);
+            } else {
+              const delay = backoffMs(newAttempts);
+              minRetryDelay = Math.min(minRetryDelay, delay);
+              const nextRetry = new Date(Date.now() + delay).toISOString();
+              await db.query(
+                `UPDATE pending_writes SET attempts = $1, next_retry_at = $2 WHERE id = $3`,
+                [newAttempts, nextRetry, write.id],
+              );
+              log.info(`[offlineQueue] will retry ${write.id} after ${Math.round(delay / 1000)}s`);
+            }
           }
         }
       }
     }
-  }
 
-  log.info(`[offlineQueue] flush done — ${flushed}/${rows.length} written`);
-  updateSyncProgress({
-    phase: 'idle',
-    total: 0,
-    completed: 0,
-    currentItem: undefined,
-    lastFlushedAt: Date.now(),
-  });
-  return flushed;
+    if (minRetryDelay !== Infinity) {
+      log.info(`[offlineQueue] scheduling retry in ${Math.round(minRetryDelay / 1000)}s`);
+      scheduleQueueFlush(db, minRetryDelay);
+    }
+
+    log.info(`[offlineQueue] flush done — ${flushed}/${rows.length} written`);
+    return flushed;
+  } catch (fatalErr) {
+    const msg = fatalErr instanceof Error ? fatalErr.message : String(fatalErr);
+    log.error('[offlineQueue] unhandled flush error:', msg);
+    updateSyncProgress({ phase: 'error', error: msg });
+    return 0;
+  } finally {
+    if (getSyncProgress().phase === 'pushing') {
+      updateSyncProgress({
+        phase: 'idle',
+        total: 0,
+        completed: 0,
+        currentItem: undefined,
+        lastFlushedAt: Date.now(),
+      });
+    }
+  }
 }

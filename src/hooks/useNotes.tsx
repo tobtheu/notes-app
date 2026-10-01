@@ -229,7 +229,7 @@ export function useNotes() {
 
   const triggerSync = useCallback(async () => {
     if (!dbRef.current || !userId) return;
-    await flushQueue(dbRef.current);
+    await flushQueue(dbRef.current, true);
   }, [userId]);
 
   const isLoading = syncStatus === 'initialising';

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useTransition } from 'react';
-import { useLiveQuery } from '@electric-sql/pglite-react';
-import { RefreshCw, CheckCircle, AlertCircle, CloudOff, ArrowUpRight, Clock, X, Database } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { useLiveQuery, usePGlite } from '@electric-sql/pglite-react';
+import { RefreshCw, CheckCircle, AlertCircle, CloudOff, ArrowUpRight, Clock, X, Database, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import { useSyncProgress } from '../lib/syncProgress';
 import type { SyncStatus } from '../types';
@@ -64,7 +65,22 @@ function PendingQueueList() {
     `SELECT id, table_name, operation, payload, attempts, next_retry_at, created_at FROM pending_writes ORDER BY created_at ASC LIMIT 10`
   );
 
+  let db: any = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    db = usePGlite();
+  } catch {
+    // Outside PGliteProvider
+  }
+
   const pendingRows: PendingRow[] = pendingQuery?.rows || [];
+
+  const handleClearQueue = async () => {
+    if (!db) return;
+    if (window.confirm('Möchtest du alle ausstehenden Writes aus der lokalen Queue löschen?')) {
+      await db.query(`DELETE FROM pending_writes`);
+    }
+  };
 
   if (pendingRows.length === 0) {
     return (
@@ -76,6 +92,18 @@ function PendingQueueList() {
 
   return (
     <div className="flex flex-col gap-1">
+      <div className="flex justify-end pb-0.5">
+        {db && (
+          <button
+            type="button"
+            onClick={handleClearQueue}
+            className="text-[9px] text-red-500 hover:text-red-600 flex items-center gap-0.5 hover:underline cursor-pointer"
+            title="Löscht alle ausstehenden Einträge aus pending_writes"
+          >
+            <Trash2 size={9} /> Queue leeren
+          </button>
+        )}
+      </div>
       {pendingRows.map((row) => (
         <div
           key={row.id}
@@ -97,7 +125,10 @@ function PendingQueueList() {
             </span>
           </div>
           {row.attempts > 0 && (
-            <span className="shrink-0 text-[9px] font-mono text-amber-500 bg-amber-500/10 px-1 rounded">
+            <span
+              className="shrink-0 text-[9px] font-mono text-amber-500 bg-amber-500/10 px-1 rounded"
+              title={`Versuche: ${row.attempts}/10`}
+            >
               {row.attempts}x
             </span>
           )}
@@ -113,6 +144,10 @@ function PendingQueueList() {
  * ONLY active in development mode (`import.meta.env.DEV`).
  * In production builds, this component is completely bypassed and only
  * returns its children without any extra DOM, listeners, or bundle overhead.
+ *
+ * Uses React Portal to document.body with fixed positioning so it escapes
+ * the overflow: hidden and stacking context of Sidebar, hovering cleanly above
+ * NoteList and Editor while remaining beneath modals.
  */
 export const DevSyncTooltip: React.FC<DevSyncTooltipProps> = ({
   children,
@@ -127,24 +162,58 @@ export const DevSyncTooltip: React.FC<DevSyncTooltipProps> = ({
 
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ bottom: number; left: number }>({ bottom: 60, left: 16 });
+
   const progress = useSyncProgress();
   const [isManualSyncing, startManualSync] = useTransition();
 
   const isFlushing = progress.phase === 'pushing';
   const isPulling = progress.phase === 'pulling';
-  const isSyncing = isFlushing || isPulling || syncStatus === 'pending';
+  // ONLY mark active in-flight sync if a network operation is actually running
+  const isSyncing = isFlushing || isPulling || isManualSyncing;
 
   // Calculate progress percentage
   const total = progress.total > 0 ? progress.total : (hasPending ? 1 : 0);
   const completed = progress.completed;
   const progressPercent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : (hasPending ? 30 : 100);
 
+  // Position calculation relative to trigger
+  useEffect(() => {
+    if (!isOpen || !containerRef.current) return;
+
+    const updatePosition = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const tooltipWidth = 320;
+      const padding = 12;
+      const bottom = Math.max(padding, window.innerHeight - rect.top + 8);
+      let left = rect.left;
+      if (left + tooltipWidth > window.innerWidth - padding) {
+        left = Math.max(padding, window.innerWidth - tooltipWidth - padding);
+      }
+      setCoords({ bottom, left });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen]);
+
   // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
 
     const handlePointerDown = (e: MouseEvent | TouchEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        popoverRef.current && !popoverRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -184,18 +253,23 @@ export const DevSyncTooltip: React.FC<DevSyncTooltipProps> = ({
         {children}
       </div>
 
-      {/* Floating Popover */}
-      {isOpen && (
+      {/* Floating Popover via Portal: above NoteList & Editor, below Modals */}
+      {isOpen && typeof document !== 'undefined' && createPortal(
         <div
+          ref={popoverRef}
+          style={{
+            position: 'fixed',
+            bottom: `${coords.bottom}px`,
+            left: `${coords.left}px`,
+            zIndex: 900,
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.25)',
+          }}
           className={clsx(
-            "absolute bottom-full left-0 mb-2.5 z-50 w-72 sm:w-80",
+            "w-72 sm:w-80",
             "bg-white/95 dark:bg-gray-900/95 backdrop-blur-md",
             "border border-gray-200/90 dark:border-gray-700/80 shadow-2xl rounded-xl p-3",
             "text-[var(--text-main)] animate-in fade-in zoom-in-95 duration-150 origin-bottom-left"
           )}
-          style={{
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.25)',
-          }}
         >
           <div className="flex flex-col gap-2.5">
             {/* Header */}
@@ -223,7 +297,7 @@ export const DevSyncTooltip: React.FC<DevSyncTooltipProps> = ({
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                 title="Schließen"
               >
                 <X size={13} />
@@ -240,6 +314,8 @@ export const DevSyncTooltip: React.FC<DevSyncTooltipProps> = ({
                     <AlertCircle size={12} className="text-red-500" />
                   ) : syncStatus === 'offline' ? (
                     <CloudOff size={12} className="text-gray-400" />
+                  ) : hasPending ? (
+                    <Clock size={12} className="text-amber-500" />
                   ) : (
                     <CheckCircle size={12} className="text-emerald-500" />
                   )}
@@ -256,7 +332,7 @@ export const DevSyncTooltip: React.FC<DevSyncTooltipProps> = ({
                     : 'Alles synchronisiert (Cloud & PGlite)'}
                 </span>
                 <span className="text-[10px] text-[var(--text-muted)] font-mono">
-                  {isFlushing && total > 0 ? `${completed}/${total}` : hasPending ? '1+ queued' : 'synced'}
+                  {isFlushing && total > 0 ? `${completed}/${total}` : hasPending ? 'Queue aktiv' : 'synced'}
                 </span>
               </div>
 
@@ -315,15 +391,16 @@ export const DevSyncTooltip: React.FC<DevSyncTooltipProps> = ({
               <button
                 type="button"
                 onClick={handleManualSync}
-                disabled={isSyncing || isManualSyncing}
+                disabled={isSyncing}
                 className="mt-1 w-full py-1.5 px-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-md text-[10px] font-medium flex items-center justify-center gap-1.5 transition-all active:scale-[0.99] shadow-sm cursor-pointer"
               >
-                <RefreshCw size={11} className={clsx((isSyncing || isManualSyncing) && "animate-spin")} />
-                {isSyncing || isManualSyncing ? 'Synchronisiere...' : 'Jetzt synchronisieren (Force Flush)'}
+                <RefreshCw size={11} className={clsx(isSyncing && "animate-spin")} />
+                {isSyncing ? 'Synchronisiere...' : 'Jetzt synchronisieren (Force Flush)'}
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

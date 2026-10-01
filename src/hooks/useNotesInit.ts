@@ -153,9 +153,22 @@ export function useNotesInit({
         };
         const handleOffline = () => setSyncStatus('offline');
 
+        const retryInterval = setInterval(async () => {
+            if (!dbRef.current || !userId || userId === 'local' || !navigator.onLine) return;
+            try {
+                const res = await dbRef.current.query<{ count: number }>(
+                    `SELECT COUNT(*) AS count FROM pending_writes WHERE CAST(next_retry_at AS timestamptz) <= NOW()`
+                );
+                if ((res.rows[0]?.count ?? 0) > 0) {
+                    await flushQueue(dbRef.current);
+                }
+            } catch {}
+        }, 30_000);
+
         window.addEventListener('online', handleOnline);
         window.addEventListener('offline', handleOffline);
         return () => {
+            clearInterval(retryInterval);
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
         };
