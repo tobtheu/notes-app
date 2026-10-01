@@ -39,6 +39,7 @@ export function useIOSEditorToolbar({
             switch (action) {
                 case 'bold':       toggleSmartMark(editor, 'bold', undefined, false); break;
                 case 'italic':     toggleSmartMark(editor, 'italic', undefined, false); break;
+                case 'underline':  toggleSmartMark(editor, 'underline', undefined, false); break;
                 case 'highlight':  toggleSmartMark(editor, 'highlight', undefined, false); break;
                 case 'h1':         editor.chain().toggleHeading({ level: 1 }).run(); break;
                 case 'h2':         editor.chain().toggleHeading({ level: 2 }).run(); break;
@@ -60,6 +61,7 @@ export function useIOSEditorToolbar({
             const state = {
                 bold:       editor.isActive('bold'),
                 italic:     editor.isActive('italic'),
+                underline:  editor.isActive('underline'),
                 highlight:  editor.isActive('highlight'),
                 h1:         editor.isActive('heading', { level: 1 }),
                 h2:         editor.isActive('heading', { level: 2 }),

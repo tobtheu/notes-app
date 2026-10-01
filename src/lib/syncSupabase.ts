@@ -1,6 +1,7 @@
 import type { PGliteWithLive } from '@electric-sql/pglite/live';
 import { supabase } from './supabaseClient';
 import { log } from './logger';
+import { updateSyncProgress } from './syncProgress';
 
 /**
  * Pulls all remote notes and app configuration directly from Supabase PostgREST
@@ -15,6 +16,13 @@ export async function pullFromSupabase(
   }
 
   log.info('[syncSupabase:pull] fetching notes from Supabase for user:', userId);
+  updateSyncProgress({
+    phase: 'pulling',
+    total: 1,
+    completed: 0,
+    currentItem: 'Lade Daten von Cloud...',
+    error: undefined,
+  });
   let notesCount = 0;
   let configUpdated = false;
 
@@ -84,8 +92,19 @@ export async function pullFromSupabase(
         configUpdated = true;
       }
     });
+    updateSyncProgress({
+      phase: 'idle',
+      total: 0,
+      completed: 0,
+      currentItem: undefined,
+      lastFlushedAt: Date.now(),
+    });
   } catch (err) {
     log.error('[syncSupabase:pull] pull failed:', err);
+    updateSyncProgress({
+      phase: 'error',
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 
   return { notesCount, configUpdated };

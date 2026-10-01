@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient';
 import { setSupabaseSession } from './supabaseClient';
 import type { AppMetadata } from '../types';
 import { log } from './logger';
+import { updateSyncProgress } from './syncProgress';
 
 /**
  * Offline-first write queue.
@@ -251,6 +252,13 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
   }
 
   log.info(`[offlineQueue] flushing ${validRows.length} pending write(s)...`);
+  updateSyncProgress({
+    phase: 'pushing',
+    total: validRows.length,
+    completed: 0,
+    currentItem: `${validRows.length} ausstehende Änderungen...`,
+    error: undefined,
+  });
   let flushed = 0;
 
   // Group writes by table + operation
@@ -277,6 +285,12 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
         [ids],
       );
       flushed += group.length;
+      updateSyncProgress({
+        phase: 'pushing',
+        total: validRows.length,
+        completed: flushed,
+        currentItem: `${tableName === 'notes' ? 'Notizen' : 'Konfiguration'} (${op})`,
+      });
       log.info(`[offlineQueue] ✓ batch-flushed ${group.length} ${tableName} ${op}(s)`);
     } catch (batchErr) {
       const batchMsg = batchErr instanceof Error ? batchErr.message : String(batchErr);
@@ -292,6 +306,19 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
           }
           await db.query(`DELETE FROM pending_writes WHERE id = $1`, [write.id]);
           flushed++;
+          let noteTitle = write.id;
+          try {
+            if (write.table_name === 'notes' && payload.content) {
+              const line1 = payload.content.trim().split('\n')[0].replace(/^#+\s*/, '').trim();
+              if (line1) noteTitle = line1.slice(0, 30);
+            }
+          } catch {}
+          updateSyncProgress({
+            phase: 'pushing',
+            total: validRows.length,
+            completed: flushed,
+            currentItem: `${op.toUpperCase()}: ${noteTitle}`,
+          });
           log.info(`[offlineQueue] ✓ flushed ${write.id}`);
         } catch (err) {
           const newAttempts = write.attempts + 1;
@@ -315,5 +342,12 @@ async function _doFlush(db: PGliteWithLive): Promise<number> {
   }
 
   log.info(`[offlineQueue] flush done — ${flushed}/${rows.length} written`);
+  updateSyncProgress({
+    phase: 'idle',
+    total: 0,
+    completed: 0,
+    currentItem: undefined,
+    lastFlushedAt: Date.now(),
+  });
   return flushed;
 }

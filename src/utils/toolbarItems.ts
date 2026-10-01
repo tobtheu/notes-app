@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/react';
 import {
-    Bold, Italic, Heading1, Heading2, Heading3, List, CheckSquare,
+    Bold, Italic, Underline as UnderlineIcon, Heading1, Heading2, Heading3, List, CheckSquare,
     Quote, Code, Table, Highlighter, Link as LinkIcon,
     type LucideIcon
 } from 'lucide-react';
@@ -48,6 +48,15 @@ export function buildToolbarItems({
             label: getLabel('editor.italic', 'Italic'),
             action: () => toggleSmartMark(editor, 'italic'),
             isActive: editor.isActive('italic'),
+            showInCompact: true
+        },
+        {
+            type: 'button',
+            id: 'underline',
+            icon: UnderlineIcon,
+            label: getLabel('editor.underline', 'Underline'),
+            action: () => toggleSmartMark(editor, 'underline'),
+            isActive: editor.isActive('underline'),
             showInCompact: true
         },
         {

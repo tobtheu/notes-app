@@ -44,6 +44,7 @@ interface SidebarProps {
     userEmail?: string | null;
     syncStatus?: SyncStatus;
     hasPending?: boolean;
+    onTriggerSync?: () => Promise<void>;
 }
 
 /**
@@ -73,6 +74,7 @@ export function Sidebar({
     userEmail,
     syncStatus,
     hasPending = false,
+    onTriggerSync,
 }: SidebarProps) {
     const { t } = useTranslation();
     const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -279,6 +281,7 @@ export function Sidebar({
                 hasPending={hasPending}
                 isCollapsed={isCollapsed}
                 onOpenSettings={onOpenSettings}
+                onTriggerSync={onTriggerSync}
             />
         </aside>
     );

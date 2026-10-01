@@ -81,6 +81,7 @@ export const en = {
         largeFileWarning: 'Large file — rich-text editor disabled for better performance.',
         bold: 'Bold',
         italic: 'Italic',
+        underline: 'Underline',
         strikethrough: 'Strikethrough',
         code: 'Inline Code',
         highlight: 'Highlight',

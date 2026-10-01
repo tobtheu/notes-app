@@ -71,6 +71,16 @@ export const BubbleToolbarContent: React.FC<BubbleToolbarContentProps> = ({
                 <span className="italic font-serif text-sm">I</span>
             </button>
             <button
+                onClick={() => toggleSmartMark(editor, 'underline')}
+                className={clsx(
+                    "p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors",
+                    editor.isActive('underline') && "bg-primary-50 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400"
+                )}
+                title={t('editor.underline')}
+            >
+                <span className="underline font-bold text-sm">U</span>
+            </button>
+            <button
                 onClick={() => toggleSmartMark(editor, 'highlight')}
                 className={clsx(
                     "p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors",

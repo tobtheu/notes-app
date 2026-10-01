@@ -23,6 +23,7 @@ export const toggleSmartMark = (editor: Editor, markType: string, options?: any,
         // Standard behavior for existing selection
         if (markType === 'bold') chain().toggleBold().run();
         else if (markType === 'italic') chain().toggleItalic().run();
+        else if (markType === 'underline') (chain() as any).toggleUnderline().run();
         else if (markType === 'highlight') chain().toggleHighlight(options).run();
         return;
     }
@@ -62,11 +63,13 @@ export const toggleSmartMark = (editor: Editor, markType: string, options?: any,
         // Apply toggling to the newly selected word
         if (markType === 'bold') chain().toggleBold().run();
         else if (markType === 'italic') chain().toggleItalic().run();
+        else if (markType === 'underline') (chain() as any).toggleUnderline().run();
         else if (markType === 'highlight') chain().toggleHighlight(options).run();
     } else {
         // Fallback: cursor in whitespace/special char — toggle at cursor for future typing.
         if (markType === 'bold') chain().toggleBold().run();
         else if (markType === 'italic') chain().toggleItalic().run();
+        else if (markType === 'underline') (chain() as any).toggleUnderline().run();
         else if (markType === 'highlight') chain().toggleHighlight(options).run();
     }
 };

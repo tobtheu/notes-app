@@ -233,6 +233,7 @@ function App() {
     userEmail,
     syncStatus,
     hasPending,
+    onTriggerSync: triggerSync,
   };
 
   const isAnyModalOpen = isSettingsOpen || editingCategory !== null || categoryToDelete !== null || isUpdateModalOpen;

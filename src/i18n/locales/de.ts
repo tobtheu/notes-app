@@ -83,6 +83,7 @@ export const de: TranslationSchema = {
         largeFileWarning: 'Große Datei — Rich-Text-Editor zur besseren Leistung deaktiviert.',
         bold: 'Fett',
         italic: 'Kursiv',
+        underline: 'Unterstrichen',
         strikethrough: 'Durchgestrichen',
         code: 'Inline Code',
         highlight: 'Hervorheben',
