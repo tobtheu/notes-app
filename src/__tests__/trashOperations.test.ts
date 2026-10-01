@@ -26,7 +26,7 @@ describe('useNotesOperations — Trash Features', () => {
 
     it('soft-deletes a note by calling writeNote with deleted = true', async () => {
         const notes: Note[] = [
-            { filename: 'meeting.md', folder: 'Work', content: '# Meeting', updatedAt: '2026-08-24T12:00:00Z' },
+            { id: 'uuid-meeting-1', folder: 'Work', content: '# Meeting', updatedAt: '2026-08-24T12:00:00Z' },
         ];
         const setSelectedNoteId = vi.fn();
 
@@ -37,7 +37,7 @@ describe('useNotesOperations — Trash Features', () => {
                 metadataRef,
                 notes,
                 sortedFolders: ['Work'],
-                selectedNoteId: 'work/meeting.md',
+                selectedNoteId: 'uuid-meeting-1',
                 setSelectedNoteId,
                 selectedCategory: null,
                 setSelectedCategory: vi.fn(),
@@ -48,16 +48,16 @@ describe('useNotesOperations — Trash Features', () => {
         );
 
         await act(async () => {
-            await result.current.deleteNote('work/meeting.md');
+            await result.current.deleteNote('uuid-meeting-1');
         });
 
         expect(setSelectedNoteId).toHaveBeenCalledWith(null);
-        expect(writeNote).toHaveBeenCalledWith('work/meeting.md', '# Meeting', expect.any(String), true);
+        expect(writeNote).toHaveBeenCalledWith('uuid-meeting-1', 'Work', '# Meeting', expect.any(String), true);
     });
 
     it('restores a soft-deleted note by querying content and calling writeNote with deleted = false', async () => {
         mockDb.query.mockResolvedValueOnce({
-            rows: [{ content: '# Restored note content' }],
+            rows: [{ content: '# Restored note content', folder: 'Work' }],
         });
 
         const { result } = renderHook(() =>
@@ -78,14 +78,14 @@ describe('useNotesOperations — Trash Features', () => {
         );
 
         await act(async () => {
-            await result.current.restoreNote('work/meeting.md');
+            await result.current.restoreNote('uuid-meeting-1');
         });
 
         expect(mockDb.query).toHaveBeenCalledWith(
-            expect.stringContaining('SELECT content FROM notes WHERE id = $1 AND user_id = $2'),
-            ['work/meeting.md', userId]
+            expect.stringContaining('SELECT content, folder FROM notes WHERE id = $1 AND user_id = $2'),
+            ['uuid-meeting-1', userId]
         );
-        expect(writeNote).toHaveBeenCalledWith('work/meeting.md', '# Restored note content', expect.any(String), false);
+        expect(writeNote).toHaveBeenCalledWith('uuid-meeting-1', 'Work', '# Restored note content', expect.any(String), false);
     });
 
     it('permanently deletes a note by deleting from PGlite notes and pending_writes, and queuing delete', async () => {

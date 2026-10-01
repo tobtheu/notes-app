@@ -8,7 +8,7 @@ interface UseNotesFilterProps {
     selectedCategory: string | null;
     selectedNoteId: string | null;
     metadata: AppMetadata;
-    getNoteId: (note: Note) => string;
+    getNoteId?: (note: Note) => string;
 }
 
 export function useNotesFilter({
@@ -19,14 +19,18 @@ export function useNotesFilter({
     metadata,
     getNoteId
 }: UseNotesFilterProps) {
+    const resolveNoteId = useCallback((note: Note): string => {
+        return note.id ?? (getNoteId ? getNoteId(note) : '');
+    }, [getNoteId]);
+
     const pinnedSet = useMemo(
         () => new Set((metadata.pinnedNotes ?? []).map(normalizeStr)),
         [metadata.pinnedNotes],
     );
 
     const isNotePinned = useCallback(
-        (note: Note) => pinnedSet.has(normalizeStr(getNoteId(note))),
-        [getNoteId, pinnedSet],
+        (note: Note) => pinnedSet.has(normalizeStr(resolveNoteId(note))),
+        [resolveNoteId, pinnedSet],
     );
 
     // Debounce the search term so every keystroke doesn't trigger a full re-filter
@@ -45,28 +49,28 @@ export function useNotesFilter({
         const matching: Note[] = [];
         for (let i = 0; i < notes.length; i++) {
             const note = notes[i];
-            if (debouncedSearch && !note.content.toLowerCase().includes(searchLower) && !note.filename.toLowerCase().includes(searchLower)) {
+            if (
+                debouncedSearch &&
+                !note.content.toLowerCase().includes(searchLower) &&
+                !(note.filename ?? '').toLowerCase().includes(searchLower)
+            ) {
                 continue;
             }
-            if (normalizedCategory && normalizeStr(note.folder) !== normalizedCategory) {
+            if (normalizedCategory && normalizeStr(note.folder ?? '') !== normalizedCategory) {
                 continue;
             }
             matching.push(note);
         }
 
         // If selectedNoteId is newly created and not yet in notes rows, inject it at the top
-        if (selectedNoteId && !notes.some(n => getNoteId(n) === selectedNoteId)) {
-            const lastSlash = selectedNoteId.lastIndexOf('/');
-            const filename = lastSlash >= 0 ? selectedNoteId.slice(lastSlash + 1) : selectedNoteId;
-            const folder = lastSlash >= 0 ? selectedNoteId.slice(0, lastSlash) : '';
-            if (!normalizedCategory || normalizeStr(folder) === normalizedCategory) {
-                matching.unshift({
-                    filename,
-                    folder,
-                    content: '# ',
-                    updatedAt: new Date().toISOString(),
-                });
-            }
+        if (selectedNoteId && !notes.some(n => resolveNoteId(n) === selectedNoteId)) {
+            const folder = selectedCategory ?? '';
+            matching.unshift({
+                id: selectedNoteId,
+                folder,
+                content: '# ',
+                updatedAt: new Date().toISOString(),
+            });
         }
 
         return matching.sort((a, b) => {
@@ -76,27 +80,24 @@ export function useNotesFilter({
             if (!aPinned && bPinned) return 1;
             const dateCompare = b.updatedAt.localeCompare(a.updatedAt);
             if (dateCompare !== 0) return dateCompare;
-            return a.filename.localeCompare(b.filename);
+            return (a.id ?? a.filename ?? '').localeCompare(b.id ?? b.filename ?? '');
         });
-    }, [notes, debouncedSearch, selectedCategory, isNotePinned, selectedNoteId, getNoteId]);
+    }, [notes, debouncedSearch, selectedCategory, isNotePinned, selectedNoteId, resolveNoteId]);
 
     const lastValidSelectedNote = useRef<Note | null>(null);
     const selectedNote = useMemo(() => {
         if (!selectedNoteId) return null;
-        const found = notes.find(n => getNoteId(n) === selectedNoteId);
+        const found = notes.find(n => resolveNoteId(n) === selectedNoteId);
         if (found) return found;
 
         // If not found in DB rows yet (freshly created note), return optimistic draft instantly
-        const lastSlash = selectedNoteId.lastIndexOf('/');
-        const filename = lastSlash >= 0 ? selectedNoteId.slice(lastSlash + 1) : selectedNoteId;
-        const folder = lastSlash >= 0 ? selectedNoteId.slice(0, lastSlash) : '';
         return {
-            filename,
-            folder,
+            id: selectedNoteId,
+            folder: selectedCategory ?? '',
             content: '# ',
             updatedAt: new Date().toISOString(),
         };
-    }, [selectedNoteId, notes, getNoteId]);
+    }, [selectedNoteId, notes, selectedCategory, resolveNoteId]);
 
     // Commit the resolved selection to the ref only after render (not during)
     useEffect(() => {
@@ -105,11 +106,11 @@ export function useNotesFilter({
             return;
         }
         if (selectedNote && (!lastValidSelectedNote.current
-            || getNoteId(selectedNote) !== getNoteId(lastValidSelectedNote.current)
+            || resolveNoteId(selectedNote) !== resolveNoteId(lastValidSelectedNote.current)
             || selectedNote.content !== lastValidSelectedNote.current.content)) {
             lastValidSelectedNote.current = selectedNote;
         }
-    }, [selectedNoteId, selectedNote, getNoteId]);
+    }, [selectedNoteId, selectedNote, resolveNoteId]);
 
     return {
         filteredNotes,

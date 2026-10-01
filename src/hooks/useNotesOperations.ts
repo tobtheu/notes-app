@@ -16,9 +16,15 @@ interface UseNotesOperationsProps {
     setSelectedNoteId: (id: string | null) => void;
     selectedCategory: string | null;
     setSelectedCategory: (cat: string | null) => void;
-    writeNote: (id: string, content: string, updatedAt: string, deleted?: boolean) => Promise<void>;
+    writeNote: (
+        id: string,
+        folderOrContent: string,
+        contentOrUpdatedAt: string,
+        updatedAtOrDeleted?: string | boolean,
+        maybeDeleted?: boolean
+    ) => Promise<void>;
     writeConfig: (newMetadata: AppMetadata) => Promise<void>;
-    getNoteId: (note: Note) => string;
+    getNoteId?: (note: Note) => string;
 }
 
 export function useNotesOperations({
@@ -43,6 +49,8 @@ export function useNotesOperations({
     });
 
     const folderOps = useNotesFolderOps({
+        dbRef,
+        userId,
         notes,
         sortedFolders,
         selectedCategory,

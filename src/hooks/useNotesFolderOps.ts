@@ -1,19 +1,30 @@
 import { useCallback } from 'react';
 import type { Note, AppMetadata, FolderMetadata } from '../types';
-import { getPathId, normalizeStr } from '../utils/path';
+import type { PGliteWithLive } from '@electric-sql/pglite/live';
+import { normalizeStr } from '../utils/path';
 
 interface UseNotesFolderOpsProps {
+    dbRef?: React.MutableRefObject<PGliteWithLive | null>;
+    userId?: string | null;
     notes: Note[];
     sortedFolders: string[];
     selectedCategory: string | null;
     setSelectedCategory: (cat: string | null) => void;
     metadataRef: React.MutableRefObject<AppMetadata>;
-    writeNote: (id: string, content: string, updatedAt: string, deleted?: boolean) => Promise<void>;
+    writeNote: (
+        id: string,
+        folderOrContent: string,
+        contentOrUpdatedAt: string,
+        updatedAtOrDeleted?: string | boolean,
+        maybeDeleted?: boolean
+    ) => Promise<void>;
     writeConfig: (newMetadata: AppMetadata) => Promise<void>;
-    getNoteId: (note: Note) => string;
+    getNoteId?: (note: Note) => string;
 }
 
 export function useNotesFolderOps({
+    dbRef,
+    userId,
     notes,
     sortedFolders,
     selectedCategory,
@@ -23,6 +34,10 @@ export function useNotesFolderOps({
     writeConfig,
     getNoteId
 }: UseNotesFolderOpsProps) {
+    const resolveNoteId = useCallback((note: Note): string => {
+        return note.id ?? (getNoteId ? getNoteId(note) : '');
+    }, [getNoteId]);
+
     const createFolder = useCallback(async (folderName: string) => {
         const current = metadataRef.current;
         const order = current.folderOrder ?? [];
@@ -36,7 +51,7 @@ export function useNotesFolderOps({
 
         const folderNotes = notes.filter(n => normalizeStr(n.folder) === normalizedTarget);
         const updatedAt = new Date().toISOString();
-        await Promise.all(folderNotes.map(n => writeNote(getNoteId(n), n.content, updatedAt, true)));
+        await Promise.all(folderNotes.map(n => writeNote(resolveNoteId(n), n.folder, n.content, updatedAt, true)));
 
         const current = metadataRef.current;
         const newMeta = { ...current };
@@ -44,13 +59,13 @@ export function useNotesFolderOps({
         if (existingKey) delete newMeta.folders[existingKey];
         if (newMeta.folderOrder) newMeta.folderOrder = newMeta.folderOrder.filter(f => normalizeStr(f) !== normalizedTarget);
         if (newMeta.pinnedNotes) {
-            const prefix = `${normalizedTarget}/`;
-            newMeta.pinnedNotes = newMeta.pinnedNotes.filter(p => !normalizeStr(p).startsWith(prefix));
+            const deletedIds = new Set(folderNotes.map(resolveNoteId));
+            newMeta.pinnedNotes = newMeta.pinnedNotes.filter(p => !deletedIds.has(p));
         }
         await writeConfig(newMeta);
 
         if (selectedCategory === folderRelative) setSelectedCategory(null);
-    }, [notes, getNoteId, metadataRef, selectedCategory, writeNote, writeConfig, setSelectedCategory]);
+    }, [notes, resolveNoteId, metadataRef, selectedCategory, writeNote, writeConfig, setSelectedCategory]);
 
     const renameFolder = useCallback(async (oldName: string, newName: string) => {
         const normalizedOld = normalizeStr(oldName);
@@ -60,11 +75,16 @@ export function useNotesFolderOps({
         if (normalizedOld !== normalizedNew) {
             const folderNotes = notes.filter(n => normalizeStr(n.folder) === normalizedOld);
             await Promise.all(folderNotes.map(async n => {
-                const oldId = getNoteId(n);
-                const newId = getPathId(n.filename, newName);
-                await writeNote(oldId, n.content, updatedAt, true);
-                await writeNote(newId, n.content, updatedAt, false);
+                const noteId = resolveNoteId(n);
+                await writeNote(noteId, newName, n.content, updatedAt, false);
             }));
+
+            if (dbRef?.current && userId) {
+                await dbRef.current.query(
+                    `UPDATE notes SET folder = $1 WHERE folder = $2 AND user_id = $3`,
+                    [newName, oldName, userId]
+                );
+            }
         }
 
         const current = metadataRef.current;
@@ -74,14 +94,6 @@ export function useNotesFolderOps({
             newMeta.folders[newName] = newMeta.folders[existingKey];
             if (existingKey !== newName) delete newMeta.folders[existingKey];
         }
-        if (newMeta.pinnedNotes && normalizedOld !== normalizedNew) {
-            const oldPrefix = `${normalizedOld}/`;
-            const newPrefix = `${normalizedNew}/`;
-            newMeta.pinnedNotes = newMeta.pinnedNotes.map(p => {
-                const np = normalizeStr(p);
-                return np.startsWith(oldPrefix) ? np.replace(oldPrefix, newPrefix) : p;
-            });
-        }
         if (newMeta.folderOrder) {
             newMeta.folderOrder = newMeta.folderOrder.map(f => normalizeStr(f) === normalizedOld ? newName : f);
         }
@@ -89,7 +101,7 @@ export function useNotesFolderOps({
 
         if (selectedCategory === oldName) setSelectedCategory(newName);
         return { success: true };
-    }, [notes, getNoteId, metadataRef, selectedCategory, writeNote, writeConfig, setSelectedCategory]);
+    }, [notes, resolveNoteId, dbRef, userId, metadataRef, selectedCategory, writeNote, writeConfig, setSelectedCategory]);
 
     const reorderFolders = useCallback(async (newOrder: string[]) => {
         const current = metadataRef.current;

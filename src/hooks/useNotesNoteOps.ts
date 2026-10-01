@@ -1,7 +1,6 @@
 import { useCallback, useRef } from 'react';
 import type { Note, AppMetadata } from '../types';
 import type { PGliteWithLive } from '@electric-sql/pglite/live';
-import { getPathId, normalizeStr } from '../utils/path';
 
 interface UseNotesNoteOpsProps {
     dbRef: React.MutableRefObject<PGliteWithLive | null>;
@@ -12,16 +11,22 @@ interface UseNotesNoteOpsProps {
     setSelectedNoteId: (id: string | null) => void;
     selectedCategory: string | null;
     metadataRef: React.MutableRefObject<AppMetadata>;
-    writeNote: (id: string, content: string, updatedAt: string, deleted?: boolean) => Promise<void>;
+    writeNote: (
+        id: string,
+        folderOrContent: string,
+        contentOrUpdatedAt: string,
+        updatedAtOrDeleted?: string | boolean,
+        maybeDeleted?: boolean
+    ) => Promise<void>;
     writeConfig: (newMetadata: AppMetadata) => Promise<void>;
-    getNoteId: (note: Note) => string;
+    getNoteId?: (note: Note) => string;
 }
 
 export function useNotesNoteOps({
     dbRef,
     userId,
     notes,
-    trashNotes,
+    trashNotes: _trashNotes,
     selectedNoteId,
     setSelectedNoteId,
     selectedCategory,
@@ -30,8 +35,11 @@ export function useNotesNoteOps({
     writeConfig,
     getNoteId
 }: UseNotesNoteOpsProps) {
+    const resolveNoteId = useCallback((note: Note): string => {
+        return note.id ?? (getNoteId ? getNoteId(note) : '');
+    }, [getNoteId]);
+
     const savingNotes = useRef<Record<string, Promise<string> | undefined>>({});
-    const inFlightCreations = useRef<Set<string>>(new Set());
 
     /**
      * Unified, non-destructive note save.
@@ -39,11 +47,24 @@ export function useNotesNoteOps({
      */
     const saveNote = useCallback(async (
         currentId: string,
-        _filename: string,
-        content: string,
-        _folder: string | null = null,
+        arg2: string,
+        arg3?: string,
+        arg4: string = '',
     ): Promise<string> => {
         if (!userId) return currentId;
+
+        let content: string;
+        let folder: string;
+
+        if (typeof arg3 === 'string' && (arg4 !== '' || arg2.endsWith('.md'))) {
+            // Legacy 4-arg or 3-arg with filename: (id, filename, content, folder)
+            content = arg3;
+            folder = arg4;
+        } else {
+            // Modern 2-arg or 3-arg: (id, content, folder?)
+            content = arg2;
+            folder = arg3 ?? (notes.find(n => resolveNoteId(n) === currentId)?.folder ?? '');
+        }
 
         if (savingNotes.current[currentId]) {
             try { await savingNotes.current[currentId]; } catch { /* ignore */ }
@@ -55,117 +76,59 @@ export function useNotesNoteOps({
 
         try {
             const updatedAt = new Date().toISOString();
-            await writeNote(currentId, content, updatedAt, false);
+            await writeNote(currentId, folder, content, updatedAt, false);
             resolvePromise(currentId);
             return currentId;
         } finally {
             delete savingNotes.current[currentId];
         }
-    }, [userId, writeNote]);
+    }, [userId, notes, resolveNoteId, writeNote]);
 
     /**
-     * Instant, atomic note creation.
-     * Generates a clean filename (Untitled note.md) in the active folder and opens the editor immediately.
-     * Prevents note overwriting and collisions across active notes, trash, and in-flight creations.
+     * Instant, atomic note creation using UUIDv4.
+     * Creates a fresh note in the active folder with globally unique ID.
      */
     const createNote = useCallback(async () => {
         if (!userId) return;
-        const folderStr = selectedCategory ?? '';
-
-        // 1. Gather all existing IDs (case-normalized) from active notes, trash, and in-flight creations
-        const existingIds = new Set<string>();
-        for (const n of notes) {
-            existingIds.add(normalizeStr(getNoteId(n)));
-        }
-        if (trashNotes) {
-            for (const n of trashNotes) {
-                existingIds.add(normalizeStr(getNoteId(n)));
-            }
-        }
-        for (const inFlight of inFlightCreations.current) {
-            existingIds.add(inFlight);
-        }
-
-        // 2. Compute first free candidate filename & ID synchronously so selection mounts in <1ms
-        let filename = 'Untitled note.md';
-        let candidateId = getPathId(filename, folderStr);
-        let counter = 1;
-        while (existingIds.has(candidateId)) {
-            filename = `Untitled note ${counter}.md`;
-            candidateId = getPathId(filename, folderStr);
-            counter++;
-        }
-
-        // Reserve ID immediately so rapid consecutive calls won't pick the same ID
-        inFlightCreations.current.add(candidateId);
+        const folder = selectedCategory ?? '';
+        const id = crypto.randomUUID();
         const updatedAt = new Date().toISOString();
 
-        // 3. Select immediately so the editor mounts in <1ms
-        setSelectedNoteId(candidateId);
+        // 1. Select immediately so the editor mounts in <1ms
+        setSelectedNoteId(id);
 
-        // 4. Verify against DB if available (defense-in-depth against external sync / trash collisions)
-        try {
-            if (dbRef.current) {
-                try {
-                    const res = await dbRef.current.query<{ id: string }>(
-                        `SELECT id FROM notes WHERE user_id = $1`,
-                        [userId]
-                    );
-                    const dbIds = new Set(res.rows.map(r => normalizeStr(r.id)));
-                    if (dbIds.has(candidateId)) {
-                        while (existingIds.has(candidateId) || dbIds.has(candidateId)) {
-                            filename = `Untitled note ${counter}.md`;
-                            candidateId = getPathId(filename, folderStr);
-                            counter++;
-                        }
-                        inFlightCreations.current.add(candidateId);
-                        setSelectedNoteId(candidateId);
-                    }
-                } catch {
-                    // Fall back to in-memory check
-                }
-            }
-
-            // 5. Direct single-write into PGlite database
-            await writeNote(candidateId, '# ', updatedAt, false);
-        } finally {
-            inFlightCreations.current.delete(candidateId);
-        }
-    }, [userId, notes, trashNotes, selectedCategory, setSelectedNoteId, writeNote, getNoteId, dbRef]);
+        // 2. Direct single-write into PGlite database
+        await writeNote(id, folder, '# ', updatedAt, false);
+    }, [userId, selectedCategory, setSelectedNoteId, writeNote]);
 
     /**
-     * Delete note with soft-delete flag in PGlite and clean up metadata pins.
+     * Soft-delete note by UUID and clean up metadata pins.
      */
     const deleteNote = useCallback(async (id: string) => {
-        const normalizedId = normalizeStr(id);
-        const updatedAt = new Date().toISOString();
-        const note = notes.find(n => getNoteId(n) === normalizedId);
+        const note = notes.find(n => resolveNoteId(n) === id);
         if (!note) return;
 
-        if (selectedNoteId && normalizeStr(selectedNoteId) === normalizedId) {
+        if (selectedNoteId && selectedNoteId === id) {
             setSelectedNoteId(null);
         }
 
-        await writeNote(normalizedId, note.content, updatedAt, true);
+        const updatedAt = new Date().toISOString();
+        await writeNote(id, note.folder ?? '', note.content, updatedAt, true);
 
         // Clean up pin in metadata
         const current = metadataRef.current;
-        if (current.pinnedNotes?.some(p => normalizeStr(p) === normalizedId)) {
+        if (current.pinnedNotes?.includes(id)) {
             const newMeta = { ...current };
-            newMeta.pinnedNotes = (newMeta.pinnedNotes ?? []).filter(
-                p => normalizeStr(p) !== normalizedId
-            );
+            newMeta.pinnedNotes = (newMeta.pinnedNotes ?? []).filter(p => p !== id);
             await writeConfig(newMeta);
         }
-    }, [notes, getNoteId, selectedNoteId, writeNote, setSelectedNoteId, writeConfig, metadataRef]);
+    }, [notes, resolveNoteId, selectedNoteId, writeNote, setSelectedNoteId, writeConfig, metadataRef]);
 
     const updateNoteLocally = useCallback(async (
-        filename: string,
+        id: string,
         content: string,
-        folder = '',
     ) => {
         if (!dbRef.current || !userId) return;
-        const id = getPathId(filename, folder);
         await dbRef.current.query(
             /* sql */ `
             UPDATE notes SET content = $1
@@ -175,44 +138,32 @@ export function useNotesNoteOps({
         );
     }, [userId, dbRef]);
 
+    /**
+     * Move note to target folder in-place without altering its UUID.
+     */
     const moveNote = useCallback(async (noteId: string, targetFolder: string | null) => {
-        const note = notes.find(n => getNoteId(n) === noteId);
-        if (!note || note.folder === (targetFolder ?? '')) return;
+        const note = notes.find(n => resolveNoteId(n) === noteId);
+        if (!note || (note.folder ?? '') === (targetFolder ?? '')) return;
 
-        const newId = getPathId(note.filename, targetFolder ?? '');
+        const newFolder = targetFolder ?? '';
         const updatedAt = new Date().toISOString();
-
-        if (notes.some(n => getNoteId(n) === newId)) return;
-
-        await writeNote(noteId, note.content, updatedAt, true);
-        await writeNote(newId, note.content, updatedAt, false);
-
-        const current = metadataRef.current;
-        if (current.pinnedNotes?.some(p => normalizeStr(p) === noteId)) {
-            const newMeta = { ...current };
-            newMeta.pinnedNotes = (newMeta.pinnedNotes ?? []).map(p =>
-                normalizeStr(p) === noteId ? newId : p,
-            );
-            await writeConfig(newMeta);
-        }
-
-        if (selectedNoteId === noteId) setSelectedNoteId(newId);
-    }, [notes, getNoteId, metadataRef, selectedNoteId, writeNote, writeConfig, setSelectedNoteId]);
+        await writeNote(noteId, newFolder, note.content, updatedAt, false);
+    }, [notes, resolveNoteId, writeNote]);
 
     const togglePinNote = useCallback(async (note: Note) => {
-        const notePath = normalizeStr(getNoteId(note));
+        const id = resolveNoteId(note);
         const current = metadataRef.current;
-        const pinned = (current.pinnedNotes ?? []).map(normalizeStr);
+        const pinned = current.pinnedNotes ?? [];
         const pinnedSet = new Set(pinned);
         
         let newPins: string[];
-        if (pinnedSet.has(notePath)) {
-            newPins = pinned.filter(p => p !== notePath);
+        if (pinnedSet.has(id)) {
+            newPins = pinned.filter(p => p !== id);
         } else {
-            newPins = [...pinned, notePath];
+            newPins = [...pinned, id];
         }
         await writeConfig({ ...current, pinnedNotes: newPins });
-    }, [getNoteId, metadataRef, writeConfig]);
+    }, [resolveNoteId, metadataRef, writeConfig]);
 
     const saveSettings = useCallback(async (settings: any) => {
         const current = metadataRef.current;

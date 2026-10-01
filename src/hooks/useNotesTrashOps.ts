@@ -23,14 +23,15 @@ export function useNotesTrashOps({
         const normalizedId = normalizeStr(id);
         const db = dbRef.current;
 
-        const res = await db.query<{ content: string }>(
-            `SELECT content FROM notes WHERE id = $1 AND user_id = $2`,
+        const res = await db.query<{ content: string; folder: string }>(
+            `SELECT content, folder FROM notes WHERE id = $1 AND user_id = $2`,
             [normalizedId, userId]
         );
         if (res.rows.length === 0) return;
         const content = res.rows[0].content;
+        const folder = res.rows[0].folder || '';
         const updatedAt = new Date().toISOString();
-        await writeNote(normalizedId, content, updatedAt, false);
+        await writeNote(normalizedId, folder, content, updatedAt, false);
     }, [userId, dbRef, writeNote]);
 
     /**
