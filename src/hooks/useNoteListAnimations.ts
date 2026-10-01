@@ -5,7 +5,7 @@ interface UseNoteListAnimationsProps {
     notes: Note[];
     selectedCategory: string | null;
     isNotePinned: (note: Note) => boolean;
-    getNoteId: (note: Note) => string;
+    getNoteId?: (note: Note) => string;
     onDeleteNote: (id: string) => void;
     scrollContainerRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -18,11 +18,12 @@ export function useNoteListAnimations({
     onDeleteNote,
     scrollContainerRef,
 }: UseNoteListAnimationsProps) {
+    const resolveNoteId = useCallback((n: Note) => n.id ?? (getNoteId ? getNoteId(n) : ''), [getNoteId]);
     const [exitingNoteIds, setExitingNoteIds] = useState<Set<string>>(new Set());
     const [newlyCreatedNoteIds, setNewlyCreatedNoteIds] = useState<Set<string>>(new Set());
     const hasMountedRef = useRef(false);
     const prevCategoryRef = useRef(selectedCategory);
-    const prevNoteIdsRef = useRef<Set<string>>(new Set(notes.map(n => getNoteId(n))));
+    const prevNoteIdsRef = useRef<Set<string>>(new Set(notes.map(resolveNoteId)));
 
     // FLIP animation tracking for smooth Pin / Unpin and reorder transitions
     const itemElementsRef = useRef<Map<string, HTMLElement>>(new Map());
@@ -92,7 +93,7 @@ export function useNoteListAnimations({
     }, []);
 
     useEffect(() => {
-        const currentIds = new Set(notes.map(n => getNoteId(n)));
+        const currentIds = new Set(notes.map(resolveNoteId));
 
         // Skip animation on initial mount or category switch
         if (!hasMountedRef.current || prevCategoryRef.current !== selectedCategory) {
@@ -125,7 +126,7 @@ export function useNoteListAnimations({
             }, 300);
             return () => clearTimeout(timer);
         }
-    }, [notes, getNoteId, selectedCategory]);
+    }, [notes, resolveNoteId, selectedCategory]);
 
     // Delete animation: smoothly collapse height over 220ms, pre-sample positions, then delete in DB
     const handleDeleteNoteWithAnimation = useCallback((id: string) => {
@@ -146,7 +147,7 @@ export function useNoteListAnimations({
 
     useEffect(() => {
         if (exitingNoteIds.size === 0) return;
-        const currentIds = new Set(notes.map(n => getNoteId(n)));
+        const currentIds = new Set(notes.map(resolveNoteId));
         setExitingNoteIds(prev => {
             let changed = false;
             const next = new Set(prev);
@@ -158,7 +159,7 @@ export function useNoteListAnimations({
             }
             return changed ? next : prev;
         });
-    }, [notes, getNoteId, exitingNoteIds]);
+    }, [notes, resolveNoteId, exitingNoteIds]);
 
     return {
         exitingNoteIds,

@@ -18,7 +18,7 @@ interface AppCanvasProps {
     onMoveNote: (id: string, folder: string | null) => void;
     onTogglePin: (note: Note) => void;
     isNotePinned: (note: Note) => boolean;
-    getNoteId: (note: Note) => string;
+    getNoteId?: (note: Note) => string;
     onCreateNote: () => void;
     activeView: 'sidebar' | 'notelist' | 'editor';
     isIOS: boolean;
@@ -26,8 +26,8 @@ interface AppCanvasProps {
     landscapeFullscreen: boolean;
     isMobile: boolean;
     workspacePath: string;
-    onSaveNote: (id: string, filename: string, content: string, folder?: string) => Promise<string>;
-    onUpdateLocally: (filename: string, content: string, folder?: string) => void;
+    onSaveNote: (id: string, arg2: string, arg3?: string, arg4?: string) => Promise<string | void>;
+    onUpdateLocally?: (id: string, content: string, folder?: string) => void;
     markdownEnabled: boolean;
     toolbarVisible: boolean;
     setToolbarVisible: (visible: boolean) => void;

@@ -6,7 +6,7 @@ import { exportNoteToPdf } from '../utils/export';
 
 interface UseNoteEditorProps {
     note: Note;
-    onSave: (id: string, filename: string, content: string, folder?: string) => Promise<string | void>;
+    onSave: (id: string, arg2: string, arg3?: string, arg4?: string) => Promise<string | void>;
     markdownEnabled: boolean;
     isFocusMode: boolean;
     onToggleFocus: () => void;
@@ -37,7 +37,7 @@ export function useNoteEditor({
     const markdownEditorRef = useRef<MarkdownEditorRef>(null);
     const plainTextContainerRef = useRef<HTMLDivElement>(null);
 
-    const currentNoteId = getPathId(note.filename, note.folder || "");
+    const currentNoteId = note.id ?? getPathId(note.filename, note.folder || "");
     const lastNoteId = useRef(currentNoteId);
     const lastSavedContent = useRef(note.content);
     const isDirty = useRef(false);
@@ -56,7 +56,7 @@ export function useNoteEditor({
      * --- STATE SYNC WHEN SWITCHING NOTES ---
      */
     useEffect(() => {
-        const id = getPathId(note.filename, note.folder || "");
+        const id = note.id ?? getPathId(note.filename, note.folder || "");
 
         if (id !== lastNoteId.current) {
             lastNoteId.current = id;
@@ -78,7 +78,7 @@ export function useNoteEditor({
                 lastSavedContent.current = note.content;
             }
         }
-    }, [note.folder, note.filename, note.content]);
+    }, [note.id, note.folder, note.filename, note.content]);
 
     // Auto-focus title input immediately when creating/opening an empty or new note
     useEffect(() => {
@@ -99,7 +99,7 @@ export function useNoteEditor({
                 clearTimeout(timer);
             };
         }
-    }, [note.filename, note.folder]);
+    }, [note.id, note.filename, note.folder]);
 
     /**
      * --- FAST CONTENT SPLITTING (O(Title) instead of O(N) array allocation) ---
@@ -173,13 +173,13 @@ export function useNoteEditor({
         if (content === lastSavedContent.current) return;
 
         const timer = setTimeout(async () => {
-            await onSave(currentNoteId, note.filename, content, note.folder);
+            await onSave(currentNoteId, content, note.folder);
             lastSavedContent.current = content;
             isDirty.current = false;
         }, 150);
 
         return () => clearTimeout(timer);
-    }, [content, currentNoteId, note.filename, note.folder, onSave]);
+    }, [content, currentNoteId, note.folder, onSave]);
 
     /**
      * --- FLUSH ON UNMOUNT / NOTE SWITCH ---
@@ -196,11 +196,11 @@ export function useNoteEditor({
     useEffect(() => {
         return () => {
             if (isDirty.current && contentRef.current !== lastSavedContent.current) {
-                onSaveRef.current(currentNoteId, note.filename, contentRef.current, note.folder);
+                onSaveRef.current(currentNoteId, contentRef.current, note.folder);
             }
             onSyncRef.current?.();
         };
-    }, [currentNoteId, note.filename, note.folder]);
+    }, [currentNoteId, note.folder]);
 
     const handleExport = useCallback(() => {
         exportNoteToPdf(title, body);

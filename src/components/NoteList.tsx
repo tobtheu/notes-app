@@ -20,7 +20,7 @@ interface NoteListProps {
     onTogglePin: (note: Note) => void;
     isNotePinned: (note: Note) => boolean;
     isIOS?: boolean;
-    getNoteId: (note: Note) => string;
+    getNoteId?: (note: Note) => string;
     selectedCategory: string | null;
     onCreateNote?: () => void;
 }
@@ -46,6 +46,7 @@ export function NoteList({
     selectedCategory,
     onCreateNote,
 }: NoteListProps) {
+    const resolveNoteId = useCallback((n: Note) => n.id ?? (getNoteId ? getNoteId(n) : ''), [getNoteId]);
     // Tracks which note's folder selection menu is currently open
     const [dropdownOpenId, setDropdownOpenId] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -164,8 +165,8 @@ export function NoteList({
                                 </div>
                                 <div className="space-y-1">
                                     {pinnedNotes.map((note) => {
-                                        const noteId = getNoteId(note);
-                                        const isSelected = selectedNote ? getNoteId(selectedNote) === noteId : false;
+                                        const noteId = resolveNoteId(note);
+                                        const isSelected = selectedNote ? resolveNoteId(selectedNote) === noteId : false;
 
                                         return (
                                             <NoteListItem
@@ -208,8 +209,8 @@ export function NoteList({
                             </div>
                             <div className="space-y-1">
                                 {unpinnedNotes.map((note) => {
-                                    const noteId = getNoteId(note);
-                                    const isSelected = selectedNote ? getNoteId(selectedNote) === noteId : false;
+                                    const noteId = resolveNoteId(note);
+                                    const isSelected = selectedNote ? resolveNoteId(selectedNote) === noteId : false;
 
                                     return (
                                         <NoteListItem

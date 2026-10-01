@@ -18,13 +18,16 @@ export type { SyncStatus };
 // Helper: derive Note from a DB row
 function rowToNote(row: {
   id: string;
+  folder?: string;
   content: string;
   updated_at: string;
 }): Note {
-  const lastSlash = row.id.lastIndexOf('/');
-  const filename = lastSlash >= 0 ? row.id.slice(lastSlash + 1) : row.id;
-  const folder = lastSlash >= 0 ? row.id.slice(0, lastSlash) : '';
-  return { filename, folder, content: row.content, updatedAt: row.updated_at };
+  return {
+    id: row.id,
+    folder: row.folder || '',
+    content: row.content,
+    updatedAt: row.updated_at,
+  };
 }
 
 export function useNotes() {
@@ -56,24 +59,20 @@ export function useNotes() {
 
   // ── Live queries — Notes ──────────────────────────────────────────────────
   const notesQuery = useLiveQuery<{
-    id: string; content: string; updated_at: string;
+    id: string; folder: string; content: string; updated_at: string;
   }>(
     userId
-      ? `SELECT id, content, updated_at FROM notes WHERE user_id = $1 AND deleted = false ORDER BY updated_at DESC`
-      : `SELECT id, content, updated_at FROM notes WHERE 1=0`,
+      ? `SELECT id, folder, content, updated_at FROM notes WHERE user_id = $1 AND deleted = false ORDER BY updated_at DESC`
+      : `SELECT id, folder, content, updated_at FROM notes WHERE 1=0`,
     userId ? [userId] : [],
   );
 
   // ── Live queries — Folders ────────────────────────────────────────────────
   const foldersQuery = useLiveQuery<{ folder: string }>(
     userId
-      ? `SELECT DISTINCT
-               CASE
-                 WHEN strpos(id, '/') > 0 THEN substring(id, 1, strpos(id, '/') - 1)
-                 ELSE ''
-               END AS folder
+      ? `SELECT DISTINCT folder
            FROM notes
-          WHERE user_id = $1 AND deleted = false AND strpos(id, '/') > 0
+          WHERE user_id = $1 AND deleted = false AND folder != ''
           ORDER BY folder ASC`
       : `SELECT '' AS folder WHERE 1=0`,
     userId ? [userId] : [],
@@ -81,11 +80,11 @@ export function useNotes() {
 
   // ── Live queries — Trash Notes ────────────────────────────────────────────
   const trashQuery = useLiveQuery<{
-    id: string; content: string; updated_at: string;
+    id: string; folder: string; content: string; updated_at: string;
   }>(
     userId
-      ? `SELECT id, content, updated_at FROM notes WHERE user_id = $1 AND deleted = true ORDER BY updated_at DESC`
-      : `SELECT id, content, updated_at FROM notes WHERE 1=0`,
+      ? `SELECT id, folder, content, updated_at FROM notes WHERE user_id = $1 AND deleted = true ORDER BY updated_at DESC`
+      : `SELECT id, folder, content, updated_at FROM notes WHERE 1=0`,
     userId ? [userId] : [],
   );
 
@@ -98,7 +97,7 @@ export function useNotes() {
 
   // Note ID helper
   const getNoteId = useCallback((note: Note) => {
-    return getPathId(note.filename, note.folder);
+    return note.id ?? getPathId(note.filename, note.folder);
   }, []);
 
   // Pending writes indicator

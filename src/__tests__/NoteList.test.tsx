@@ -5,7 +5,7 @@ import type { Note } from '../types';
 
 const mockNotes: Note[] = [
     {
-        filename: 'note1.md',
+        id: 'uuid-1',
         content: '# Test Title\nSome content',
         updatedAt: new Date().toISOString(),
         folder: '',
@@ -47,7 +47,7 @@ describe('NoteList Swipe Gesture', () => {
                 onMoveNote={vi.fn()}
                 onTogglePin={vi.fn()}
                 isNotePinned={() => false}
-                getNoteId={(n) => n.filename}
+                getNoteId={(n) => n.id}
                 selectedCategory={null}
             />
         );
@@ -83,7 +83,7 @@ describe('NoteList Swipe Gesture', () => {
                 onMoveNote={vi.fn()}
                 onTogglePin={vi.fn()}
                 isNotePinned={() => false}
-                getNoteId={(n) => n.filename}
+                getNoteId={(n) => n.id}
                 selectedCategory={null}
             />
         );
@@ -110,7 +110,7 @@ describe('NoteList Swipe Gesture', () => {
                 onMoveNote={vi.fn()}
                 onTogglePin={vi.fn()}
                 isNotePinned={() => false}
-                getNoteId={(n) => n.filename}
+                getNoteId={(n) => n.id}
                 selectedCategory={null}
             />
         );
@@ -149,7 +149,7 @@ describe('NoteList Swipe Gesture', () => {
                 onMoveNote={vi.fn()}
                 onTogglePin={vi.fn()}
                 isNotePinned={() => false}
-                getNoteId={(n) => n.filename}
+                getNoteId={(n) => n.id}
                 selectedCategory={null}
             />
         );
@@ -190,7 +190,7 @@ describe('NoteList Swipe Gesture', () => {
                 onMoveNote={vi.fn()}
                 onTogglePin={vi.fn()}
                 isNotePinned={() => false}
-                getNoteId={(n) => n.filename}
+                getNoteId={(n) => n.id}
                 selectedCategory={null}
             />
         );
@@ -218,7 +218,7 @@ describe('NoteList Swipe Gesture', () => {
                 onMoveNote={vi.fn()}
                 onTogglePin={vi.fn()}
                 isNotePinned={() => false}
-                getNoteId={(n) => n.filename}
+                getNoteId={(n) => n.id}
                 selectedCategory={null}
             />
         );
@@ -237,7 +237,7 @@ describe('NoteList Swipe Gesture', () => {
         act(() => {
             vi.advanceTimersByTime(250);
         });
-        expect(onDelete).toHaveBeenCalledWith('note1.md');
+        expect(onDelete).toHaveBeenCalledWith('uuid-1');
         vi.useRealTimers();
     });
 });

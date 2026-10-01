@@ -12,8 +12,8 @@ import { useTranslation } from '../i18n';
 interface EditorProps {
     note: Note;
     allNotes?: Note[];
-    onSave: (id: string, filename: string, content: string, folder?: string) => Promise<string | void>;
-    onUpdateLocally?: (filename: string, content: string, folder?: string, updateTimestamp?: boolean) => void;
+    onSave: (id: string, arg2: string, arg3?: string, arg4?: string) => Promise<string | void>;
+    onUpdateLocally?: (filenameOrId: string, content: string, folder?: string, updateTimestamp?: boolean) => void;
     onNavigate?: (id: string, anchor?: string) => void;
     markdownEnabled: boolean;
     toolbarVisible: boolean;
