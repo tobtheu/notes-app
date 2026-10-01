@@ -46,7 +46,7 @@ export function AboutSection({
                         className="w-14 h-14 mx-auto mb-2.5 rounded-2xl shadow-sm object-contain select-none pointer-events-none"
                     />
                     <h4 className="font-bold text-[var(--text-main)] text-sm">LamaNotes</h4>
-                    <p className="text-[var(--text-muted)] font-mono text-xs mt-0.5">{t('settings.aboutSection.version', { version: version || '0.8.3' })}</p>
+                    <p className="text-[var(--text-muted)] font-mono text-xs mt-0.5">{t('settings.aboutSection.version', { version: version || '0.8.4' })}</p>
                     <p className="text-[var(--text-muted)] text-[11px] mt-1 font-medium">{t('settings.aboutSection.developer')}</p>
                     
                     <div className="flex justify-center gap-2 mt-4">
