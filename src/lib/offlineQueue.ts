@@ -96,6 +96,21 @@ async function upsertWithTimeout(
       .abortSignal(controller.signal);
 
     if (error) {
+      if (table === 'notes' && (error.code === '42703' || error.message?.includes('folder'))) {
+        const stripFolder = (p: any) => {
+          const { folder, ...rest } = p;
+          return rest;
+        };
+        const fallbackPayload = Array.isArray(payload) ? payload.map(stripFolder) : stripFolder(payload);
+        const retryRes = await supabase
+          .from(table)
+          .upsert(fallbackPayload as any, { onConflict: conflictCol })
+          .abortSignal(controller.signal);
+        if (!retryRes.error) {
+          log.warn(`[offlineQueue] upsert succeeded without folder column (remote schema missing folder column)`);
+          return;
+        }
+      }
       log.error(`[offlineQueue] upsert error for ${table}:`, error);
       throw new Error(error.message);
     }

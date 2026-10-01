@@ -28,7 +28,7 @@ export async function pullFromSupabase(
 
   try {
     // 1. Fetch remote notes and config in parallel
-    const [notesRes, configRes] = await Promise.all([
+    let [notesRes, configRes] = await Promise.all([
       supabase
         .from('notes')
         .select('id, user_id, folder, content, updated_at, deleted')
@@ -39,6 +39,20 @@ export async function pullFromSupabase(
         .eq('user_id', userId)
         .maybeSingle(),
     ]);
+
+    if (notesRes.error && (notesRes.error.code === '42703' || notesRes.error.message.includes('folder'))) {
+      log.warn('[syncSupabase:pull] remote notes table missing folder column, falling back without folder');
+      const fallbackRes = await supabase
+        .from('notes')
+        .select('id, user_id, content, updated_at, deleted')
+        .eq('user_id', userId);
+      if (!fallbackRes.error && fallbackRes.data) {
+        notesRes = {
+          ...fallbackRes,
+          data: fallbackRes.data.map((r: any) => ({ ...r, folder: '' })),
+        } as any;
+      }
+    }
 
     if (notesRes.error) {
       log.error('[syncSupabase:pull] error fetching remote notes:', notesRes.error);
