@@ -234,6 +234,30 @@ export async function migrateLegacyNotes(db: PGlite): Promise<void> {
       `DELETE FROM notes WHERE id = $1 AND user_id = $2`,
       [row.id, row.user_id]
     );
+
+    // Remap any pending offline writes for this note
+    try {
+      const pendingOld = await db.query<{ id: string; payload: string | object }>(
+        `SELECT id, payload FROM pending_writes WHERE id = $1`,
+        [`notes:${row.id}`]
+      );
+      if (pendingOld.rows.length > 0) {
+        const payload = typeof pendingOld.rows[0].payload === 'string'
+          ? JSON.parse(pendingOld.rows[0].payload)
+          : { ...pendingOld.rows[0].payload };
+        payload.id = newId;
+        payload.folder = extractedFolder;
+        await db.query(
+          `INSERT INTO pending_writes (id, table_name, operation, payload, updated_at)
+           VALUES ($1, 'notes', 'upsert', $2, $3)
+           ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at`,
+          [`notes:${newId}`, JSON.stringify(payload), new Date().toISOString()]
+        );
+        await db.query(`DELETE FROM pending_writes WHERE id = $1`, [`notes:${row.id}`]);
+      }
+    } catch {
+      // Ignore if pending_writes is not yet created or accessible
+    }
   }
 
   // Remap pinnedNotes in app_config
