@@ -110,16 +110,16 @@ describe('note ID generation consistency', () => {
         expect(getNoteId(a)).toBe(getNoteId(b))
     })
 
-    it('ID changes when a note is moved to a different folder', () => {
+    it('note ID remains stable when a note is moved to a different folder', () => {
         const note = makeNote('Test.md', 'Work')
         const movedNote = { ...note, folder: 'Personal' }
-        expect(getNoteId(note)).not.toBe(getNoteId(movedNote))
+        expect(getNoteId(note)).toBe(getNoteId(movedNote))
     })
 
-    it('ID changes when a note is renamed', () => {
+    it('note ID remains stable when note content changes', () => {
         const note = makeNote('Old.md', '')
-        const renamedNote = { ...note, filename: 'New.md' }
-        expect(getNoteId(note)).not.toBe(getNoteId(renamedNote))
+        const renamedNote = { ...note, content: '# New Title' }
+        expect(getNoteId(note)).toBe(getNoteId(renamedNote))
     })
 
     it('ID is case-insensitive', () => {

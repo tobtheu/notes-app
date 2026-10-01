@@ -84,7 +84,7 @@ describe('TrashSection', () => {
             vi.advanceTimersByTime(250);
         });
 
-        expect(onRestore).toHaveBeenCalledWith('ideas/old project ideas.md');
+        expect(onRestore).toHaveBeenCalledWith('trash-1');
     });
 
     it('handles permanent delete with confirmation step and animation', async () => {
@@ -117,7 +117,7 @@ describe('TrashSection', () => {
             vi.advanceTimersByTime(250);
         });
 
-        expect(onDeletePermanently).toHaveBeenCalledWith('ideas/old project ideas.md');
+        expect(onDeletePermanently).toHaveBeenCalledWith('trash-1');
     });
 
     it('handles empty trash with confirmation step and calls onEmptyTrash', async () => {
