@@ -25,7 +25,7 @@ export const TypographySelector: React.FC<TypographySelectorProps> = ({
     return (
         <div className="pt-3 border-t border-[var(--border-subtle)]">
             <label className="block font-semibold text-[var(--text-main)] mb-2">{t('settings.appearance.typography')}</label>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-4">
                 <button
                     type="button"
                     onClick={() => setFontFamily('inter')}
@@ -85,6 +85,18 @@ export const TypographySelector: React.FC<TypographySelectorProps> = ({
                     )}
                 >
                     Newsreader
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setFontFamily('libron')}
+                    className={clsx(
+                        "p-2 sm:p-2.5 rounded-xl text-center text-xs font-libron transition-all border min-w-0 truncate",
+                        fontFamily === 'libron'
+                            ? "border-[var(--accent-color)] bg-[var(--card-active)] text-[var(--accent-color)] font-semibold shadow-sm"
+                            : "border-transparent bg-[var(--card-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                    )}
+                >
+                    Libron
                 </button>
             </div>
 

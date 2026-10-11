@@ -249,7 +249,8 @@ function App() {
           fontFamily === 'roboto' && "font-roboto",
           fontFamily === 'courier' && "font-courier",
           fontFamily === 'sfmono' && "font-sfmono",
-          fontFamily === 'serif' && "font-serif"
+          fontFamily === 'serif' && "font-serif",
+          fontFamily === 'libron' && "font-libron"
         )}
         style={{
           backgroundColor: 'var(--shell-bg)',
