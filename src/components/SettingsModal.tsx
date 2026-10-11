@@ -34,8 +34,8 @@ interface SettingsModalProps {
     onToggleShowIconsWhenCollapsed?: (v: boolean) => void;
     showNoteCounts?: boolean;
     onToggleShowNoteCounts?: (v: boolean) => void;
-    fontFamily: 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system';
-    setFontFamily: (fontFamily: 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system') => void;
+    fontFamily: 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'libron' | 'system';
+    setFontFamily: (fontFamily: 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'libron' | 'system') => void;
     fontSize: 'small' | 'medium' | 'large';
     setFontSize: (fontSize: 'small' | 'medium' | 'large') => void;
     spellcheckEnabled: boolean;

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Theme, LightTheme } from './useTheme';
 import type { LanguageOption } from '../i18n/types';
 
-export type FontFamily = 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system';
+export type FontFamily = 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'libron' | 'system';
 export type FontSize = 'small' | 'medium' | 'large';
 
 export interface AllSettings {
@@ -32,7 +32,7 @@ function loadInitialSettings(): AllSettings {
         : (theme === 'sage' ? 'sage' : 'clay');
 
     const savedFont = localStorage.getItem('font-family');
-    const fontFamily: FontFamily = (savedFont === 'inter' || savedFont === 'roboto' || savedFont === 'courier' || savedFont === 'sfmono' || savedFont === 'serif' || savedFont === 'system')
+    const fontFamily: FontFamily = (savedFont === 'inter' || savedFont === 'roboto' || savedFont === 'courier' || savedFont === 'sfmono' || savedFont === 'serif' || savedFont === 'libron' || savedFont === 'system')
         ? (savedFont as FontFamily)
         : 'inter';
 
@@ -100,7 +100,7 @@ export function useSettings(metadataSettings?: any, onSaveSettings?: (settings: 
                     next.preferredLightTheme = metadataSettings.preferredLightTheme;
                     hasChange = true;
                 }
-                if (metadataSettings.fontFamily !== undefined && (['inter', 'roboto', 'courier', 'sfmono', 'serif', 'system'].includes(metadataSettings.fontFamily)) && metadataSettings.fontFamily !== prev.fontFamily) {
+                if (metadataSettings.fontFamily !== undefined && (['inter', 'roboto', 'courier', 'sfmono', 'serif', 'libron', 'system'].includes(metadataSettings.fontFamily)) && metadataSettings.fontFamily !== prev.fontFamily) {
                     next.fontFamily = metadataSettings.fontFamily;
                     hasChange = true;
                 }

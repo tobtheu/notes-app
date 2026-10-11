@@ -2,7 +2,7 @@ import React from 'react';
 import clsx from 'clsx';
 import { useTranslation } from '../i18n';
 
-export type FontFamily = 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'system';
+export type FontFamily = 'inter' | 'roboto' | 'courier' | 'sfmono' | 'serif' | 'libron' | 'system';
 export type FontSize = 'small' | 'medium' | 'large';
 
 interface TypographySelectorProps {

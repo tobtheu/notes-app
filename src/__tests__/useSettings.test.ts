@@ -121,6 +121,21 @@ describe('useSettings', () => {
             expect(localStorage.getItem('language')).toBe('de')
         })
 
+        it('restores libron fontFamily from localStorage', () => {
+            localStorage.setItem('font-family', 'libron')
+            const { result } = renderHook(() => useSettings())
+            expect(result.current.fontFamily).toBe('libron')
+        })
+
+        it('allows setting fontFamily to libron', () => {
+            const { result } = renderHook(() => useSettings())
+            act(() => {
+                result.current.setFontFamily('libron')
+            })
+            expect(result.current.fontFamily).toBe('libron')
+            expect(localStorage.getItem('font-family')).toBe('libron')
+        })
+
         it('ignores invalid fontFamily values and defaults to inter', () => {
             localStorage.setItem('font-family', 'comic-sans')
             const { result } = renderHook(() => useSettings())
