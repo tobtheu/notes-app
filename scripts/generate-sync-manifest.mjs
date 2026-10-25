@@ -25,21 +25,24 @@ export function generateSyncManifest({ artifactsDir, version, baseUrl, pubDate =
     const encodedUrl = `${baseUrl.replace(/\/+$/, '')}/${encodeURIComponent(targetFile)}`;
 
     // Tauri platform matching rules
-    if (targetFile.includes('aarch64') && targetFile.endsWith('.tar.gz')) {
+    if (targetFile.includes('darwin-aarch64') || (targetFile.includes('aarch64') && targetFile.endsWith('.tar.gz'))) {
       manifest.platforms['darwin-aarch64'] = { signature, url: encodedUrl };
     } else if (
-      targetFile.includes('x64') &&
-      (targetFile.endsWith('.app.tar.gz') || (targetFile.includes('darwin') && targetFile.endsWith('.tar.gz')) || targetFile.includes('mac'))
+      targetFile.includes('darwin-x86_64') ||
+      (targetFile.includes('x64') && (targetFile.endsWith('.app.tar.gz') || targetFile.endsWith('.tar.gz')))
     ) {
       manifest.platforms['darwin-x86_64'] = { signature, url: encodedUrl };
     } else if (
-      (targetFile.endsWith('.nsis.zip') || targetFile.endsWith('.zip')) &&
-      (targetFile.includes('x64') || targetFile.includes('x86_64') || targetFile.includes('windows'))
+      targetFile.includes('windows') ||
+      targetFile.endsWith('.exe') ||
+      targetFile.endsWith('.zip') ||
+      targetFile.endsWith('.msi')
     ) {
       manifest.platforms['windows-x86_64'] = { signature, url: encodedUrl };
     } else if (
-      targetFile.endsWith('.AppImage.tar.gz') ||
-      (targetFile.includes('linux') && targetFile.endsWith('.tar.gz'))
+      targetFile.includes('linux') ||
+      targetFile.endsWith('.AppImage') ||
+      targetFile.endsWith('.AppImage.tar.gz')
     ) {
       manifest.platforms['linux-x86_64'] = { signature, url: encodedUrl };
     }

@@ -170,30 +170,40 @@ jobs:
       - name: Prepare VPS Deploy Package & Generate sync.json
         run: |
           mkdir -p vps-deploy
-          # Flatten artifacts
-          find all-sync-artifacts/ -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.tar.gz" -o -name "*.zip" -o -name "*.sig" \) -exec cp {} vps-deploy/ \;
-
-          # Extract version from package.json
           VERSION=$(node -p "require('./package.json').version")
+
+          # 1. macOS ARM64
+          if [ -d all-sync-artifacts/sync-macos-arm64 ]; then
+            find all-sync-artifacts/sync-macos-arm64 -name "*.dmg" -exec cp {} vps-deploy/lama-notes-sync-mac-arm64.dmg \;
+            find all-sync-artifacts/sync-macos-arm64 -name "*app.tar.gz" -exec cp {} vps-deploy/Lama-Notes-Sync_${VERSION}_darwin-aarch64.app.tar.gz \;
+            find all-sync-artifacts/sync-macos-arm64 -name "*app.tar.gz.sig" -exec cp {} vps-deploy/Lama-Notes-Sync_${VERSION}_darwin-aarch64.app.tar.gz.sig \;
+          fi
+
+          # 2. macOS Intel x64
+          if [ -d all-sync-artifacts/sync-macos-x64 ]; then
+            find all-sync-artifacts/sync-macos-x64 -name "*.dmg" -exec cp {} vps-deploy/lama-notes-sync-mac-x64.dmg \;
+            find all-sync-artifacts/sync-macos-x64 -name "*app.tar.gz" -exec cp {} vps-deploy/Lama-Notes-Sync_${VERSION}_darwin-x86_64.app.tar.gz \;
+            find all-sync-artifacts/sync-macos-x64 -name "*app.tar.gz.sig" -exec cp {} vps-deploy/Lama-Notes-Sync_${VERSION}_darwin-x86_64.app.tar.gz.sig \;
+          fi
+
+          # 3. Windows x64
+          if [ -d all-sync-artifacts/sync-windows-x64 ]; then
+            find all-sync-artifacts/sync-windows-x64 -name "*setup.exe" -exec cp {} vps-deploy/lama-notes-sync-windows.exe \;
+            find all-sync-artifacts/sync-windows-x64 -name "*setup.exe.sig" -exec cp {} vps-deploy/lama-notes-sync-windows.exe.sig \;
+            find all-sync-artifacts/sync-windows-x64 -name "*.msi" -exec cp {} vps-deploy/ \;
+            find all-sync-artifacts/sync-windows-x64 -name "*.msi.sig" -exec cp {} vps-deploy/ \;
+          fi
+
+          # 4. Linux x64
+          if [ -d all-sync-artifacts/sync-linux-x64 ]; then
+            find all-sync-artifacts/sync-linux-x64 -name "*.AppImage" -exec cp {} vps-deploy/lama-notes-sync-linux.AppImage \;
+            find all-sync-artifacts/sync-linux-x64 -name "*.AppImage.sig" -exec cp {} vps-deploy/lama-notes-sync-linux.AppImage.sig \;
+            find all-sync-artifacts/sync-linux-x64 -name "*.deb" -exec cp {} vps-deploy/lama-notes-sync-linux.deb \;
+            find all-sync-artifacts/sync-linux-x64 -name "*.deb.sig" -exec cp {} vps-deploy/lama-notes-sync-linux.deb.sig \;
+          fi
 
           # Generate multi-platform sync.json
           node scripts/generate-sync-manifest.mjs vps-deploy "$VERSION" "https://api.lamanotes.de/updates" vps-deploy/sync.json
-
-          # Create stable download aliases
-          MAC_ARM=$(find vps-deploy/ -type f -name "*aarch64*.dmg" | head -n 1)
-          if [ -n "$MAC_ARM" ]; then cp "$MAC_ARM" vps-deploy/lama-notes-sync-mac-arm64.dmg; fi
-
-          MAC_X64=$(find vps-deploy/ -type f -name "*x64*.dmg" | head -n 1)
-          if [ -n "$MAC_X64" ]; then cp "$MAC_X64" vps-deploy/lama-notes-sync-mac-x64.dmg; fi
-
-          WIN_X64=$(find vps-deploy/ -type f -name "*.exe" | head -n 1)
-          if [ -n "$WIN_X64" ]; then cp "$WIN_X64" vps-deploy/lama-notes-sync-windows.exe; fi
-
-          LINUX_APPIMAGE=$(find vps-deploy/ -type f -name "*.AppImage" | head -n 1)
-          if [ -n "$LINUX_APPIMAGE" ]; then cp "$LINUX_APPIMAGE" vps-deploy/lama-notes-sync-linux.AppImage; fi
-
-          LINUX_DEB=$(find vps-deploy/ -type f -name "*.deb" | head -n 1)
-          if [ -n "$LINUX_DEB" ]; then cp "$LINUX_DEB" vps-deploy/lama-notes-sync-linux.deb; fi
 
           echo "VPS deploy package contents:"
           ls -la vps-deploy/
