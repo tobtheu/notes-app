@@ -1,24 +1,32 @@
-name: "Release Offline (Public)"
+name: "Release (Offline Public & Sync Private)"
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
-  publish:
+  # -------------------------------------------------------------
+  # 1. Public Offline Release (GitHub Releases)
+  # -------------------------------------------------------------
+  build-offline:
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-latest" # for Apple Silicon
+          - platform: "macos-latest"
+            target: "aarch64-apple-darwin"
             args: "--target aarch64-apple-darwin"
-          - platform: "macos-latest" # for Intel
+          - platform: "macos-latest"
+            target: "x86_64-apple-darwin"
             args: "--target x86_64-apple-darwin"
-          - platform: "ubuntu-22.04" # for Linux
+          - platform: "ubuntu-22.04"
+            target: "x86_64-unknown-linux-gnu"
             args: ""
-          - platform: "windows-latest" # for Windows
+          - platform: "windows-latest"
+            target: "x86_64-pc-windows-msvc"
             args: ""
 
     runs-on: ${{ matrix.platform }}
@@ -33,7 +41,6 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          # Those targets are only used on macos runners so it's safe to always install them
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: install dependencies (ubuntu only)
@@ -51,10 +58,139 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__ # the action replaces this with the version from tauri.conf.json
+          tagName: v__VERSION__
           releaseName: "Lama Notes v__VERSION__"
           releaseBody: "Offline-first release of Lama Notes."
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+  # -------------------------------------------------------------
+  # 2. Private Sync Release (Build Artifacts for VPS)
+  # -------------------------------------------------------------
+  build-sync:
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            target: "aarch64-apple-darwin"
+            args: "--config src-tauri/tauri.sync.conf.json --target aarch64-apple-darwin"
+            artifact_name: "sync-macos-arm64"
+          - platform: "macos-latest"
+            target: "x86_64-apple-darwin"
+            args: "--config src-tauri/tauri.sync.conf.json --target x86_64-apple-darwin"
+            artifact_name: "sync-macos-x64"
+          - platform: "windows-latest"
+            target: "x86_64-pc-windows-msvc"
+            args: "--config src-tauri/tauri.sync.conf.json"
+            artifact_name: "sync-windows-x64"
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: install frontend dependencies
+        run: npm install
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_ENABLE_SYNC: "true"
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_ELECTRIC_URL: ${{ secrets.VITE_ELECTRIC_URL }}
+          VITE_LAMA_SECRET: ${{ secrets.VITE_LAMA_SECRET }}
+        with:
+          tagName: v__VERSION__
+          releaseDraft: true
+          prerelease: true
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}
+
+      - name: Upload Sync Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            src-tauri/target/**/bundle/**/*.dmg
+            src-tauri/target/**/bundle/**/*.exe
+            src-tauri/target/**/bundle/**/*.msi
+            src-tauri/target/**/bundle/**/*.tar.gz
+            src-tauri/target/**/bundle/**/*.zip
+            src-tauri/target/**/bundle/**/*.sig
+
+  # -------------------------------------------------------------
+  # 3. VPS Deploy & Manifest Synthesis
+  # -------------------------------------------------------------
+  deploy-sync-vps:
+    needs: build-sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download all sync artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-sync-artifacts
+
+      - name: Prepare VPS Deploy Package & Generate sync.json
+        run: |
+          mkdir -p vps-deploy
+          # Flatten artifacts
+          find all-sync-artifacts/ -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.tar.gz" -o -name "*.zip" -o -name "*.sig" \) -exec cp {} vps-deploy/ \;
+
+          # Extract version from package.json
+          VERSION=$(node -p "require('./package.json').version")
+
+          # Generate multi-platform sync.json
+          node scripts/generate-sync-manifest.mjs vps-deploy "$VERSION" "https://api.lamanotes.de/updates" vps-deploy/sync.json
+
+          # Create stable download aliases
+          MAC_ARM=$(find vps-deploy/ -type f -name "*aarch64*.dmg" | head -n 1)
+          if [ -n "$MAC_ARM" ]; then cp "$MAC_ARM" vps-deploy/lama-notes-sync-mac-arm64.dmg; fi
+
+          MAC_X64=$(find vps-deploy/ -type f -name "*x64*.dmg" | head -n 1)
+          if [ -n "$MAC_X64" ]; then cp "$MAC_X64" vps-deploy/lama-notes-sync-mac-x64.dmg; fi
+
+          WIN_X64=$(find vps-deploy/ -type f -name "*.exe" | head -n 1)
+          if [ -n "$WIN_X64" ]; then cp "$WIN_X64" vps-deploy/lama-notes-sync-windows.exe; fi
+
+          echo "VPS deploy package contents:"
+          ls -la vps-deploy/
+          cat vps-deploy/sync.json
+
+      - name: Deploy to VPS via SSH / SCP
+        if: env.VPS_HOST != '' && env.VPS_SSH_KEY != ''
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME || 'root' }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          source: "vps-deploy/*"
+          target: "/var/www/lamanotes-updates/"
+          strip_components: 1
