@@ -4,6 +4,7 @@ import { getDb, startElectricSync } from '../lib/electric';
 import { setSupabaseSession, supabase } from '../lib/supabaseClient';
 import { flushQueue } from '../lib/offlineQueue';
 import { pullFromSupabase } from '../lib/syncSupabase';
+import { deduplicateNotes } from '../lib/deduplicateNotes';
 import { log } from '../lib/logger';
 import { FEATURES } from '../config/features';
 import type { PGliteWithLive } from '@electric-sql/pglite/live';
@@ -43,6 +44,7 @@ export function useNotesInit({
                     log.info('[useNotes:init] operating in local-only offline mode');
                     setUserId('local');
                     setSyncStatus('offline');
+                    await deduplicateNotes(db, 'local');
                     return;
                 }
 
@@ -116,6 +118,11 @@ export function useNotesInit({
                 if (navigator.onLine && stored.userId) {
                     log.info('[useNotes:init] pulling remote notes from Supabase...');
                     await pullFromSupabase(db, stored.userId);
+                }
+
+                if (stored.userId) {
+                    log.info('[useNotes:init] running note deduplication...');
+                    await deduplicateNotes(db, stored.userId);
                 }
 
                 await startElectricSync(stored.userId, stored.accessToken, (err) => {

@@ -235,6 +235,33 @@ export async function migrateLegacyNotes(db: PGlite): Promise<void> {
       [row.id, row.user_id]
     );
 
+    // Enqueue deletion of the old legacy ID to Supabase and upsert new UUID
+    if (row.user_id && row.user_id !== 'local') {
+      try {
+        await db.query(
+          `INSERT INTO pending_writes (id, table_name, operation, payload, updated_at)
+           VALUES ($1, 'notes', 'upsert', $2, $3)
+           ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at`,
+          [`notes:${row.id}`, JSON.stringify({ id: row.id, user_id: row.user_id, deleted: true }), new Date().toISOString()]
+        );
+        await db.query(
+          `INSERT INTO pending_writes (id, table_name, operation, payload, updated_at)
+           VALUES ($1, 'notes', 'upsert', $2, $3)
+           ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at`,
+          [`notes:${newId}`, JSON.stringify({
+            id: newId,
+            user_id: row.user_id,
+            folder: extractedFolder,
+            content: row.content,
+            updated_at: row.updated_at,
+            deleted: row.deleted,
+          }), new Date().toISOString()]
+        );
+      } catch {
+        // Ignore if pending_writes is not yet created
+      }
+    }
+
     // Remap any pending offline writes for this note
     try {
       const pendingOld = await db.query<{ id: string; payload: string | object }>(
@@ -253,7 +280,6 @@ export async function migrateLegacyNotes(db: PGlite): Promise<void> {
            ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload, updated_at = EXCLUDED.updated_at`,
           [`notes:${newId}`, JSON.stringify(payload), new Date().toISOString()]
         );
-        await db.query(`DELETE FROM pending_writes WHERE id = $1`, [`notes:${row.id}`]);
       }
     } catch {
       // Ignore if pending_writes is not yet created or accessible

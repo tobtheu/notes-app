@@ -73,6 +73,11 @@ export async function pullFromSupabase(
       if (remoteNotes && remoteNotes.length > 0) {
         log.info(`[syncSupabase:pull] atomically applying ${remoteNotes.length} remote note(s)`);
         for (const row of remoteNotes) {
+          if (row.id.endsWith('.md') || row.id.includes('/')) {
+            log.warn(`[syncSupabase:pull] skipping legacy path-based note from Supabase: ${row.id}`);
+            continue;
+          }
+
           await tx.query(
             `INSERT INTO notes (id, user_id, folder, content, updated_at, deleted)
              VALUES ($1, $2, $3, $4, $5, $6)

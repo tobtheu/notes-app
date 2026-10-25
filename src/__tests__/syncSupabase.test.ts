@@ -55,4 +55,33 @@ describe('syncSupabase', () => {
     // Verify PGlite upsert queries
     expect(mockQuery).toHaveBeenCalledTimes(3); // 2 notes + 1 config
   });
+
+  it('filters out legacy path-based notes from remote Supabase payload', async () => {
+    const mockDb = { query: mockQuery } as any;
+
+    mockSupabaseFrom.mockImplementation((table: string) => {
+      if (table === 'notes') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({
+              data: [
+                { id: 'uuid-valid', user_id: 'user-123', folder: 'work', content: '# Valid', updated_at: '2026-08-22T20:00:00Z', deleted: false },
+                { id: 'work/legacy.md', user_id: 'user-123', folder: 'work', content: '# Legacy', updated_at: '2026-08-22T20:00:00Z', deleted: false },
+              ],
+              error: null,
+            }),
+          }),
+        };
+      }
+      return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) }) }) };
+    });
+
+    const result = await pullFromSupabase(mockDb, 'user-123');
+    expect(result.notesCount).toBe(1);
+    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO notes'),
+      expect.arrayContaining(['uuid-valid'])
+    );
+  });
 });
