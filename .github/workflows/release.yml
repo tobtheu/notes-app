@@ -88,6 +88,10 @@ jobs:
             target: "x86_64-pc-windows-msvc"
             args: "--config src-tauri/tauri.sync.conf.json"
             artifact_name: "sync-windows-x64"
+          - platform: "ubuntu-22.04"
+            target: "x86_64-unknown-linux-gnu"
+            args: "--config src-tauri/tauri.sync.conf.json"
+            artifact_name: "sync-linux-x64"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -102,6 +106,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: install frontend dependencies
         run: npm install
@@ -131,6 +141,8 @@ jobs:
             src-tauri/target/**/bundle/**/*.dmg
             src-tauri/target/**/bundle/**/*.exe
             src-tauri/target/**/bundle/**/*.msi
+            src-tauri/target/**/bundle/**/*.deb
+            src-tauri/target/**/bundle/**/*.AppImage
             src-tauri/target/**/bundle/**/*.tar.gz
             src-tauri/target/**/bundle/**/*.zip
             src-tauri/target/**/bundle/**/*.sig
@@ -158,7 +170,7 @@ jobs:
         run: |
           mkdir -p vps-deploy
           # Flatten artifacts
-          find all-sync-artifacts/ -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.tar.gz" -o -name "*.zip" -o -name "*.sig" \) -exec cp {} vps-deploy/ \;
+          find all-sync-artifacts/ -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.tar.gz" -o -name "*.zip" -o -name "*.sig" \) -exec cp {} vps-deploy/ \;
 
           # Extract version from package.json
           VERSION=$(node -p "require('./package.json').version")
@@ -175,6 +187,12 @@ jobs:
 
           WIN_X64=$(find vps-deploy/ -type f -name "*.exe" | head -n 1)
           if [ -n "$WIN_X64" ]; then cp "$WIN_X64" vps-deploy/lama-notes-sync-windows.exe; fi
+
+          LINUX_APPIMAGE=$(find vps-deploy/ -type f -name "*.AppImage" | head -n 1)
+          if [ -n "$LINUX_APPIMAGE" ]; then cp "$LINUX_APPIMAGE" vps-deploy/lama-notes-sync-linux.AppImage; fi
+
+          LINUX_DEB=$(find vps-deploy/ -type f -name "*.deb" | head -n 1)
+          if [ -n "$LINUX_DEB" ]; then cp "$LINUX_DEB" vps-deploy/lama-notes-sync-linux.deb; fi
 
           echo "VPS deploy package contents:"
           ls -la vps-deploy/

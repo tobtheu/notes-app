@@ -81,6 +81,8 @@ async function ensureFreshToken(): Promise<void> {
 // ── Request timeout ───────────────────────────────────────────────────────────
 const REQUEST_TIMEOUT_MS = 15_000;
 
+let _remoteNotesMissingFolder = false;
+
 async function upsertWithTimeout(
   table: 'notes' | 'app_config',
   payload: NoteWritePayload | ConfigWritePayload | NoteWritePayload[] | ConfigWritePayload[],
@@ -88,19 +90,25 @@ async function upsertWithTimeout(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
+  const stripFolder = (p: any) => {
+    const { folder, ...rest } = p;
+    return rest;
+  };
+
+  const actualPayload = (table === 'notes' && _remoteNotesMissingFolder)
+    ? (Array.isArray(payload) ? payload.map(stripFolder) : stripFolder(payload))
+    : payload;
+
   try {
     const conflictCol = table === 'notes' ? 'id,user_id' : 'user_id';
     const { error } = await supabase
       .from(table)
-      .upsert(payload as any, { onConflict: conflictCol })
+      .upsert(actualPayload as any, { onConflict: conflictCol })
       .abortSignal(controller.signal);
 
     if (error) {
       if (table === 'notes' && (error.code === '42703' || error.message?.includes('folder'))) {
-        const stripFolder = (p: any) => {
-          const { folder, ...rest } = p;
-          return rest;
-        };
+        _remoteNotesMissingFolder = true;
         const fallbackPayload = Array.isArray(payload) ? payload.map(stripFolder) : stripFolder(payload);
         const retryRes = await supabase
           .from(table)

@@ -22,11 +22,16 @@ export function initGlobalHandlers() {
 
       (window as any).deduplicateNotesNow = async () => {
         const { deduplicateNotes } = await import('../lib/deduplicateNotes');
+        const { flushQueue } = await import('../lib/offlineQueue');
         const db = await getDb();
         const userId = localStorage.getItem('lama-user-id') || 'local';
         console.log(`Running deduplicateNotesNow for user: ${userId}`);
         const res = await deduplicateNotes(db, userId);
         console.log('Deduplication result:', res);
+        if (navigator.onLine && userId !== 'local') {
+          await flushQueue(db);
+          console.log('Flushed changes to Supabase ✓');
+        }
         return res;
       };
 

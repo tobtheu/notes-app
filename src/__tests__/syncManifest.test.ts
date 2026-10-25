@@ -20,6 +20,10 @@ describe('generateSyncManifest', () => {
     // Simulate Windows x64 updater bundle
     fs.writeFileSync(path.join(tmpDir, 'Lama Notes Sync_0.8.5_x64-setup.nsis.zip'), 'dummy-zip');
     fs.writeFileSync(path.join(tmpDir, 'Lama Notes Sync_0.8.5_x64-setup.nsis.zip.sig'), 'SIG_WIN_X64');
+
+    // Simulate Linux x64 updater bundle
+    fs.writeFileSync(path.join(tmpDir, 'Lama Notes Sync_0.8.5_amd64.AppImage.tar.gz'), 'dummy-linux-tar');
+    fs.writeFileSync(path.join(tmpDir, 'Lama Notes Sync_0.8.5_amd64.AppImage.tar.gz.sig'), 'SIG_LINUX_X64');
   });
 
   afterEach(() => {
@@ -48,6 +52,10 @@ describe('generateSyncManifest', () => {
     expect(manifest.platforms['windows-x86_64']).toEqual({
       signature: 'SIG_WIN_X64',
       url: 'https://api.lamanotes.de/updates/Lama%20Notes%20Sync_0.8.5_x64-setup.nsis.zip',
+    });
+    expect(manifest.platforms['linux-x86_64']).toEqual({
+      signature: 'SIG_LINUX_X64',
+      url: 'https://api.lamanotes.de/updates/Lama%20Notes%20Sync_0.8.5_amd64.AppImage.tar.gz',
     });
   });
 });

@@ -82,7 +82,7 @@ export async function pullFromSupabase(
             `INSERT INTO notes (id, user_id, folder, content, updated_at, deleted)
              VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (id, user_id) DO UPDATE SET
-               folder     = EXCLUDED.folder,
+               folder     = CASE WHEN EXCLUDED.folder IS NOT NULL AND EXCLUDED.folder != '' THEN EXCLUDED.folder ELSE notes.folder END,
                content    = EXCLUDED.content,
                updated_at = EXCLUDED.updated_at,
                deleted    = EXCLUDED.deleted
