@@ -209,6 +209,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME || 'root' }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
           port: ${{ secrets.VPS_SSH_PORT || 22 }}
           source: "vps-deploy/*"
           target: "/var/www/lamanotes-updates/"
