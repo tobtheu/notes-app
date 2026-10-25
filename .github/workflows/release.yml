@@ -71,7 +71,7 @@ jobs:
   # -------------------------------------------------------------
   build-sync:
     permissions:
-      contents: read
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -127,7 +127,8 @@ jobs:
           VITE_ELECTRIC_URL: ${{ secrets.VITE_ELECTRIC_URL }}
           VITE_LAMA_SECRET: ${{ secrets.VITE_LAMA_SECRET }}
         with:
-          tagName: v__VERSION__
+          tagName: sync-v__VERSION__
+          releaseName: "Lama Notes Sync v__VERSION__ (Internal)"
           releaseDraft: true
           prerelease: true
           includeUpdaterJson: true
